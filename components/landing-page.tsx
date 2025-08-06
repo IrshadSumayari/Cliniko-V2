@@ -656,7 +656,7 @@ const LandingPage = ({ onGetStarted, onLogin, onSignup }: LandingPageProps) => {
                   className="w-full"
                   asChild
                 >
-                  <Link href="/signup">{plan.cta}</Link>
+                  <Link href="/test-stripe">{plan.cta}</Link>
                 </Button>
               </div>
             ))}
