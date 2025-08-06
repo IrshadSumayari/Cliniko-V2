@@ -1,0 +1,264 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* MyPhysioFlow - Luxury Design System
+All colors MUST be HSL.
+*/
+
+@layer base {
+  :root {
+    /* Premium cream & charcoal color palette */
+    --background: 0 0% 100%; /* Sophisticated cream white */
+    --foreground: 222.2 84% 4.9%; /* Deep charcoal */
+
+    --card: 0 0% 100%; /* Pure white cards */
+    --card-foreground: 222.2 84% 4.9%;
+
+    --popover: 0 0% 100%;
+    --popover-foreground: 222.2 84% 4.9%;
+
+    /* Primary - Elegant charcoal */
+    --primary: 0 0% 9%;
+    --primary-foreground: 210 40% 98%; /* Pure white */
+
+    /* Secondary - Warm cream variations */
+    --secondary: 210 40% 96%; /* Light cream */
+    --secondary-foreground: 222.2 84% 4.9%;
+
+    /* Muted tones - Sophisticated neutrals */
+    --muted: 210 40% 96%; /* Subtle cream */
+    --muted-foreground: 215.4 16.3% 46.9%; /* Medium gray */
+
+    /* Accent - Premium cream */
+    --accent: 210 40% 96%; /* Very light cream */
+    --accent-foreground: 222.2 84% 4.9%;
+
+    /* Status colors - Enhanced attractive palette */
+    --destructive: 0 84.2% 60.2%; /* Vibrant coral red */
+    --destructive-foreground: 210 40% 98%;
+
+    --success: 142.1 76.2% 36.3%; /* Fresh emerald green */
+    --success-foreground: 355.7 100% 97.3%; /* Bright white */
+
+    --warning: 32.5 94.6% 43.7%; /* Rich golden amber */
+    --warning-foreground: 210 40% 98%; /* Deep charcoal */
+
+    /* Borders and inputs */
+    --border: 214.3 31.8% 91.4%; /* Soft cream border */
+    --input: 214.3 31.8% 91.4%; /* Light input background */
+    --ring: 221.2 83.2% 53.3%; /* Focus ring */
+
+    /* Program type colors */
+    --epc: 142.1 76.2% 36.3%; /* Warm cream for EPC */
+    --epc-foreground: 355.7 100% 97.3%; /* Bright white */
+
+    --ctp: 221.2 83.2% 53.3%; /* Professional blue for CTP */
+    --ctp-foreground: 210 40% 98%; /* Pure white */
+
+    --workcover: 32.5 94.6% 43.7%; /* Muted blue-gray for Workers Comp */
+    --workcover-foreground: 210 40% 98%; /* Deep charcoal */
+
+    --ndis-beta: 262.1 83.3% 57.8%; /* NDIS Beta color */
+    --ndis-beta-foreground: 210 40% 98%; /* Deep charcoal */
+
+    /* Premium gradients */
+    --gradient-hero: linear-gradient(135deg, hsl(35 12% 98%), hsl(35 20% 96%));
+    --gradient-card: linear-gradient(145deg, hsl(0 0% 100%), hsl(35 15% 97%));
+    --gradient-button: linear-gradient(135deg, hsl(0 0% 8%), hsl(0 0% 12%));
+    --gradient-accent: linear-gradient(
+      135deg,
+      hsl(35 20% 96%),
+      hsl(35 15% 97%)
+    );
+
+    /* Luxury shadows - More refined */
+    --shadow-card: 0 2px 20px hsl(0 0% 0% / 0.04), 0 1px 4px hsl(0 0% 0% / 0.08);
+    --shadow-card-hover: 0 4px 28px hsl(0 0% 0% / 0.08),
+      0 2px 8px hsl(0 0% 0% / 0.12);
+    --shadow-button: 0 2px 8px hsl(0 0% 0% / 0.12);
+    --shadow-float: 0 10px 25px -5px rgba(0, 0, 0, 0.1),
+      0 10px 10px -5px rgba(0, 0, 0, 0.04);
+    --shadow-elegant: 0 1px 3px hsl(0 0% 0% / 0.05),
+      0 20px 60px hsl(0 0% 0% / 0.04);
+
+    --radius: 0.75rem;
+
+    --sidebar-background: 0 0% 98%;
+    --sidebar-foreground: 240 5.3% 26.1%;
+    --sidebar-primary: 240 5.9% 10%;
+    --sidebar-primary-foreground: 0 0% 98%;
+    --sidebar-accent: 240 4.8% 95.9%;
+    --sidebar-accent-foreground: 240 5.9% 10%;
+    --sidebar-border: 220 13% 91%;
+    --sidebar-ring: 217.2 91.2% 59.8%;
+  }
+
+  .dark {
+    --background: 222.2 84% 4.9%;
+    --foreground: 210 40% 98%;
+    --card: 222.2 84% 4.9%;
+    --card-foreground: 210 40% 98%;
+    --popover: 222.2 84% 4.9%;
+    --popover-foreground: 210 40% 98%;
+    --primary: 217.2 91.2% 59.8%;
+    --primary-foreground: 222.2 84% 4.9%;
+    --secondary: 217.2 32.6% 17.5%;
+    --secondary-foreground: 210 40% 98%;
+    --muted: 217.2 32.6% 17.5%;
+    --muted-foreground: 215 20.2% 65.1%;
+    --accent: 217.2 32.6% 17.5%;
+    --accent-foreground: 210 40% 98%;
+    --destructive: 0 62.8% 30.6%;
+    --destructive-foreground: 210 40% 98%;
+    --success: 142.1 70.6% 45.3%;
+    --success-foreground: 144.9 80.4% 10%; /* Dark green */
+    --warning: 32.5 94.6% 43.7%;
+    --warning-foreground: 210 40% 98%;
+    --border: 217.2 32.6% 17.5%;
+    --input: 217.2 32.6% 17.5%;
+    --ring: 224.3 76.3% 48%; /* Lighter focus ring */
+    --epc: 142.1 70.6% 45.3%; /* Darker EPC color */
+    --epc-foreground: 144.9 80.4% 10%; /* Dark green */
+    --ctp: 217.2 91.2% 59.8%; /* Darker CTP color */
+    --ctp-foreground: 222.2 84% 4.9%; /* Pure white */
+    --workcover: 32.5 94.6% 43.7%; /* Rich golden amber */
+    --workcover-foreground: 210 40% 98%; /* Deep charcoal */
+    --ndis-beta: 262.1 83.3% 57.8%; /* NDIS Beta color */
+    --ndis-beta-foreground: 210 40% 98%; /* Deep charcoal */
+    --sidebar-background: 240 5.9% 10%; /* Darker sidebar background */
+    --sidebar-foreground: 240 4.8% 95.9%; /* Lighter sidebar foreground */
+    --sidebar-primary: 224.3 76.3% 48%; /* Lighter sidebar primary */
+    --sidebar-primary-foreground: 0 0% 100%; /* Pure white */
+    --sidebar-accent: 240 3.7% 15.9%; /* Darker sidebar accent */
+    --sidebar-accent-foreground: 240 4.8% 95.9%; /* Lighter sidebar accent foreground */
+    --sidebar-border: 240 3.7% 15.9%; /* Darker sidebar border */
+    --sidebar-ring: 217.2 91.2% 59.8%; /* Focus ring */
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+  body {
+    @apply bg-background text-foreground font-sans;
+  }
+}
+
+/* Premium utility classes for luxury UX */
+@layer components {
+  .luxury-card {
+    @apply bg-white/80 dark:bg-slate-800/80 backdrop-blur-sm border-0 shadow-lg hover:shadow-xl transition-all duration-300;
+  }
+
+  .luxury-card-elevated {
+    @apply bg-gradient-to-br from-card to-accent border border-border/60 rounded-xl 
+           shadow-lg hover:shadow-xl 
+           transition-all duration-500 hover:scale-[1.01] hover:border-border/80;
+  }
+
+  .luxury-button {
+    @apply bg-gradient-to-r from-primary to-primary/90 text-primary-foreground font-medium 
+           px-6 py-3 rounded-lg shadow-lg 
+           hover:shadow-xl transition-all duration-300 
+           hover:scale-[1.02] hover:from-primary/90 hover:to-primary/80;
+  }
+
+  .glass-card {
+    @apply bg-card/80 backdrop-blur-sm border border-border/40 rounded-xl 
+           shadow-lg transition-all duration-300;
+  }
+
+  .luxury-input {
+    @apply bg-background border border-border/60 rounded-lg px-4 py-3 
+           focus:border-primary/60 focus:ring-2 focus:ring-primary/10 outline-none 
+           transition-all duration-200 placeholder:text-muted-foreground/60;
+  }
+
+  .fade-in {
+    animation: fadeIn 0.6s ease-in-out;
+  }
+
+  .slide-up {
+    animation: slideUp 0.8s ease-out;
+  }
+
+  .program-badge-epc {
+    @apply bg-gradient-to-r from-epc to-epc/80 text-epc-foreground 
+           px-3 py-1.5 rounded-full text-xs font-semibold shadow-sm border border-epc/20;
+  }
+
+  .program-badge-ctp {
+    @apply bg-gradient-to-r from-ctp to-ctp/90 text-ctp-foreground 
+           px-3 py-1.5 rounded-full text-xs font-semibold shadow-sm;
+  }
+
+  .program-badge-workcover {
+    @apply bg-gradient-to-r from-workcover to-workcover/90 text-workcover-foreground 
+           px-3 py-1.5 rounded-full text-xs font-semibold shadow-sm;
+  }
+
+  .ndis-beta-banner {
+    @apply bg-gradient-to-r from-ndis-beta to-ndis-beta/90 text-ndis-beta-foreground 
+           border border-ndis-beta/20 px-6 py-4 rounded-xl 
+           shadow-lg hover:shadow-xl 
+           transition-all duration-300;
+  }
+
+  .status-indicator {
+    @apply w-2 h-2 rounded-full;
+  }
+
+  .status-good {
+    @apply bg-green-500 shadow-lg shadow-green-500/30;
+  }
+  .status-warning {
+    @apply bg-yellow-500 shadow-lg shadow-yellow-500/30 animate-pulse;
+  }
+  .status-critical {
+    @apply bg-red-500 shadow-lg shadow-red-500/30 animate-pulse;
+  }
+}
+
+/* Premium animations */
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes slideUp {
+  from {
+    opacity: 0;
+    transform: translateY(40px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Scrollbar styling */
+::-webkit-scrollbar {
+  width: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: hsl(var(--muted));
+  border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb {
+  background: hsl(var(--border));
+  border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: hsl(var(--muted-foreground));
+}
