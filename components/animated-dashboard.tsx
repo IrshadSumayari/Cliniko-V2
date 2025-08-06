@@ -135,12 +135,12 @@ const AnimatedDashboard = () => {
   return (
     <div className="w-full max-w-6xl mx-auto">
       {/* Dashboard Container */}
-      <Card className="shadow-2xl border-0 bg-white/95 backdrop-blur-sm">
+      <Card className="shadow-2xl border-0 bg-white/95 dark:bg-slate-800/80 backdrop-blur-sm">
         <CardContent className="p-0">
           {/* Dashboard Header */}
           <div className="bg-gradient-to-r from-primary/5 to-primary/10 p-6 border-b border-border/50">
             {/* Browser Header */}
-            <div className="bg-card border-b border-border p-4 flex items-center gap-3">
+            <div className="bg-card border-b border-border p-4 flex items-center gap-3 mb-2">
               <div className="flex gap-2">
                 <div className="w-3 h-3 rounded-full bg-destructive"></div>
                 <div className="w-3 h-3 rounded-full bg-warning"></div>
@@ -156,7 +156,7 @@ const AnimatedDashboard = () => {
               {stats.map((stat, index) => (
                 <div
                   key={index}
-                  className={`bg-white/80 p-4 rounded-lg border border-border/30 transition-all duration-500 ${
+                  className={`bg-white/80 dark:bg-gray-500/10 p-4 rounded-lg border border-border/30 transition-all duration-500 ${
                     animationStep === index ? "scale-105 shadow-lg" : ""
                   }`}
                 >
@@ -183,7 +183,7 @@ const AnimatedDashboard = () => {
                   onClick={() => setActiveTab(tab.id)}
                   className={`flex-1 flex items-center justify-center gap-2 px-4 py-2 rounded-md text-sm font-medium transition-all ${
                     activeTab === tab.id
-                      ? "bg-white shadow-sm text-foreground"
+                      ? "bg-white dark:bg-gray-600/15 shadow-sm text-foreground"
                       : "text-muted-foreground hover:text-foreground"
                   }`}
                 >
