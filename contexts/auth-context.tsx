@@ -3,6 +3,7 @@
 import { createContext, useContext, useEffect, useState } from "react";
 import { User } from "@supabase/supabase-js";
 import { supabase } from "@/integrations/supabase/client";
+import { useRouter } from "next/navigation";
 
 interface AuthUser extends User {
   isOnboarded?: boolean;
@@ -37,9 +38,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<AuthUser | null>(null);
   const [loading, setLoading] = useState(true);
   const [isLoading, setIsLoading] = useState(false);
+  const router = useRouter();
 
   const fetchUserData = async (authUser: User): Promise<AuthUser> => {
     try {
+      console.log("Fetching user data for:", authUser.id);
       const { data: userData, error } = await supabase
         .from("users")
         .select("is_onboarded")
@@ -48,21 +51,27 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
       if (error) {
         console.error("Error fetching user data:", error);
-        // If user doesn't exist in database, they need to be created
+        // If user doesn't exist in database, default to not onboarded
+        // Don't sign them out - they are still authenticated
         if (error.code === "PGRST116") {
-          console.log("User not found in database, will be created");
+          console.log(
+            "User not found in database, defaulting to not onboarded"
+          );
           return { ...authUser, isOnboarded: false };
         }
+        // For other errors, also default to not onboarded but keep them authenticated
+        console.log("Database error, defaulting to not onboarded");
         return { ...authUser, isOnboarded: false };
       }
 
-      console.log("User data fetched:", userData);
+      console.log("User data fetched successfully:", userData);
       return {
         ...authUser,
         isOnboarded: userData?.is_onboarded || false,
       };
     } catch (error) {
       console.error("Error fetching user data:", error);
+      // Even on error, keep the user authenticated but default to not onboarded
       return { ...authUser, isOnboarded: false };
     }
   };
@@ -85,6 +94,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     const initializeAuth = async () => {
       try {
+        console.log("Initializing auth...");
         const {
           data: { session },
           error,
@@ -102,8 +112,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         if (session?.user && mounted) {
           console.log("Session found, fetching user data...");
           const userWithData = await fetchUserData(session.user);
+          console.log("Initial user data:", userWithData);
           setUser(userWithData);
         } else if (mounted) {
+          console.log("No session found");
           setUser(null);
         }
       } catch (error) {
@@ -128,20 +140,20 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
       try {
         if (session?.user) {
-          const userRecordCreated = await ensureUserRecord(session.user);
-          if (userRecordCreated) {
-            const userWithData = await fetchUserData(session.user);
-            setUser(userWithData);
-          } else {
-            console.error("Failed to create/verify user record");
-            setUser(null);
-          }
+          const userWithData = await fetchUserData(session.user);
+          setUser(userWithData);
         } else {
+          console.log("No authenticated user");
           setUser(null);
         }
       } catch (error) {
         console.error("Error handling auth state change:", error);
-        setUser(null);
+        // Even on error, if there's a session, keep the user authenticated
+        if (session?.user) {
+          setUser({ ...session.user, isOnboarded: false });
+        } else {
+          setUser(null);
+        }
       } finally {
         setLoading(false);
       }
@@ -152,87 +164,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       subscription.unsubscribe();
     };
   }, []);
-
-  const ensureUserRecord = async (user: User): Promise<boolean> => {
-    try {
-      console.log("Ensuring user record for:", user.id);
-
-      // First check if user already exists
-      const { data: existingUser, error: checkError } = await supabase
-        .from("users")
-        .select("id")
-        .eq("id", user.id)
-        .single();
-
-      if (existingUser) {
-        console.log("User already exists in database");
-        return true;
-      }
-
-      if (checkError && checkError.code !== "PGRST116") {
-        console.error("Error checking existing user:", checkError);
-        return false;
-      }
-
-      // User doesn't exist, create them
-      const firstName =
-        user.user_metadata?.full_name?.split(" ")[0] ||
-        user.user_metadata?.name?.split(" ")[0] ||
-        user.user_metadata?.first_name ||
-        user.user_metadata?.given_name ||
-        "User";
-
-      const lastName =
-        user.user_metadata?.full_name?.split(" ").slice(1).join(" ") ||
-        user.user_metadata?.name?.split(" ").slice(1).join(" ") ||
-        user.user_metadata?.last_name ||
-        user.user_metadata?.family_name ||
-        "Name";
-
-      const clinicName = user.user_metadata?.clinic_name || "My Clinic";
-
-      const userData = {
-        id: user.id,
-        email: user.email || "",
-        first_name: firstName,
-        last_name: lastName,
-        clinic_name: clinicName,
-        is_onboarded: false,
-      };
-
-      console.log("Creating new user record:", userData);
-
-      const { error: insertError } = await supabase
-        .from("users")
-        .insert(userData);
-
-      if (insertError) {
-        console.error("Error creating user record:", insertError);
-
-        // If it's a duplicate key error, check if user exists now
-        if (insertError.code === "23505") {
-          const { data: recheckUser } = await supabase
-            .from("users")
-            .select("id")
-            .eq("id", user.id)
-            .single();
-
-          if (recheckUser) {
-            console.log("User exists after duplicate key error");
-            return true;
-          }
-        }
-
-        return false;
-      } else {
-        console.log("User record created successfully");
-        return true;
-      }
-    } catch (error) {
-      console.error("Error ensuring user record:", error);
-      return false;
-    }
-  };
 
   const updateUserOnboardingStatus = async (
     isOnboarded: boolean
@@ -326,6 +257,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   ): Promise<AuthResult> => {
     setIsLoading(true);
     try {
+      // Check if user already exists in our database
       const { data: existingUser } = await supabase
         .from("users")
         .select("email")
@@ -425,6 +357,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     try {
       await supabase.auth.signOut();
       setUser(null);
+      router.push("/");
     } catch (error) {
       console.error("Error signing out:", error);
     } finally {
