@@ -88,11 +88,10 @@ const SignupForm = () => {
         formData.lastName,
         formData.clinicName
       );
-      console.log(result, "pop");
       if (result.success) {
-        toast.success(
-          "Account created successfully! Please check your email to verify your account."
-        );
+        toast.success("Account created!", {
+          description: "Welcome to MyPhysioFlow.",
+        });
         router.push("/");
       } else {
         setError(result.error || "Failed to create account");
