@@ -46,7 +46,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       const { data: userData, error } = await supabase
         .from("users")
         .select("is_onboarded")
-        .eq("id", authUser.id)
+        .eq("auth_user_id", authUser.id)
         .single();
 
       if (error) {
@@ -71,16 +71,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       };
     } catch (error) {
       console.error("Error fetching user data:", error);
-      // Even on error, keep the user authenticated but default to not onboarded
       return { ...authUser, isOnboarded: false };
     }
   };
 
   const refreshUserData = async () => {
-    if (!user) {
-      return;
-    }
-
+    if (!user) return;
     try {
       const updatedUser = await fetchUserData(user);
       setUser(updatedUser);
@@ -112,7 +108,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         if (session?.user && mounted) {
           console.log("Session found, fetching user data...");
           const userWithData = await fetchUserData(session.user);
-          console.log("Initial user data:", userWithData);
           setUser(userWithData);
         } else if (mounted) {
           console.log("No session found");
@@ -132,10 +127,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     initializeAuth();
 
-    // Listen for auth changes
     const {
       data: { subscription },
-    } = supabase.auth.onAuthStateChange(async (event, session) => {
+    } = supabase.auth.onAuthStateChange(async (_, session) => {
       if (!mounted) return;
 
       try {
@@ -148,7 +142,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         }
       } catch (error) {
         console.error("Error handling auth state change:", error);
-        // Even on error, if there's a session, keep the user authenticated
         if (session?.user) {
           setUser({ ...session.user, isOnboarded: false });
         } else {
@@ -185,7 +178,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       const { data, error } = await supabase
         .from("users")
         .update({ is_onboarded: isOnboarded })
-        .eq("id", user.id)
+        .eq("auth_user_id", user.id)
         .select("is_onboarded");
 
       if (error) {
@@ -193,12 +186,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         return false;
       }
 
-      console.log("Database update successful:", data);
-
-      // Update local user state immediately
       setUser((prev) => (prev ? { ...prev, isOnboarded } : null));
-
-      console.log(`Onboarding status updated to: ${isOnboarded}`);
       return true;
     } catch (error) {
       console.error("Error updating onboarding status:", error);
@@ -257,7 +245,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   ): Promise<AuthResult> => {
     setIsLoading(true);
     try {
-      // Check if user already exists in our database
       const { data: existingUser } = await supabase
         .from("users")
         .select("email")
@@ -272,7 +259,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         };
       }
 
-      const { data, error } = await supabase.auth.signUp({
+      const { error } = await supabase.auth.signUp({
         email,
         password,
         options: {
@@ -287,14 +274,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         },
       });
 
-      if (error) {
-        console.error("Sign up error:", error);
-        return { success: false, error: getErrorMessage(error) };
-      }
-
+      if (error) return { success: false, error: getErrorMessage(error) };
       return { success: true };
     } catch (error) {
-      console.error("Sign up error:", error);
       return { success: false, error: getErrorMessage(error) };
     } finally {
       setIsLoading(false);
@@ -312,14 +294,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         password,
       });
 
-      if (error) {
-        console.error("Sign in error:", error);
-        return { success: false, error: getErrorMessage(error) };
-      }
-
+      if (error) return { success: false, error: getErrorMessage(error) };
       return { success: true };
     } catch (error) {
-      console.error("Sign in error:", error);
       return { success: false, error: getErrorMessage(error) };
     } finally {
       setIsLoading(false);
@@ -338,14 +315,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         },
       });
 
-      if (error) {
-        console.error("Google sign in error:", error);
-        return { success: false, error: getErrorMessage(error) };
-      }
-
+      if (error) return { success: false, error: getErrorMessage(error) };
       return { success: true };
     } catch (error) {
-      console.error("Google sign in error:", error);
       return { success: false, error: getErrorMessage(error) };
     } finally {
       setIsLoading(false);
@@ -386,7 +358,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
 export function useAuth() {
   const context = useContext(AuthContext);
-  if (context === undefined) {
+  if (!context) {
     throw new Error("useAuth must be used within an AuthProvider");
   }
   return context;

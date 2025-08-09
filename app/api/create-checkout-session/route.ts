@@ -1,41 +1,47 @@
 import { NextRequest, NextResponse } from "next/server";
 import Stripe from "stripe";
-import { supabase } from "@/integrations/supabase/client";
+import { createClient } from "@supabase/supabase-js";
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {});
 
+// Create server-side Supabase client with service role key
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
+const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
+
+const supabase = createClient(supabaseUrl, supabaseServiceKey, {
+  auth: {
+    autoRefreshToken: false,
+    persistSession: false,
+  },
+});
+
 export async function POST(request: NextRequest) {
   try {
-    const { priceId, userId } = await request.json();
-
-    if (!priceId || !userId) {
+    const { userId, email } = await request.json();
+    if (!userId) {
       return NextResponse.json(
-        { error: "Missing required fields" },
+        { error: "User ID is required" },
         { status: 400 }
       );
     }
 
-    // Get user data - only select columns that exist
-    const { data: user, error: userError } = await supabase
-      .from("users")
-      .select("id, email")
-      .eq("id", userId)
-      .single();
+    // Get the professional plan price ID
+    const priceId = process.env.NEXT_PUBLIC_STRIPE_PROFESSIONAL_PRICE_ID;
 
-    if (userError || !user) {
-      console.error("User lookup error:", userError);
+    if (!priceId) {
+      console.error("NEXT_PUBLIC_STRIPE_PROFESSIONAL_PRICE_ID not configured");
       return NextResponse.json(
-        {
-          error: "Failed to lookup user",
-          details: userError?.message || "User not found",
-        },
-        { status: 404 }
+        { error: "Stripe configuration error - missing price ID" },
+        { status: 500 }
       );
     }
 
+    console.log("Using price ID:", priceId);
+
     // Create Stripe checkout session
+    console.log("Creating Stripe checkout session...");
     const session = await stripe.checkout.sessions.create({
-      customer_email: user.email,
+      customer_email: email,
       payment_method_types: ["card"],
       line_items: [
         {
@@ -44,20 +50,26 @@ export async function POST(request: NextRequest) {
         },
       ],
       mode: "subscription",
-      success_url: `${
-        process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000"
-      }/dashboard?session_id={CHECKOUT_SESSION_ID}`,
-      cancel_url: `${
-        process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000"
-      }/pricing`,
+      success_url: `${process.env.NEXT_PUBLIC_APP_URL}/?session_id={CHECKOUT_SESSION_ID}`,
+      cancel_url: `${process.env.NEXT_PUBLIC_APP_URL}/`,
       metadata: {
         userId: userId,
+        planType: "professional",
+      },
+      subscription_data: {
+        metadata: {
+          userId: userId,
+        },
       },
     });
 
-    return NextResponse.json({ sessionId: session.id });
+    console.log("Checkout session created successfully:", session.id);
+    return NextResponse.json({
+      sessionId: session.id,
+      url: session.url,
+    });
   } catch (error: any) {
-    console.error("Stripe checkout error:", error);
+    console.error("Error creating checkout session:", error);
     return NextResponse.json(
       {
         error: "Failed to create checkout session",

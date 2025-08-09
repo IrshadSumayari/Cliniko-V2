@@ -81,17 +81,13 @@ export default function OnboardingFlow() {
 
   const handleCompleteOnboarding = async () => {
     await updateUserOnboardingStatus(true);
-    // The parent component `app/page.tsx` will automatically re-render.
   };
 
   const handleSkip = async () => {
-    // localStorage.clear();
-
     toast.info(
       "Skipping for now... You can connect your PMS later in settings."
     );
-    router.push("/test-stripe");
-    // await updateUserOnboardingStatus(true); // Still mark as onboarded
+    await updateUserOnboardingStatus(true);
   };
 
   const renderStep = () => {

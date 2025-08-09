@@ -9,10 +9,9 @@ export const stripe = new Stripe(process.env.STRIPE_SECRET_KEY, {
 });
 
 export const STRIPE_PLANS = {
-  basic: process.env.STRIPE_BASIC_PRICE_ID || "price_basic",
   professional:
-    process.env.STRIPE_PROFESSIONAL_PRICE_ID || "price_professional",
-  enterprise: process.env.STRIPE_ENTERPRISE_PRICE_ID || "price_enterprise",
+    process.env.NEXT_PUBLIC_STRIPE_PROFESSIONAL_PRICE_ID ||
+    "price_professional",
 };
 
 export async function createStripeCustomer(email: string, name: string) {
@@ -42,28 +41,13 @@ export async function createSubscription(
 
   if (prices.data.length === 0) {
     const price = await stripe.prices.create({
-      unit_amount:
-        plan === "price_basic"
-          ? 0
-          : plan === "price_professional"
-          ? 2900
-          : 7900,
+      unit_amount: plan === "price_basic" ? 0 : 30,
       currency: "aud",
       recurring: {
-        interval:
-          plan === "price_basic"
-            ? "month"
-            : plan === "price_professional"
-            ? "month"
-            : "month",
+        interval: "month",
       },
       product_data: {
-        name:
-          plan === "price_basic"
-            ? "Basic"
-            : plan === "price_professional"
-            ? "Professional"
-            : "Enterprise",
+        name: plan === "price_basic" ? "Basic" : "price_professional",
       },
       lookup_key: planId,
     });
@@ -111,20 +95,10 @@ export async function createCheckoutSession(
           : 7900,
       currency: "aud",
       recurring: {
-        interval:
-          plan === "price_basic"
-            ? "month"
-            : plan === "price_professional"
-            ? "month"
-            : "month",
+        interval: "month",
       },
       product_data: {
-        name:
-          plan === "price_basic"
-            ? "Basic"
-            : plan === "price_professional"
-            ? "Professional"
-            : "Enterprise",
+        name: plan === "price_basic" ? "Basic" : "price_professional",
       },
       lookup_key: planId,
     });

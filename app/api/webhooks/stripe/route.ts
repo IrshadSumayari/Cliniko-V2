@@ -2,8 +2,11 @@ import { NextRequest, NextResponse } from "next/server";
 import Stripe from "stripe";
 import { supabase } from "@/integrations/supabase/client";
 
-const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {});
+const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
+  apiVersion: "2024-06-20",
+});
 
+const endpointSecret = process.env.STRIPE_WEBHOOK_SECRET!;
 const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET!;
 
 export async function POST(request: NextRequest) {
@@ -11,47 +14,41 @@ export async function POST(request: NextRequest) {
     const body = await request.text();
     const signature = request.headers.get("stripe-signature");
 
-    console.log("Webhook received:", {
-      hasBody: !!body,
-      hasSignature: !!signature,
-      signaturePreview: signature?.substring(0, 50) + "...",
-    });
-
     if (!signature) {
-      console.error("No signature provided");
+      console.error("No Stripe signature found");
       return NextResponse.json(
         { error: "No signature provided" },
         { status: 400 }
       );
     }
 
-    // Handle test signatures from the test page
-    if (signature === "invalid_test_signature") {
-      console.log("Test webhook call detected, returning success");
-      return NextResponse.json({ received: true, test: true });
-    }
+    // // Handle test signatures from the test page
+    // if (signature === "invalid_test_signature") {
+    //   console.log("Test webhook call detected, returning success");
+    //   return NextResponse.json({ received: true, test: true });
+    // }
 
-    if (!webhookSecret) {
-      console.error("Webhook secret not configured");
-      return NextResponse.json(
-        { error: "Webhook secret not configured" },
-        { status: 500 }
-      );
-    }
+    // if (!webhookSecret) {
+    //   console.error("Webhook secret not configured");
+    //   return NextResponse.json(
+    //     { error: "Webhook secret not configured" },
+    //     { status: 500 }
+    //   );
+    // }
 
     let event: Stripe.Event;
 
     try {
-      event = stripe.webhooks.constructEvent(body, signature, webhookSecret);
-      console.log("Webhook signature verified:", event.type);
+      event = stripe.webhooks.constructEvent(body, signature, endpointSecret);
     } catch (err: any) {
       console.error("Webhook signature verification failed:", err.message);
-      console.log("Signature received:", signature);
       return NextResponse.json(
         { error: `Webhook signature verification failed: ${err.message}` },
         { status: 400 }
       );
     }
+
+    console.log("Received webhook event:", event.type);
 
     // Handle the event
     switch (event.type) {
@@ -59,30 +56,46 @@ export async function POST(request: NextRequest) {
         const session = event.data.object as Stripe.Checkout.Session;
         console.log("Checkout session completed:", session.id);
 
-        // Here you would typically update your database
-        // For now, just log the event
-        console.log(
-          "Would update subscription for user:",
-          session.metadata?.userId
-        );
+        // Update user subscription status
+        if (session.metadata?.userId) {
+          const { error } = await supabase
+            .from("users")
+            .update({
+              subscription_status: "active",
+              stripe_customer_id: session.customer as string,
+            })
+            .eq("id", session.metadata.userId);
+
+          if (error) {
+            console.error("Error updating user subscription:", error);
+          } else {
+            console.log("User subscription updated successfully");
+          }
+        }
         break;
 
-      case "customer.subscription.created":
       case "customer.subscription.updated":
-      case "customer.subscription.deleted":
         const subscription = event.data.object as Stripe.Subscription;
-        console.log("Subscription event:", event.type, subscription.id);
+        console.log("Subscription updated:", subscription.id);
+        break;
+
+      case "customer.subscription.deleted":
+        const deletedSubscription = event.data.object as Stripe.Subscription;
+        console.log("Subscription deleted:", deletedSubscription.id);
         break;
 
       default:
-        console.log("Unhandled event type:", event.type);
+        console.log(`Unhandled event type: ${event.type}`);
     }
 
     return NextResponse.json({ received: true });
   } catch (error: any) {
     console.error("Webhook error:", error);
     return NextResponse.json(
-      { error: "Webhook handler failed", details: error.message },
+      {
+        error: "Webhook processing failed",
+        details: error.message,
+      },
       { status: 500 }
     );
   }
