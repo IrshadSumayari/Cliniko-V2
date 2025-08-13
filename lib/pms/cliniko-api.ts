@@ -56,13 +56,22 @@ export class ClinikoAPI implements PMSApiInterface {
         this.credentials.apiKey ? `${this.credentials.apiKey.substring(0, 10)}...` : "missing",
       )
 
-      const response = await this.makeRequest("/businesses", { per_page: "1" })
+      // Add timeout to prevent hanging
+      const timeoutPromise = new Promise((_, reject) => {
+        setTimeout(() => reject(new Error("Connection test timeout after 10 seconds")), 10000);
+      });
+
+      const connectionPromise = this.makeRequest("/businesses", { per_page: "1" });
+      
+      const response = await Promise.race([connectionPromise, timeoutPromise]);
       console.log("✅ Connection test successful - found businesses:", response.businesses?.length || 0)
       return true
     } catch (error) {
       console.error("❌ Cliniko connection test failed:", error)
       if (error instanceof Error) {
-        if (error.message.includes("401")) {
+        if (error.message.includes("timeout")) {
+          throw new Error("Connection test timed out - please check your internet connection")
+        } else if (error.message.includes("401")) {
           throw new Error("Invalid API key - please check your Cliniko API key is correct")
         } else if (error.message.includes("403")) {
           throw new Error("API key does not have sufficient permissions")
@@ -78,8 +87,10 @@ export class ClinikoAPI implements PMSApiInterface {
 
   async getPatients(lastModified?: string): Promise<PMSPatient[]> {
     try {
+      console.log("🔍 Fetching patients from Cliniko (LIMITED TO 10 FOR TESTING)");
+      
       const params: Record<string, string> = {
-        per_page: "50",
+        per_page: "10", // Reduced from 50 to 10 for testing
         sort: "updated_at",
       }
 
@@ -90,26 +101,37 @@ export class ClinikoAPI implements PMSApiInterface {
       const allPatients: PMSPatient[] = []
       let page = 1
       let hasMore = true
+      const maxPages = 1 // Only fetch first page for testing
 
-      while (hasMore) {
+      while (hasMore && page <= maxPages) {
+        console.log(`📄 Fetching page ${page}...`);
         params.page = page.toString()
         const response = await this.makeRequest("/bookings", params)
 
         const bookings = response.bookings || []
+        console.log(`📋 Found ${bookings.length} bookings on page ${page}`);
+        
         const individualAppointments = bookings.filter(
           (booking) => booking.patient && booking.appointment_type && !booking.unavailable_block_type,
         )
+        console.log(`👥 Filtered to ${individualAppointments.length} individual appointments`);
 
         const filteredPatients = await this.processBookingsForPatients(individualAppointments)
+        console.log(`👤 Processed ${filteredPatients.length} unique patients from page ${page}`);
         allPatients.push(...filteredPatients)
 
-        hasMore = response.links?.next !== undefined
+        hasMore = response.links?.next !== undefined && page < maxPages
         page++
 
-        if (page > 100) break
+        // Early break for testing - only get first 10 patients
+        if (allPatients.length >= 10) {
+          console.log("✅ Reached 10 patients limit, stopping fetch");
+          break;
+        }
       }
 
-      return allPatients
+      console.log(`🎯 Total patients fetched: ${allPatients.length}`);
+      return allPatients.slice(0, 10); // Ensure we only return max 10
     } catch (error) {
       console.error("Error fetching Cliniko patients:", error)
       throw error

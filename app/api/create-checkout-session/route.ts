@@ -2,11 +2,13 @@ import { NextRequest, NextResponse } from "next/server";
 import Stripe from "stripe";
 import { createClient } from "@supabase/supabase-js";
 
-const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {});
+const stripe = new Stripe(config.stripe.secretKey, {});
 
 // Create server-side Supabase client with service role key
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
+import { config } from "@/lib/config";
+
+const supabaseUrl = config.supabase.url;
+const supabaseServiceKey = config.supabase.serviceRoleKey;
 
 const supabase = createClient(supabaseUrl, supabaseServiceKey, {
   auth: {
@@ -26,7 +28,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Get the professional plan price ID
-    const priceId = process.env.NEXT_PUBLIC_STRIPE_PROFESSIONAL_PRICE_ID;
+    const priceId = config.stripe.priceIds.professional;
 
     if (!priceId) {
       console.error("NEXT_PUBLIC_STRIPE_PROFESSIONAL_PRICE_ID not configured");
@@ -50,8 +52,8 @@ export async function POST(request: NextRequest) {
         },
       ],
       mode: "subscription",
-      success_url: `${process.env.NEXT_PUBLIC_APP_URL}/?session_id={CHECKOUT_SESSION_ID}`,
-      cancel_url: `${process.env.NEXT_PUBLIC_APP_URL}/`,
+              success_url: `${config.app.url}/?session_id={CHECKOUT_SESSION_ID}`,
+        cancel_url: `${config.app.url}/`,
       metadata: {
         userId: userId,
         planType: "professional",

@@ -1,17 +1,12 @@
 import Stripe from "stripe";
+import { config } from "@/lib/config";
 
-if (!process.env.STRIPE_SECRET_KEY) {
-  throw new Error("STRIPE_SECRET_KEY is not set in environment variables");
-}
-
-export const stripe = new Stripe(process.env.STRIPE_SECRET_KEY, {
+export const stripe = new Stripe(config.stripe.secretKey, {
   typescript: true,
 });
 
 export const STRIPE_PLANS = {
-  professional:
-    process.env.NEXT_PUBLIC_STRIPE_PROFESSIONAL_PRICE_ID ||
-    "price_professional",
+  professional: config.stripe.priceIds.professional,
 };
 
 export async function createStripeCustomer(email: string, name: string) {

@@ -4,6 +4,7 @@ import { createContext, useContext, useEffect, useState } from "react";
 import { User } from "@supabase/supabase-js";
 import { supabase } from "@/integrations/supabase/client";
 import { useRouter } from "next/navigation";
+import { config } from "@/lib/config";
 
 interface AuthUser extends User {
   isOnboarded?: boolean;
@@ -263,9 +264,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         email,
         password,
         options: {
-          emailRedirectTo: `${
-            process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000"
-          }/auth/callback`,
+          emailRedirectTo: `${config.app.url}/auth/callback`,
           data: {
             first_name: firstName,
             last_name: lastName,
@@ -309,9 +308,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       const { error } = await supabase.auth.signInWithOAuth({
         provider: "google",
         options: {
-          redirectTo: `${
-            process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000"
-          }/auth/callback`,
+          redirectTo: `${config.app.url}/auth/callback`,
         },
       });
 

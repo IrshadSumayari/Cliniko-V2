@@ -1,13 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
 import Stripe from "stripe";
 import { supabase } from "@/integrations/supabase/client";
+import { config } from "@/lib/config";
 
-const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
+const stripe = new Stripe(config.stripe.secretKey, {
   apiVersion: "2024-06-20",
 });
 
-const endpointSecret = process.env.STRIPE_WEBHOOK_SECRET!;
-const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET!;
+const endpointSecret = config.stripe.webhookSecret;
+const webhookSecret = config.stripe.webhookSecret;
 
 export async function POST(request: NextRequest) {
   try {

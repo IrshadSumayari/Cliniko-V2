@@ -33,8 +33,10 @@ interface PMSConnection {
   connected: boolean;
   lastSync: string;
 }
+import { config } from "@/lib/config";
+
 // Get the professional plan price ID
-const priceId = process.env.NEXT_PUBLIC_STRIPE_PROFESSIONAL_PRICE_ID;
+const priceId = config.stripe.priceIds.professional;
 const Settings = ({ onBack }: { onBack: () => void }) => {
   const { user, signOut } = useAuth();
   const [upgradeLoading, setUpgradeLoading] = useState(false);

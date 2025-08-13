@@ -1,17 +1,18 @@
 import { type NextRequest, NextResponse } from "next/server"
 import { createServerClient } from "@supabase/ssr"
 import { PMSFactory } from "@/lib/pms/factory"
+import { config } from "@/lib/config"
 
 export async function GET(request: NextRequest) {
   try {
     const authHeader = request.headers.get("authorization")
-    if (authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
+    if (authHeader !== `Bearer ${config.cron.secret}`) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
     }
 
     console.log("=== Starting Scheduled Patient Sync ===")
 
-    const supabase = createServerClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!, {
+    const supabase = createServerClient(config.supabase.url, config.supabase.serviceRoleKey, {
       cookies: {
         get() {
           return undefined

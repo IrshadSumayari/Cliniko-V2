@@ -6,6 +6,7 @@ import {
   storeEncryptedApiKey,
   createAdminClient,
 } from "@/lib/supabase/server-admin";
+import { config } from "@/lib/config";
 
 export async function POST(request: NextRequest) {
   try {
@@ -27,8 +28,8 @@ export async function POST(request: NextRequest) {
     );
 
     const supabase = createServerClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+      config.supabase.url,
+      config.supabase.anonKey,
       {
         cookies: {
           get(name: string) {
@@ -139,6 +140,9 @@ export async function POST(request: NextRequest) {
     let pmsClient;
     try {
       pmsClient = PMSFactory.createClient(pmsType, apiKey);
+      if (!pmsClient) {
+        throw new Error("PMS client creation returned null");
+      }
     } catch (factoryError) {
       console.error("Error creating PMS client:", factoryError);
       return NextResponse.json(
@@ -157,6 +161,7 @@ export async function POST(request: NextRequest) {
     try {
       const isConnected = await pmsClient.testConnection();
       if (!isConnected) {
+        console.error(`❌ Connection test failed for ${pmsType}`);
         return NextResponse.json(
           {
             error: `Failed to connect to ${pmsType}. Please verify your API key is correct.`,
@@ -164,9 +169,9 @@ export async function POST(request: NextRequest) {
           { status: 400 }
         );
       }
-      console.log("Connection test successful!");
+      console.log("✅ Connection test successful!");
     } catch (connectionError) {
-      console.error("Connection test error:", connectionError);
+      console.error("❌ Connection test error:", connectionError);
       const errorMessage =
         connectionError instanceof Error
           ? connectionError.message
@@ -180,6 +185,7 @@ export async function POST(request: NextRequest) {
     }
 
     console.log("Storing encrypted credentials...");
+    let userRecord: any;
     try {
       const region =
         pmsType === "cliniko" ? apiKey.split("-").pop() : undefined;
@@ -188,7 +194,24 @@ export async function POST(request: NextRequest) {
           ? `https://api.${region}.cliniko.com/v1`
           : undefined;
 
-      await storeEncryptedApiKey(userId, pmsType, apiKey, apiUrl);
+      // Get the user record from the users table to get the correct user_id
+      const { data: userRecordData, error: userError } = await adminSupabase
+        .from("users")
+        .select("id")
+        .eq("auth_user_id", userId)
+        .single();
+      console.log("userRecordData", userRecordData);
+
+      if (userError || !userRecordData) {
+        console.error("❌ User record not found:", userError);
+        return NextResponse.json(
+          { error: "User record not found in database" },
+          { status: 500 }
+        );
+      }
+
+      userRecord = userRecordData;
+      await storeEncryptedApiKey(userRecord.id, pmsType, apiKey, apiUrl);
       console.log("✅ Credentials stored successfully in database!");
     } catch (credentialsError) {
       console.error("❌ Error storing credentials:", credentialsError);
@@ -201,21 +224,19 @@ export async function POST(request: NextRequest) {
     console.log("Connection successful, starting initial sync...");
     const syncResults = await performInitialSync(
       adminSupabase,
-      userId,
+      userRecord.id, // Use the user ID from users table, not auth_user_id
       pmsClient,
       pmsType
     );
 
     await adminSupabase.from("sync_logs").insert({
-      user_id: userId,
+      user_id: userRecord.id, // Use the user ID from users table, not auth_user_id
       pms_type: pmsType,
       sync_type: "initial",
       status: "completed",
-      patients_processed: syncResults.wcPatients + syncResults.epcPatients,
-      patients_added: syncResults.wcPatients + syncResults.epcPatients,
+      patients_synced: syncResults.wcPatients + syncResults.epcPatients,
       started_at: new Date().toISOString(),
       completed_at: new Date().toISOString(),
-      last_modified_sync: new Date().toISOString(),
     });
 
     return NextResponse.json(syncResults);
@@ -250,6 +271,16 @@ async function performInitialSync(
     const patients = await pmsClient.getPatients();
     console.log(`[SERVER] Fetched ${patients.length} patients from ${pmsType}`);
 
+    if (!patients || patients.length === 0) {
+      console.log("[SERVER] No patients found, skipping sync");
+      return {
+        wcPatients: 0,
+        epcPatients: 0,
+        totalAppointments: 0,
+        issues: ["No patients found in PMS"],
+      };
+    }
+
     for (const patient of patients) {
       console.log(
         `[SERVER] Processing patient: ${patient.firstName} ${patient.lastName} (Type: ${patient.patientType})`
@@ -271,8 +302,6 @@ async function performInitialSync(
             phone: patient.phone,
             date_of_birth: patient.dateOfBirth,
             patient_type: patientType,
-            physio_name: patient.physioName,
-            pms_last_modified: patient.lastModified,
             created_at: new Date().toISOString(),
             updated_at: new Date().toISOString(),
           });
@@ -314,12 +343,10 @@ async function performInitialSync(
                 pms_appointment_id: appointment.id,
                 pms_type: pmsType,
                 appointment_date: appointment.date,
+                appointment_end_date: appointment.date, // Using same date for now
                 appointment_type: appointment.type,
-                physio_name: appointment.physioName,
                 status: appointment.status,
-                duration_minutes: appointment.durationMinutes,
                 notes: appointment.notes,
-                pms_last_modified: appointment.lastModified,
                 created_at: new Date().toISOString(),
                 updated_at: new Date().toISOString(),
               });
@@ -354,20 +381,7 @@ async function performInitialSync(
       }
     }
 
-    console.log("[SERVER] Updating user profile with PMS type...");
-    const { data: userData, error: userError } = await supabase
-      .from("users")
-      .update({
-        pms_type: pmsType,
-        updated_at: new Date().toISOString(),
-      })
-      .eq("id", userId);
-
-    if (userError) {
-      console.error("[SERVER] Error updating user profile:", userError);
-    } else {
-      console.log("[SERVER] Successfully updated user profile:", userData);
-    }
+    console.log("[SERVER] User profile update skipped - pms_type field not in users table");
 
     console.log("[SERVER] Sync completed successfully!");
     console.log(
