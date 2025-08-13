@@ -161,3 +161,62 @@ export async function getDecryptedApiKey(userId: string, pmsType: string) {
     return null;
   }
 }
+
+export async function storeAppointmentTypes(
+  userId: string,
+  pmsType: "cliniko" | "halaxy" | "nookal",
+  appointmentTypes: Array<{
+    appointment_id: string
+    appointment_name: string
+    code: string
+  }>,
+) {
+  try {
+    console.log("[SERVER] Starting appointment types storage...");
+    const supabase = createAdminClient();
+
+    // Clear existing appointment types for this user and PMS type
+    const { error: deleteError } = await supabase
+      .from("appointment_types")
+      .delete()
+      .eq("user_id", userId)
+      .eq("pms_type", pmsType);
+
+    if (deleteError) {
+      console.error("[SERVER] Error clearing existing appointment types:", deleteError);
+    } else {
+      console.log("[SERVER] Cleared existing appointment types");
+    }
+
+    // Insert new appointment types
+    const appointmentTypesData = appointmentTypes.map((type) => ({
+      user_id: userId,
+      appointment_id: type.appointment_id,
+      appointment_name: type.appointment_name,
+      code: type.code,
+      pms_type: pmsType,
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    }));
+
+    const { data, error } = await supabase.from("appointment_types").insert(appointmentTypesData).select();
+
+    if (error) {
+      console.error("[SERVER] Database error storing appointment types:", {
+        code: error.code,
+        message: error.message,
+        details: error.details,
+        hint: error.hint,
+      });
+      throw new Error(`Database error: ${error.message}`);
+    }
+
+    console.log(`[SERVER] Successfully stored ${data.length} appointment types in database`);
+    return data;
+  } catch (error) {
+    console.error("[SERVER] Error in storeAppointmentTypes:", error);
+    throw new Error(
+      `Failed to store appointment types: ${error instanceof Error ? error.message : "Unknown error"}`
+    );
+  }
+}

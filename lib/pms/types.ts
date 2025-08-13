@@ -29,12 +29,23 @@ export interface PMSAppointment {
   durationMinutes?: number
   notes?: string
   lastModified: string
+  // Additional fields for filtering
+  cancelled_at?: string | null
+  did_not_arrive?: boolean
+  appointment_date?: string
+  appointment_type_id?: string
 }
 
 export interface PMSApiCredentials {
   apiKey: string
   apiUrl?: string
   clinicId?: string
+}
+
+export interface AppointmentType {
+  appointment_id: string
+  appointment_name: string
+  code: string
 }
 
 export interface SyncResult {
@@ -51,6 +62,8 @@ export interface PMSApiInterface {
   getPatients(lastModified?: string): Promise<PMSPatient[]>
   getAppointments(patientIds: string[], lastModified?: string): Promise<PMSAppointment[]>
   getPatientAppointments(patientId: string): Promise<PMSAppointment[]>
+  getAppointmentTypes(): Promise<any[]>
+  processAppointmentTypes(appointmentTypes: any[]): AppointmentType[]
 }
 
 export type PMSType = "cliniko" | "halaxy" | "nookal"

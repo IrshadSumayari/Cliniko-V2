@@ -152,6 +152,11 @@ export class HalaxyAPI implements PMSApiInterface {
         durationMinutes: apt.duration_minutes,
         notes: apt.notes,
         lastModified: apt.updated_at,
+        // Add additional fields needed for filtering
+        cancelled_at: apt.cancelled_at || null,
+        did_not_arrive: apt.did_not_arrive || false,
+        appointment_date: apt.start_time,
+        appointment_type_id: apt.appointment_type?.id,
       }))
     } catch (error) {
       console.error(`Error fetching Halaxy appointments for patient ${patientId}:`, error)
@@ -173,5 +178,66 @@ export class HalaxyAPI implements PMSApiInterface {
     }
 
     return "scheduled"
+  }
+
+  async getAppointmentTypes(): Promise<any[]> {
+    try {
+      console.log("🔍 Fetching appointment types from Halaxy...")
+      const response = await this.makeRequest("/appointment-types")
+      const appointmentTypes = response.data || []
+      console.log(`✅ Found ${appointmentTypes.length} appointment types from Halaxy`)
+      return appointmentTypes
+    } catch (error) {
+      console.error("❌ Error fetching Halaxy appointment types:", error)
+      return []
+    }
+  }
+
+  processAppointmentTypes(appointmentTypes: any[]): Array<{
+    appointment_id: string
+    appointment_name: string
+    code: string
+  }> {
+    const processedTypes: Array<{
+      appointment_id: string
+      appointment_name: string
+      code: string
+    }> = []
+
+    for (const appointmentType of appointmentTypes) {
+      const code = this.extractCodeFromName(appointmentType.name)
+
+      if (code) {
+        processedTypes.push({
+          appointment_id: appointmentType.id,
+          appointment_name: appointmentType.name,
+          code: code,
+        })
+
+        console.log(`📝 Processed appointment type: ${appointmentType.name} -> ${code}`)
+      }
+    }
+
+    console.log(`✅ Filtered ${processedTypes.length} EPC/WC appointment types from ${appointmentTypes.length} total`)
+    return processedTypes
+  }
+
+  private extractCodeFromName(name: string): string | null {
+    const nameLower = name.toLowerCase()
+
+    if (nameLower.includes("epc") || nameLower.includes("enhanced primary care") || nameLower.includes("medicare")) {
+      return "EPC"
+    }
+
+    if (
+      nameLower.includes("wc") ||
+      nameLower.includes("workers comp") ||
+      nameLower.includes("workcover") ||
+      nameLower.includes("work injury")
+    ) {
+      return "WC"
+    }
+
+    return null
   }
 }

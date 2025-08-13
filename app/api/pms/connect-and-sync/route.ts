@@ -5,6 +5,7 @@ import { PMSFactory } from "@/lib/pms/factory";
 import {
   storeEncryptedApiKey,
   createAdminClient,
+  storeAppointmentTypes,
 } from "@/lib/supabase/server-admin";
 import { config } from "@/lib/config";
 
@@ -98,6 +99,8 @@ export async function POST(request: NextRequest) {
       .eq("auth_user_id", userId)
       .single();
 
+    let userRecordData: any;
+
     if (userCheckError || !existingUser) {
       console.log("User record not found, creating...");
       const { data: newUser, error: createUserError } = await adminSupabase
@@ -120,8 +123,10 @@ export async function POST(request: NextRequest) {
         );
       }
       console.log("User record created successfully:", newUser);
+      userRecordData = newUser;
     } else {
       console.log("User record exists:", existingUser);
+      userRecordData = existingUser;
     }
 
     if (!PMSFactory.validateCredentials(pmsType, { apiKey })) {
@@ -140,9 +145,6 @@ export async function POST(request: NextRequest) {
     let pmsClient;
     try {
       pmsClient = PMSFactory.createClient(pmsType, apiKey);
-      if (!pmsClient) {
-        throw new Error("PMS client creation returned null");
-      }
     } catch (factoryError) {
       console.error("Error creating PMS client:", factoryError);
       return NextResponse.json(
@@ -161,7 +163,6 @@ export async function POST(request: NextRequest) {
     try {
       const isConnected = await pmsClient.testConnection();
       if (!isConnected) {
-        console.error(`❌ Connection test failed for ${pmsType}`);
         return NextResponse.json(
           {
             error: `Failed to connect to ${pmsType}. Please verify your API key is correct.`,
@@ -169,9 +170,9 @@ export async function POST(request: NextRequest) {
           { status: 400 }
         );
       }
-      console.log("✅ Connection test successful!");
+      console.log("Connection test successful!");
     } catch (connectionError) {
-      console.error("❌ Connection test error:", connectionError);
+      console.error("Connection test error:", connectionError);
       const errorMessage =
         connectionError instanceof Error
           ? connectionError.message
@@ -185,7 +186,6 @@ export async function POST(request: NextRequest) {
     }
 
     console.log("Storing encrypted credentials...");
-    let userRecord: any;
     try {
       const region =
         pmsType === "cliniko" ? apiKey.split("-").pop() : undefined;
@@ -200,7 +200,6 @@ export async function POST(request: NextRequest) {
         .select("id")
         .eq("auth_user_id", userId)
         .single();
-      console.log("userRecordData", userRecordData);
 
       if (userError || !userRecordData) {
         console.error("❌ User record not found:", userError);
@@ -210,8 +209,7 @@ export async function POST(request: NextRequest) {
         );
       }
 
-      userRecord = userRecordData;
-      await storeEncryptedApiKey(userRecord.id, pmsType, apiKey, apiUrl);
+      await storeEncryptedApiKey(userRecordData.id, pmsType, apiKey, apiUrl);
       console.log("✅ Credentials stored successfully in database!");
     } catch (credentialsError) {
       console.error("❌ Error storing credentials:", credentialsError);
@@ -221,25 +219,55 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    console.log("Fetching and storing appointment types...");
+    try {
+      const appointmentTypes = await pmsClient.getAppointmentTypes();
+      const processedTypes =
+        pmsClient.processAppointmentTypes(appointmentTypes);
+
+      if (processedTypes.length > 0) {
+        await storeAppointmentTypes(userRecordData.id, pmsType, processedTypes);
+        console.log(
+          `✅ Stored ${processedTypes.length} appointment types successfully!`
+        );
+      } else {
+        console.log("⚠️ No EPC/WC appointment types found");
+      }
+    } catch (appointmentTypesError) {
+      console.error("❌ Error with appointment types:", appointmentTypesError);
+      // Don't fail the entire process, just log the error
+    }
+
     console.log("Connection successful, starting initial sync...");
     const syncResults = await performInitialSync(
       adminSupabase,
-      userRecord.id, // Use the user ID from users table, not auth_user_id
+      userRecordData.id,
       pmsClient,
       pmsType
     );
 
+    const appointmentTypesCount = await getAppointmentTypesCount(
+      adminSupabase,
+      userRecordData.id,
+      pmsType
+    );
+
     await adminSupabase.from("sync_logs").insert({
-      user_id: userRecord.id, // Use the user ID from users table, not auth_user_id
+      user_id: userRecordData.id,
       pms_type: pmsType,
       sync_type: "initial",
       status: "completed",
-      patients_synced: syncResults.wcPatients + syncResults.epcPatients,
+      patients_processed: syncResults.wcPatients + syncResults.epcPatients,
+      patients_added: syncResults.wcPatients + syncResults.epcPatients,
       started_at: new Date().toISOString(),
       completed_at: new Date().toISOString(),
+      last_modified_sync: new Date().toISOString(),
     });
 
-    return NextResponse.json(syncResults);
+    return NextResponse.json({
+      ...syncResults,
+      appointmentTypesCount,
+    });
   } catch (error) {
     console.error("PMS connect & sync error:", error);
     return NextResponse.json(
@@ -250,6 +278,30 @@ export async function POST(request: NextRequest) {
       },
       { status: 500 }
     );
+  }
+}
+
+async function getAppointmentTypesCount(
+  supabase: any,
+  userId: string,
+  pmsType: string
+): Promise<number> {
+  try {
+    const { count, error } = await supabase
+      .from("appointment_types")
+      .select("*", { count: "exact", head: true })
+      .eq("user_id", userId)
+      .eq("pms_type", pmsType);
+
+    if (error) {
+      console.error("Error getting appointment types count:", error);
+      return 0;
+    }
+
+    return count || 0;
+  } catch (error) {
+    console.error("Error in getAppointmentTypesCount:", error);
+    return 0;
   }
 }
 
@@ -270,16 +322,6 @@ async function performInitialSync(
 
     const patients = await pmsClient.getPatients();
     console.log(`[SERVER] Fetched ${patients.length} patients from ${pmsType}`);
-
-    if (!patients || patients.length === 0) {
-      console.log("[SERVER] No patients found, skipping sync");
-      return {
-        wcPatients: 0,
-        epcPatients: 0,
-        totalAppointments: 0,
-        issues: ["No patients found in PMS"],
-      };
-    }
 
     for (const patient of patients) {
       console.log(
@@ -302,6 +344,8 @@ async function performInitialSync(
             phone: patient.phone,
             date_of_birth: patient.dateOfBirth,
             patient_type: patientType,
+            physio_name: patient.physioName,
+            pms_last_modified: patient.lastModified,
             created_at: new Date().toISOString(),
             updated_at: new Date().toISOString(),
           });
@@ -327,15 +371,64 @@ async function performInitialSync(
           const appointments = await pmsClient.getPatientAppointments(
             patient.id
           );
-          const completedAppointments = appointments.filter(
-            (apt: any) => apt.status === "completed"
+          console.log("patient app", appointments);
+          // Filter appointments based on stored appointment types
+          const { data: userAppointmentTypes, error: typesError } =
+            await supabase
+              .from("appointment_types")
+              .select("appointment_id")
+              .eq("user_id", userId)
+              .eq("pms_type", pmsType);
+
+          if (typesError) {
+            console.error(
+              "[SERVER] Error fetching appointment types:",
+              typesError
+            );
+            continue;
+          }
+
+          const validAppointmentTypeIds =
+            userAppointmentTypes?.map((t: any) => t.appointment_id) || [];
+
+          // Filter for appointments that meet all criteria:
+          // 1. cancelled_at = null
+          // 2. did_not_arrive = false  
+          // 3. appointment_date <= today
+          // 4. status = completed
+          // 5. matches stored appointment types
+          const validCompletedAppointments = appointments.filter(
+            (apt: any) => {
+              const today = new Date();
+              const appointmentDate = new Date(apt.appointment_date || apt.date);
+              
+              // Log appointment details for debugging
+              console.log(`[SERVER] Checking appointment ${apt.id}:`, {
+                type: apt.type || apt.appointment_type,
+                cancelled_at: apt.cancelled_at,
+                did_not_arrive: apt.did_not_arrive,
+                appointment_date: apt.appointment_date || apt.date,
+                status: apt.status,
+                hasValidType: validAppointmentTypeIds.includes(apt.appointment_type_id || apt.type_id)
+              });
+              
+              return (
+                apt.status === "completed" &&
+                apt.cancelled_at === null && // cancelled_at = null
+                apt.did_not_arrive === false && // did_not_arrive = false
+                appointmentDate <= today && // appointment_date <= today
+                validAppointmentTypeIds.includes(
+                  apt.appointment_type_id || apt.type_id
+                )
+              );
+            }
           );
 
           console.log(
-            `[SERVER] Found ${appointments.length} total appointments, ${completedAppointments.length} completed`
+            `[SERVER] Found ${appointments.length} total appointments, ${validCompletedAppointments.length} valid completed appointments`
           );
 
-          for (const appointment of completedAppointments) {
+          for (const appointment of validCompletedAppointments) {
             const { data: appointmentData, error: appointmentError } =
               await supabase.from("appointments").upsert({
                 user_id: userId,
@@ -343,10 +436,12 @@ async function performInitialSync(
                 pms_appointment_id: appointment.id,
                 pms_type: pmsType,
                 appointment_date: appointment.date,
-                appointment_end_date: appointment.date, // Using same date for now
                 appointment_type: appointment.type,
+                physio_name: appointment.physioName,
                 status: appointment.status,
+                duration_minutes: appointment.durationMinutes,
                 notes: appointment.notes,
+                pms_last_modified: appointment.lastModified,
                 created_at: new Date().toISOString(),
                 updated_at: new Date().toISOString(),
               });
@@ -381,7 +476,20 @@ async function performInitialSync(
       }
     }
 
-    console.log("[SERVER] User profile update skipped - pms_type field not in users table");
+    console.log("[SERVER] Updating user profile with PMS type...");
+    const { data: userData, error: userError } = await supabase
+      .from("users")
+      .update({
+        pms_type: pmsType,
+        updated_at: new Date().toISOString(),
+      })
+      .eq("id", userId);
+
+    if (userError) {
+      console.error("[SERVER] Error updating user profile:", userError);
+    } else {
+      console.log("[SERVER] Successfully updated user profile:", userData);
+    }
 
     console.log("[SERVER] Sync completed successfully!");
     console.log(

@@ -181,6 +181,11 @@ export class NookalAPI implements PMSApiInterface {
         durationMinutes: Number.parseInt(apt.Duration) || 0,
         notes: apt.Notes,
         lastModified: apt.LastModified,
+        // Add additional fields needed for filtering
+        cancelled_at: apt.CancelledAt || null,
+        did_not_arrive: apt.DidNotArrive || false,
+        appointment_date: apt.Date + " " + apt.StartTime,
+        appointment_type_id: apt.AppointmentTypeID,
       }));
     } catch (error) {
       console.error(
@@ -207,5 +212,66 @@ export class NookalAPI implements PMSApiInterface {
     }
 
     return "scheduled";
+  }
+
+  async getAppointmentTypes(): Promise<any[]> {
+    try {
+      console.log("🔍 Fetching appointment types from Nookal...");
+      const response = await this.makeRequest("/getAppointmentTypes");
+      const appointmentTypes = response.data?.appointment_types || [];
+      console.log(`✅ Found ${appointmentTypes.length} appointment types from Nookal`);
+      return appointmentTypes;
+    } catch (error) {
+      console.error("❌ Error fetching Nookal appointment types:", error);
+      return [];
+    }
+  }
+
+  processAppointmentTypes(appointmentTypes: any[]): Array<{
+    appointment_id: string;
+    appointment_name: string;
+    code: string;
+  }> {
+    const processedTypes: Array<{
+      appointment_id: string;
+      appointment_name: string;
+      code: string;
+    }> = [];
+
+    for (const appointmentType of appointmentTypes) {
+      const code = this.extractCodeFromName(appointmentType.Name);
+
+      if (code) {
+        processedTypes.push({
+          appointment_id: appointmentType.ID,
+          appointment_name: appointmentType.Name,
+          code: code,
+        });
+
+        console.log(`📝 Processed appointment type: ${appointmentType.Name} -> ${code}`);
+      }
+    }
+
+    console.log(`✅ Filtered ${processedTypes.length} EPC/WC appointment types from ${appointmentTypes.length} total`);
+    return processedTypes;
+  }
+
+  private extractCodeFromName(name: string): string | null {
+    const nameLower = name.toLowerCase();
+
+    if (nameLower.includes("epc") || nameLower.includes("enhanced primary care") || nameLower.includes("medicare")) {
+      return "EPC";
+    }
+
+    if (
+      nameLower.includes("wc") ||
+      nameLower.includes("workers comp") ||
+      nameLower.includes("workcover") ||
+      nameLower.includes("work injury")
+    ) {
+      return "WC";
+    }
+
+    return null;
   }
 }
