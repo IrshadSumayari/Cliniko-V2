@@ -63,7 +63,7 @@ export async function storeEncryptedApiKey(
     console.log("[SERVER] PMS Type:", pmsType);
     console.log("[SERVER] API URL:", apiUrl);
     console.log("[SERVER] Clinic ID:", clinicId);
-    
+
     const supabase = createAdminClient();
     console.log("[SERVER] Admin client created successfully");
 
@@ -86,7 +86,9 @@ export async function storeEncryptedApiKey(
     console.log("[SERVER] Attempting to insert/update API key with data:", {
       user_id: userId,
       pms_type: pmsType,
-      api_key_encrypted: encryptedKey ? `${encryptedKey.substring(0, 20)}...` : "missing",
+      api_key_encrypted: encryptedKey
+        ? `${encryptedKey.substring(0, 20)}...`
+        : "missing",
       api_url: apiUrl,
       clinic_id: clinicId,
       is_active: true,
@@ -166,29 +168,16 @@ export async function storeAppointmentTypes(
   userId: string,
   pmsType: "cliniko" | "halaxy" | "nookal",
   appointmentTypes: Array<{
-    appointment_id: string
-    appointment_name: string
-    code: string
-  }>,
+    appointment_id: string;
+    appointment_name: string;
+    code: string;
+  }>
 ) {
   try {
     console.log("[SERVER] Starting appointment types storage...");
     const supabase = createAdminClient();
 
-    // Clear existing appointment types for this user and PMS type
-    const { error: deleteError } = await supabase
-      .from("appointment_types")
-      .delete()
-      .eq("user_id", userId)
-      .eq("pms_type", pmsType);
-
-    if (deleteError) {
-      console.error("[SERVER] Error clearing existing appointment types:", deleteError);
-    } else {
-      console.log("[SERVER] Cleared existing appointment types");
-    }
-
-    // Insert new appointment types
+    // Use upsert instead of delete + insert to handle duplicates gracefully
     const appointmentTypesData = appointmentTypes.map((type) => ({
       user_id: userId,
       appointment_id: type.appointment_id,
@@ -199,7 +188,14 @@ export async function storeAppointmentTypes(
       updated_at: new Date().toISOString(),
     }));
 
-    const { data, error } = await supabase.from("appointment_types").insert(appointmentTypesData).select();
+    // Upsert will insert new records or update existing ones based on the unique constraint
+    const { data, error } = await supabase
+      .from("appointment_types")
+      .upsert(appointmentTypesData, {
+        onConflict: "user_id,appointment_id,pms_type", // Specify the conflict resolution
+        ignoreDuplicates: false, // Update existing records instead of ignoring
+      })
+      .select();
 
     if (error) {
       console.error("[SERVER] Database error storing appointment types:", {
@@ -211,12 +207,74 @@ export async function storeAppointmentTypes(
       throw new Error(`Database error: ${error.message}`);
     }
 
-    console.log(`[SERVER] Successfully stored ${data.length} appointment types in database`);
+    console.log(
+      `[SERVER] Successfully stored/updated ${data.length} appointment types in database`
+    );
     return data;
   } catch (error) {
     console.error("[SERVER] Error in storeAppointmentTypes:", error);
     throw new Error(
-      `Failed to store appointment types: ${error instanceof Error ? error.message : "Unknown error"}`
+      `Failed to store appointment types: ${
+        error instanceof Error ? error.message : "Unknown error"
+      }`
     );
+  }
+}
+
+export async function storeAppointment(appointmentData: {
+  user_id: string;
+  patient_id: number;
+  pms_appointment_id: number;
+  pms_type: string;
+  appointment_date: string;
+  appointment_type?: string;
+  status: string;
+  practitioner_name?: string;
+  notes?: string;
+  duration_minutes?: number;
+  is_completed?: boolean;
+}) {
+  try {
+    console.log("[SERVER] Starting appointment storage...");
+    console.log(
+      "[SERVER] Appointment data:",
+      JSON.stringify(appointmentData, null, 2)
+    );
+
+    const supabase = createAdminClient();
+    console.log("[SERVER] Admin client created successfully");
+
+    // First, let's test if the appointments table is accessible
+    console.log("[SERVER] Testing appointments table access...");
+    const { data: testData, error: testError } = await supabase
+      .from("appointments")
+      .select("id")
+      .limit(1);
+
+    if (testError) {
+      console.error("[SERVER] Table access test failed:", testError);
+      throw new Error(`Table access failed: ${testError.message}`);
+    }
+    console.log("[SERVER] Table access test successful");
+
+    // Now try to store the appointment
+    console.log("[SERVER] Attempting to store appointment...");
+    const { data, error } = await supabase
+      .from("appointments")
+      .upsert(appointmentData, {
+        onConflict: "user_id,pms_appointment_id,pms_type",
+      })
+      .select();
+
+    if (error) {
+      console.error("[SERVER] Error storing appointment:", error);
+      throw new Error(`Failed to store appointment: ${error.message}`);
+    }
+
+    console.log("[SERVER] Appointment stored successfully:", data);
+    return data;
+  } catch (error) {
+    console.error("[SERVER] Error in storeAppointment:", error);
+    throw error;
   }
 }

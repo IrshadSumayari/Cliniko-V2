@@ -43,7 +43,7 @@ export class HalaxyAPI implements PMSApiInterface {
     }
   }
 
-  async getPatients(lastModified?: string): Promise<PMSPatient[]> {
+  async getPatients(lastModified?: string, appointmentTypeIds?: string[]): Promise<PMSPatient[]> {
     try {
       const params: Record<string, string> = {
         limit: "100",
@@ -51,6 +51,12 @@ export class HalaxyAPI implements PMSApiInterface {
 
       if (lastModified) {
         params.modified_since = lastModified
+      }
+
+      // Note: Halaxy API doesn't support appointment type filtering like Cliniko
+      // So we'll ignore the appointmentTypeIds parameter for now
+      if (appointmentTypeIds && appointmentTypeIds.length > 0) {
+        console.log("⚠️ Halaxy API doesn't support appointment type filtering, fetching all patients");
       }
 
       const response = await this.makeRequest("/patients", params)

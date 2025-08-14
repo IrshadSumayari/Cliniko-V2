@@ -19,11 +19,48 @@ const supabase = createClient(supabaseUrl, supabaseServiceKey, {
 
 export async function POST(request: NextRequest) {
   try {
+    // Get the authorization header
+    const authHeader = request.headers.get("authorization");
+    
+    if (!authHeader || !authHeader.startsWith("Bearer ")) {
+      return NextResponse.json(
+        { error: "Authentication required. Please provide a valid token." },
+        { status: 401 }
+      );
+    }
+
+    const token = authHeader.replace("Bearer ", "");
+    
+    // Verify the token and get user
+    const supabase = createClient(supabaseUrl, supabaseServiceKey, {
+      auth: {
+        autoRefreshToken: false,
+        persistSession: false,
+      },
+    });
+
+    const { data: { user }, error: authError } = await supabase.auth.getUser(token);
+    
+    if (authError || !user) {
+      return NextResponse.json(
+        { error: "Invalid authentication token." },
+        { status: 401 }
+      );
+    }
+
     const { userId, email } = await request.json();
     if (!userId) {
       return NextResponse.json(
         { error: "User ID is required" },
         { status: 400 }
+      );
+    }
+
+    // Verify that the authenticated user matches the requested userId
+    if (user.id !== userId) {
+      return NextResponse.json(
+        { error: "Unauthorized access to this user's data." },
+        { status: 403 }
       );
     }
 

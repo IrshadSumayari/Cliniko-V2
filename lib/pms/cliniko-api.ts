@@ -19,21 +19,43 @@ export class ClinikoAPI implements PMSApiInterface {
     console.log(`   Region: ${this.region}`);
     console.log(`   Base URL: ${this.baseUrl}`);
     console.log(`   API Key: ${credentials.apiKey.substring(0, 20)}...`);
+
+    // Verify zone consistency
+    this.verifyZoneConsistency();
+  }
+
+  private verifyZoneConsistency() {
+    console.log(
+      `🔍 Zone consistency check: API Key zone: ${this.region} Base URL: ${this.baseUrl}`
+    );
   }
 
   private async makeRequest(endpoint: string, params?: Record<string, string>) {
-    const url = new URL(`${this.baseUrl}${endpoint}`);
+    let urlString = `${this.baseUrl}${endpoint}`;
 
     if (params) {
-      Object.entries(params).forEach(([key, value]) => {
-        url.searchParams.append(key, value);
-      });
+      // Manually build the query string to handle q[] parameter correctly
+      const queryParams = Object.entries(params)
+        .map(([key, value]) => {
+          if (key === "q[]") {
+            // Don't encode the q[] parameter value, let it be as-is
+            return `${key}=${value}`;
+          }
+          return `${key}=${encodeURIComponent(value)}`;
+        })
+        .join("&");
+
+      if (queryParams) {
+        urlString += `?${queryParams}`;
+      }
     }
+
+    console.log(`🔍 Final URL: ${urlString}`);
 
     const basicKey = Buffer.from(this.credentials.apiKey).toString("base64");
     console.log(`🔑 Authorization: Basic ${basicKey.substring(0, 20)}...`);
 
-    const response = await fetch(url.toString(), {
+    const response = await fetch(urlString, {
       headers: {
         Authorization: `Basic ${basicKey}`,
         Accept: "application/json",
@@ -48,12 +70,34 @@ export class ClinikoAPI implements PMSApiInterface {
         `❌ Cliniko API error: ${response.status} ${response.statusText}`,
         errorText
       );
+      console.error(`   Failed URL: ${urlString}`);
+      console.error(`   Zone: ${this.region}`);
       throw new Error(
         `Cliniko API error: ${response.status} ${response.statusText}`
       );
     }
 
-    return response.json();
+    const responseData = await response.json();
+    console.log(`✅ API call successful:`);
+    console.log(`   Response status: ${response.status}`);
+    console.log(
+      `   Response data keys: ${Object.keys(responseData).join(", ")}`
+    );
+
+    // Log specific data counts if available
+    if (responseData.bookings) {
+      console.log(`   Bookings count: ${responseData.bookings.length}`);
+    }
+    if (responseData.patients) {
+      console.log(`   Patients count: ${responseData.patients.length}`);
+    }
+    if (responseData.appointment_types) {
+      console.log(
+        `   Appointment types count: ${responseData.appointment_types.length}`
+      );
+    }
+
+    return responseData;
   }
 
   async testConnection(): Promise<boolean> {
@@ -111,90 +155,122 @@ export class ClinikoAPI implements PMSApiInterface {
     }
   }
 
-  async getPatients(lastModified?: string): Promise<PMSPatient[]> {
+  async getPatients(
+    lastModified?: string,
+    appointmentTypeIds?: string[]
+  ): Promise<PMSPatient[]> {
     try {
       console.log(
-        "🔍 Fetching patients from Cliniko (LIMITED TO 10 FOR TESTING)"
+        "🔍 Fetching patients from Cliniko with appointment type filtering..."
+      );
+      console.log("   Last modified:", lastModified || "not specified");
+      console.log(
+        "   Appointment type IDs:",
+        appointmentTypeIds || "not specified"
+      );
+
+      if (!appointmentTypeIds || appointmentTypeIds.length === 0) {
+        console.log(
+          "⚠️ No appointment type IDs provided, cannot filter bookings"
+        );
+        return [];
+      }
+
+      // Create the query parameter for appointment type filtering
+      // Format: q[]=appointment_type_id:=ID1,ID2,ID3 (this is the exact format that works in Postman!)
+      const appointmentTypeFilter = appointmentTypeIds.join(",");
+      console.log(
+        `🔍 Filtering bookings by appointment types: ${appointmentTypeFilter}`
       );
 
       const params: Record<string, string> = {
-        per_page: "10", // Reduced from 50 to 10 for testing
-        sort: "updated_at",
+        per_page: "100", // Increased for better performance
+        "q[]": `appointment_type_id:=${appointmentTypeFilter}`, // Fixed: using the exact working Postman format
       };
 
       if (lastModified) {
         params.updated_since = lastModified;
       }
 
-      const allPatients: PMSPatient[] = [];
+      const allBookings: any[] = [];
       let page = 1;
       let hasMore = true;
-      const maxPages = 1; // Only fetch first page for testing
+      let totalPages = 0;
+      const maxPages = 20; // Safety limit to prevent infinite loops
 
       while (hasMore && page <= maxPages) {
-        console.log(`📄 Fetching page ${page}...`);
         params.page = page.toString();
+        console.log(`📄 Fetching page ${page}...`);
+
         const response = await this.makeRequest("/bookings", params);
-
         const bookings = response.bookings || [];
+
         console.log(`📋 Found ${bookings.length} bookings on page ${page}`);
-        console.log(bookings, "bookings");
-        const individualAppointments = bookings.filter(
-          (booking) =>
-            booking.patient &&
-            booking.appointment_type &&
-            !booking.unavailable_block_type
-        );
+
+        // Filter bookings by the 3 conditions you specified
+        const validBookings = bookings.filter((booking: any) => {
+          const today = new Date();
+          const createdDate = new Date(booking.created_at);
+
+          // Check the 3 conditions:
+          // 1. cancelled_at is null
+          // 2. did_not_arrive is false
+          // 3. created_date <= today
+          const isValid =
+            !booking.cancelled_at && // cancelled_at is null
+            !booking.did_not_arrive && // did_not_arrive is false
+            createdDate <= today; // created_date <= today
+
+          if (!isValid) {
+            console.log(
+              `❌ Skipping booking ${booking.id}: cancelled_at=${booking.cancelled_at}, did_not_arrive=${booking.did_not_arrive}, created_at=${booking.created_at}`
+            );
+          }
+
+          return isValid;
+        });
+
         console.log(
-          `👥 Filtered to ${individualAppointments.length} individual appointments`
+          `✅ Valid bookings on page ${page}: ${validBookings.length}/${bookings.length}`
         );
 
-        // Debug: Log the first few appointments to see their structure
-        if (individualAppointments.length > 0) {
-          console.log("🔍 Sample appointment structure:");
-          console.log(
-            "Appointment Type:",
-            individualAppointments[0].appointment_type
-          );
-          console.log(
-            "Appointment Type Links:",
-            individualAppointments[0].appointment_type?.links
-          );
-          console.log(
-            "Appointment Type Self URL:",
-            individualAppointments[0].appointment_type?.links?.self
-          );
+        allBookings.push(...validBookings);
 
-          // Extract appointment type ID from the first appointment
-          const firstAppointmentTypeId =
-            individualAppointments[0].appointment_type?.links?.self
-              ?.split("/")
-              .pop();
-          console.log("Extracted Appointment Type ID:", firstAppointmentTypeId);
-        }
-
-        const filteredPatients = await this.processBookingsForPatients(
-          individualAppointments
-        );
-        console.log(
-          `👤 Processed ${filteredPatients.length} unique patients from page ${page}`
-        );
-        allPatients.push(...filteredPatients);
-
-        hasMore = response.links?.next !== undefined && page < maxPages;
+        // Check if there are more pages
+        hasMore = response.links?.next !== undefined;
+        totalPages = page;
         page++;
 
-        // Early break for testing - only get first 10 patients
-        if (allPatients.length >= 10) {
-          console.log("✅ Reached 10 patients limit, stopping fetch");
+        // Safety check to prevent infinite loops
+        if (page > maxPages) {
+          console.log(
+            `⚠️ Reached maximum page limit (${maxPages}), stopping pagination`
+          );
           break;
+        }
+
+        // Add a small delay between requests to be respectful to the API
+        if (hasMore) {
+          await new Promise((resolve) => setTimeout(resolve, 100));
         }
       }
 
-      console.log(`🎯 Total patients fetched: ${allPatients.length}`);
-      return allPatients.slice(0, 10); // Ensure we only return max 10
+      console.log(
+        `✅ Total synced records: ${allBookings.length} valid bookings from ${totalPages} pages`
+      );
+      console.log(
+        `📊 Pagination summary: Processed ${totalPages} pages, max limit: ${maxPages}`
+      );
+
+      // Process valid bookings to extract patients
+      const patients = await this.processBookingsForPatients(allBookings);
+      console.log(
+        `✅ Processed ${allBookings.length} valid bookings, found ${patients.length} EPC/WC patients`
+      );
+
+      return patients;
     } catch (error) {
-      console.error("Error fetching Cliniko patients:", error);
+      console.error("❌ Error fetching patients from Cliniko:", error);
       throw error;
     }
   }
@@ -397,7 +473,7 @@ export class ClinikoAPI implements PMSApiInterface {
 
         const bookings = response.bookings || [];
         const completedBookings = bookings.filter(
-          (booking) =>
+          (booking: any) =>
             booking.patient &&
             booking.appointment_type &&
             !booking.unavailable_block_type &&
@@ -407,11 +483,11 @@ export class ClinikoAPI implements PMSApiInterface {
         );
 
         const appointments = completedBookings
-          .filter((booking) => {
+          .filter((booking: any) => {
             const patientId = booking.patient.links.self.split("/").pop();
             return patientIds.includes(patientId);
           })
-          .map((booking) => this.mapBookingToAppointment(booking));
+          .map((booking: any) => this.mapBookingToAppointment(booking));
 
         allAppointments.push(...appointments);
 
@@ -428,14 +504,40 @@ export class ClinikoAPI implements PMSApiInterface {
     }
   }
 
-  private mapBookingToAppointment(booking: any): PMSAppointment {
+  private mapBookingToAppointment(booking: any): PMSAppointment | null {
+    if (!booking) {
+      return null;
+    }
+
+    if (!booking.patient) {
+      return null;
+    }
+
+    if (!booking.patient.links || !booking.patient.links.self) {
+      return null;
+    }
+
     const patientId = booking.patient.links.self.split("/").pop();
 
+    if (!patientId) {
+      return null;
+    }
+
+    const appointmentTypeId =
+      booking.appointment_type?.links?.self?.split("/").pop() || "";
+
+    if (Math.random() < 0.1) {
+      // Log only ~10% of successful mappings
+      console.log(
+        `🔍 Mapping booking ${booking.id} for patient ${patientId}, type: ${appointmentTypeId}`
+      );
+    }
+
     return {
-      id: booking.id,
-      patientId: patientId,
+      id: parseInt(booking.id),
+      patientId: parseInt(patientId),
       date: booking.starts_at,
-      type: booking.appointment_type?.name || "Unknown",
+      type: appointmentTypeId,
       status: "completed",
       physioName: booking.patient_name,
       durationMinutes: this.calculateDuration(
@@ -448,7 +550,7 @@ export class ClinikoAPI implements PMSApiInterface {
       cancelled_at: booking.cancelled_at,
       did_not_arrive: booking.did_not_arrive,
       appointment_date: booking.starts_at,
-      appointment_type_id: booking.appointment_type?.id,
+      appointment_type_id: parseInt(appointmentTypeId),
     };
   }
 
@@ -459,18 +561,58 @@ export class ClinikoAPI implements PMSApiInterface {
   }
 
   async getPatientAppointments(patientId: string): Promise<PMSAppointment[]> {
-    const bookings = await this.getPatientBookings(patientId);
-    return bookings.map((booking) => this.mapBookingToAppointment(booking));
+    try {
+      const bookings = await this.getPatientBookings(patientId);
+      console.log(
+        `🔍 Found ${bookings.length} bookings for patient ${patientId}`
+      );
+
+      const appointments: PMSAppointment[] = [];
+
+      for (const booking of bookings) {
+        const appointment = this.mapBookingToAppointment(booking);
+        if (appointment) {
+          appointments.push(appointment);
+        }
+        // Skip null appointments silently - no need to log every single one
+      }
+
+      console.log(
+        `✅ Successfully mapped ${appointments.length} appointments from ${bookings.length} bookings for patient ${patientId}`
+      );
+      return appointments;
+    } catch (error) {
+      console.error(
+        `❌ Error in getPatientAppointments for patient ${patientId}:`,
+        error
+      );
+      return [];
+    }
   }
 
   private async getPatientBookings(patientId: string): Promise<any[]> {
     try {
+      console.log(`🔍 Fetching bookings for patient ${patientId}...`);
+
       const response = await this.makeRequest("/bookings", {
         patient_id: patientId,
         per_page: "50",
       });
 
-      return response.bookings || [];
+      const bookings = response.bookings || [];
+      console.log(
+        `📋 Found ${bookings.length} bookings for patient ${patientId}`
+      );
+
+      // Log the first booking structure for debugging
+      if (bookings.length > 0) {
+        console.log(
+          `🔍 First booking structure:`,
+          JSON.stringify(bookings[0], null, 2)
+        );
+      }
+
+      return bookings;
     } catch (error) {
       console.error(`Error fetching bookings for patient ${patientId}:`, error);
       return [];
@@ -580,13 +722,13 @@ export class ClinikoAPI implements PMSApiInterface {
 
       if (code) {
         processedTypes.push({
-          appointment_id: appointmentType.duration_in_minutes,
+          appointment_id: appointmentType.id, // Fixed: was using duration_in_minutes instead of id
           appointment_name: appointmentType.name,
           code: code,
         });
 
         console.log(
-          `📝 Processed appointment type: ${appointmentType.name} -> ${code}`
+          `📝 Processed appointment type: ${appointmentType.name} (ID: ${appointmentType.id}) -> ${code}`
         );
       }
     }
@@ -595,5 +737,144 @@ export class ClinikoAPI implements PMSApiInterface {
       `✅ Filtered ${processedTypes.length} EPC/WC appointment types from ${appointmentTypes.length} total`
     );
     return processedTypes;
+  }
+
+  async getPatientsWithAppointments(
+    lastModified?: string,
+    appointmentTypeIds?: string[]
+  ): Promise<{ patients: PMSPatient[]; appointments: PMSAppointment[] }> {
+    try {
+      console.log(
+        "🔍 Fetching patients and appointments from Cliniko with appointment type filtering..."
+      );
+      console.log("   Last modified:", lastModified || "not specified");
+      console.log(
+        "   Appointment type IDs:",
+        appointmentTypeIds || "not specified"
+      );
+
+      if (!appointmentTypeIds || appointmentTypeIds.length === 0) {
+        console.log(
+          "⚠️ No appointment type IDs provided, cannot filter bookings"
+        );
+        return { patients: [], appointments: [] };
+      }
+
+      // Create the query parameter for appointment type filtering
+      // Format: q[]=appointment_type_id:=ID1,ID2,ID3 (this is the exact format that works in Postman!)
+      const appointmentTypeFilter = appointmentTypeIds.join(",");
+      console.log(
+        `🔍 Filtering bookings by appointment types: ${appointmentTypeFilter}`
+      );
+
+      const params: Record<string, string> = {
+        per_page: "100", // Increased for better performance
+        "q[]": `appointment_type_id:=${appointmentTypeFilter}`, // Fixed: using the exact working Postman format
+      };
+
+      if (lastModified) {
+        params.updated_since = lastModified;
+      }
+
+      const allBookings: any[] = [];
+      let page = 1;
+      let hasMore = true;
+      let totalPages = 0;
+      const maxPages = 20; // Safety limit to prevent infinite loops
+
+      while (hasMore && page <= maxPages) {
+        params.page = page.toString();
+        console.log(`📄 Fetching page ${page}...`);
+
+        const response = await this.makeRequest("/bookings", params);
+        const bookings = response.bookings || [];
+
+        console.log(`📋 Found ${bookings.length} bookings on page ${page}`);
+
+        // Filter bookings by the 3 conditions you specified
+        const validBookings = bookings.filter((booking: any) => {
+          const today = new Date();
+          const createdDate = new Date(booking.created_at);
+
+          // Check the 3 conditions:
+          // 1. cancelled_at is null
+          // 2. did_not_arrive is false
+          // 3. created_date <= today
+          const isValid =
+            !booking.cancelled_at && // cancelled_at is null
+            !booking.did_not_arrive && // did_not_arrive is false
+            createdDate <= today; // created_date <= today
+
+          if (!isValid) {
+            console.log(
+              `❌ Skipping booking ${booking.id}: cancelled_at=${booking.cancelled_at}, did_not_arrive=${booking.did_not_arrive}, created_at=${booking.created_at}`
+            );
+          }
+
+          return isValid;
+        });
+
+        console.log(
+          `✅ Valid bookings on page ${page}: ${validBookings.length}/${bookings.length}`
+        );
+
+        allBookings.push(...validBookings);
+
+        // Check if there are more pages
+        hasMore = response.links?.next !== undefined;
+        totalPages = page;
+        page++;
+
+        // Safety check to prevent infinite loops
+        if (page > maxPages) {
+          console.log(
+            `⚠️ Reached maximum page limit (${maxPages}), stopping pagination`
+          );
+          break;
+        }
+
+        // Add a small delay between requests to be respectful to the API
+        if (hasMore) {
+          await new Promise((resolve) => setTimeout(resolve, 100));
+        }
+      }
+
+      console.log(
+        `✅ Total synced records: ${allBookings.length} valid bookings from ${totalPages} pages`
+      );
+      console.log(
+        `📊 Pagination summary: Processed ${totalPages} pages, max limit: ${maxPages}`
+      );
+
+      // Process valid bookings to extract patients
+      const patients = await this.processBookingsForPatients(allBookings);
+      console.log(
+        `✅ Processed ${allBookings.length} valid bookings, found ${patients.length} EPC/WC patients`
+      );
+
+      // Convert valid bookings to appointments
+      const appointments = allBookings
+        .map((booking: any) => this.mapBookingToAppointment(booking))
+        .filter(
+          (appointment): appointment is PMSAppointment => appointment !== null
+        );
+      const skippedBookings = allBookings.length - appointments.length;
+      if (skippedBookings > 0) {
+        console.log(
+          `⚠️ Skipped ${skippedBookings} bookings due to incomplete data (missing patient info)`
+        );
+      }
+      console.log(
+        `✅ Converted ${allBookings.length} valid bookings to ${appointments.length} valid appointments`
+      );
+
+      return { patients, appointments };
+    } catch (error) {
+      console.error(
+        "❌ Error fetching patients and appointments from Cliniko:",
+        error
+      );
+      throw error;
+    }
   }
 }

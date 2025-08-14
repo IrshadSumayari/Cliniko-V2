@@ -22,6 +22,7 @@ CREATE TABLE IF NOT EXISTS users (
     is_onboarded BOOLEAN DEFAULT FALSE,
     subscription_status TEXT DEFAULT 'trial',
     trial_ends_at TIMESTAMP WITH TIME ZONE DEFAULT (NOW() + INTERVAL '7 days'),
+    pms_type TEXT,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
@@ -53,6 +54,8 @@ CREATE TABLE patients (
     phone TEXT,
     date_of_birth DATE,
     patient_type TEXT CHECK (patient_type IN ('EPC', 'WC', 'Private')),
+    physio_name TEXT,
+    pms_last_modified TEXT,
     is_active BOOLEAN DEFAULT TRUE,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
@@ -69,13 +72,26 @@ CREATE TABLE appointments (
     appointment_type TEXT,
     status TEXT NOT NULL,
     appointment_date TIMESTAMP WITH TIME ZONE NOT NULL,
-    appointment_end_date TIMESTAMP WITH TIME ZONE NOT NULL,
     practitioner_name TEXT,
     notes TEXT,
+    duration_minutes INTEGER,
     is_completed BOOLEAN DEFAULT FALSE,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
     UNIQUE(user_id, pms_appointment_id, pms_type)
+);
+
+-- Create appointment_types table
+CREATE TABLE appointment_types (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    appointment_id TEXT NOT NULL,
+    appointment_name TEXT NOT NULL,
+    pms_type TEXT NOT NULL,
+    code TEXT NOT NULL,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    UNIQUE(user_id, appointment_id, pms_type)
 );
 
 -- Create sync_logs table
@@ -85,12 +101,15 @@ CREATE TABLE sync_logs (
     pms_type TEXT NOT NULL,
     sync_type TEXT NOT NULL CHECK (sync_type IN ('initial', 'incremental', 'manual')),
     status TEXT NOT NULL CHECK (status IN ('running', 'completed', 'failed')),
+    patients_processed INTEGER DEFAULT 0,
+    patients_added INTEGER DEFAULT 0,
     patients_synced INTEGER DEFAULT 0,
     appointments_synced INTEGER DEFAULT 0,
     errors_count INTEGER DEFAULT 0,
     error_details JSONB,
     started_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
     completed_at TIMESTAMP WITH TIME ZONE,
+    last_modified_sync TIMESTAMP WITH TIME ZONE,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 

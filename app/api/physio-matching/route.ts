@@ -3,6 +3,16 @@ import { supabase } from "@/integrations/supabase/client"
 
 export async function GET(req: NextRequest) {
   try {
+    // Get the authorization header
+    const authHeader = req.headers.get("authorization");
+    
+    if (!authHeader || !authHeader.startsWith("Bearer ")) {
+      return NextResponse.json(
+        { error: "Authentication required. Please provide a valid token." },
+        { status: 401 }
+      );
+    }
+
     const { searchParams } = new URL(req.url)
     const clinicId = searchParams.get("clinicId")
 

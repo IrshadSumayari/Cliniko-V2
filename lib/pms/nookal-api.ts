@@ -60,12 +60,18 @@ export class NookalAPI implements PMSApiInterface {
     }
   }
 
-  async getPatients(lastModified?: string): Promise<PMSPatient[]> {
+  async getPatients(lastModified?: string, appointmentTypeIds?: string[]): Promise<PMSPatient[]> {
     try {
       const params: Record<string, string> = {};
 
       if (lastModified) {
         params.modified_since = lastModified;
+      }
+
+      // Note: Nookal API doesn't support appointment type filtering like Cliniko
+      // So we'll ignore the appointmentTypeIds parameter for now
+      if (appointmentTypeIds && appointmentTypeIds.length > 0) {
+        console.log("⚠️ Nookal API doesn't support appointment type filtering, fetching all patients");
       }
 
       const response = await this.makeRequest("/getPatients", params);

@@ -26,6 +26,7 @@ import {
 } from "lucide-react";
 import { useAuth } from "@/contexts/auth-context";
 import { toast } from "sonner";
+import { authenticatedFetch } from "@/lib/utils";
 
 interface PMSConnection {
   software: string;
@@ -94,9 +95,8 @@ const Settings = ({ onBack }: { onBack: () => void }) => {
   async function handleUpgrade() {
     setUpgradeLoading(true);
     try {
-      const res = await fetch("/api/create-checkout-session", {
+      const res = await authenticatedFetch("/api/create-checkout-session", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           email: user?.email,
           userId: user?.id,

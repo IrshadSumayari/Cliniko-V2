@@ -220,6 +220,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         return "Please enter a valid email address.";
       case "Email rate limit exceeded":
         return "Too many requests. Please wait a moment before trying again.";
+      case "User already registered":
+        return "An account with this email already exists. Please sign in instead.";
+      case "A user with this email address has already been registered":
+        return "An account with this email already exists. Please sign in instead.";
       default:
         // Handle other common error patterns
         if (error.message?.includes("password")) {
@@ -230,6 +234,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         }
         if (error.message?.includes("network")) {
           return "Network error. Please check your connection and try again.";
+        }
+        if (error.message?.includes("already been registered")) {
+          return "An account with this email already exists. Please sign in instead.";
         }
         return (
           error.message || "An unexpected error occurred. Please try again."
@@ -246,20 +253,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   ): Promise<AuthResult> => {
     setIsLoading(true);
     try {
-      const { data: existingUser } = await supabase
-        .from("users")
-        .select("email")
-        .eq("email", email)
-        .single();
-
-      if (existingUser) {
-        return {
-          success: false,
-          error:
-            "An account with this email already exists. Please sign in instead.",
-        };
-      }
-
+      // Let Supabase handle duplicate email checks automatically
       const { error } = await supabase.auth.signUp({
         email,
         password,

@@ -17,6 +17,7 @@ import {
 import { useAuth } from "@/contexts/auth-context";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
+import { authenticatedFetch } from "@/lib/utils";
 
 type OnboardingStep = "pms" | "api" | "syncing" | "sync-results";
 
@@ -73,11 +74,8 @@ export default function OnboardingFlow() {
     setCurrentStep("syncing");
 
     try {
-      const response = await fetch("/api/pms/connect-and-sync", {
+      const response = await authenticatedFetch("/api/pms/connect-and-sync", {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
         body: JSON.stringify({
           pmsType: formData.selectedPMS.toLowerCase(),
           apiKey: formData.apiKey,
@@ -107,9 +105,19 @@ export default function OnboardingFlow() {
       setCurrentStep("sync-results");
     } catch (error) {
       console.error("Sync error:", error);
-      toast.error(
-        error instanceof Error ? error.message : "Failed to connect to PMS"
-      );
+      
+      let errorMessage = "Failed to connect to PMS";
+      if (error instanceof Error) {
+        if (error.message.includes("Failed to fetch")) {
+          errorMessage = "Network error. Please check your connection and try again.";
+        } else if (error.message.includes("authentication")) {
+          errorMessage = "Authentication error. Please refresh the page and sign in again.";
+        } else {
+          errorMessage = error.message;
+        }
+      }
+      
+      toast.error(errorMessage);
       setCurrentStep("api");
     } finally {
       setIsProcessing(false);
