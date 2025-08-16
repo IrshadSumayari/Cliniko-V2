@@ -2,7 +2,7 @@
   "crons": [
     {
       "path": "/api/cron/sync-patients",
-      "schedule": "0 */6 * * *"
+      "schedule": "0 */24 * * *"
     }
   ],
   "functions": {
@@ -11,4 +11,3 @@
     }
   }
 }
-
