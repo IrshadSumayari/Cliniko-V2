@@ -63,6 +63,11 @@ export interface PMSApiInterface {
     lastModified?: string,
     appointmentTypeIds?: string[]
   ): Promise<PMSPatient[]>;
+  getAllPatients(): Promise<PMSPatient[]>;
+  getModifiedPatients(lastModified: Date): Promise<PMSPatient[]>;
+  isEPCPatient(patient: any): boolean;
+  isWCPatient(patient: any): boolean;
+  isCompletedAppointment(appointment: any): boolean;
   getPatientsWithAppointments?(
     lastModified?: string,
     appointmentTypeIds?: string[]
@@ -71,7 +76,10 @@ export interface PMSApiInterface {
     patientIds: string[],
     lastModified?: string
   ): Promise<PMSAppointment[]>;
-  getPatientAppointments(patientId: string): Promise<PMSAppointment[]>;
+  getPatientAppointments(
+    patientId: string,
+    lastModified?: Date
+  ): Promise<PMSAppointment[]>;
   getAppointmentTypes(): Promise<any[]>;
   processAppointmentTypes(appointmentTypes: any[]): AppointmentType[];
 }
