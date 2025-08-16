@@ -1,21 +1,19 @@
 // Configuration file with environment variables
 export const config = {
   //Production DB
-  supabase: {
-    url: "https://kbsneyhvuhkkshlmnloa.supabase.co",
-    anonKey:
-      "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imtic25leWh2dWhra3NobG1ubG9hIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTQzMTU1OTIsImV4cCI6MjA2OTg5MTU5Mn0.PBU7DGi_ystiqCGveVT1vXDoxhNOi7FlMieLbg_NlE4",
-    serviceRoleKey:
-      "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imtic25leWh2dWhra3NobG1ubG9hIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc1NDMxNTU5MiwiZXhwIjoyMDY5ODkxNTkyfQ.YgngnBUB43vtkI44BdXtx5hefyCgUzSGOHxsIOgtQyw",
-  },
-  //Local DB
   // supabase: {
-  //   url: "https://iyielcnhqudbzuisswwl.supabase.co",
-  //   anonKey:
-  //     "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Iml5aWVsY25ocXVkYnp1aXNzd3dsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTUxNjU0NTEsImV4cCI6MjA3MDc0MTQ1MX0.Yy5C6dp_Z3Z1L-siOIJOG5Fgy8ZdDmUU8xYya-GKzm0",
-  //   serviceRoleKey:
-  //     "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Iml5aWVsY25ocXVkYnp1aXNzd3dsIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc1NTE2NTQ1MSwiZXhwIjoyMDcwNzQxNDUxfQ.Xgptm46wf_r6PN301PSIMaKvg9Vkhb8bxelJgVJkPd8",
+  //   url: "https://kbsneyhvuhkkshlmnloa.supabase.co",
+  //   anonKey: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imtic25leWh2dWhra3NobG1ubG9hIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTQzMTU1OTIsImV4cCI6MjA2OTg5MTU5Mn0.PBU7DGi_ystiqCGveVT1vXDoxhNOi7FlMieLbg_NlE4",
+  //   serviceRoleKey: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imtic25leWh2dWhra3NobG1ubG9hIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc1NDMxNTU5MiwiZXhwIjoyMDY5ODkxNTkyfQ.YgngnBUB43vtkI44BdXtx5hefyCgUzSGOHxsIOgtQyw",
   // },
+  //Local DB
+  supabase: {
+    url: "https://iyielcnhqudbzuisswwl.supabase.co",
+    anonKey:
+      "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Iml5aWVsY25ocXVkYnp1aXNzd3dsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTUxNjU0NTEsImV4cCI6MjA3MDc0MTQ1MX0.Yy5C6dp_Z3Z1L-siOIJOG5Fgy8ZdDmUU8xYya-GKzm0",
+    serviceRoleKey:
+      "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Iml5aWVsY25ocXVkYnp1aXNzd3dsIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc1NTE2NTQ1MSwiZXhwIjoyMDcwNzQxNDUxfQ.Xgptm46wf_r6PN301PSIMaKvg9Vkhb8bxelJgVJkPd8",
+  },
   encryption: {
     secret: "83a22bb4478e7b82a17e27e7ec59c664453ecd630d3cb890cb7e79679b1c5749",
   },
