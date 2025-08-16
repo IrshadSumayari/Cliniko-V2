@@ -28,8 +28,20 @@ function AuthenticatedApp() {
 }
 
 export default function HomePage() {
-  const { user, loading } = useAuth();
+  const { user, loading, refreshUserData } = useAuth();
+  useEffect(() => {
+    if (loading) {
+      const timer = setTimeout(() => {
+        // console.warn("Auth loading too long → clearing storage & reloading");
+        // localStorage.clear();
+        // sessionStorage.clear();
+        // window.location.reload();
+        refreshUserData();
+      }, 10000); // 10 seconds
 
+      return () => clearTimeout(timer);
+    }
+  }, [loading]);
   // REMOVED: localStorage clearing logic that was causing logout issues
   //
   // Previous issue: The page was clearing localStorage after 10 seconds of loading,
