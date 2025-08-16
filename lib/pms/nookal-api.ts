@@ -168,36 +168,20 @@ export class NookalAPI implements PMSApiInterface {
       console.log(`[NOOKAL] Found ${patients.length} EPC/WC patients`);
 
       const allAppointments: PMSAppointment[] = [];
-      const MAX_APPOINTMENTS = 200;
 
       for (const patient of patients) {
-        // Check if we've reached the appointment limit
-        if (allAppointments.length >= MAX_APPOINTMENTS) {
-          break;
-        }
-
         const patientAppointments = await this.getPatientAppointments(
           patient.id.toString()
         );
-
-        // Add appointments up to the limit
-        const remainingSlots = MAX_APPOINTMENTS - allAppointments.length;
-        const appointmentsToAdd = patientAppointments.slice(0, remainingSlots);
-        allAppointments.push(...appointmentsToAdd);
-
-        if (allAppointments.length >= MAX_APPOINTMENTS) {
-          break;
-        }
+        
+        // Add all appointments (no limit)
+        allAppointments.push(...patientAppointments);
       }
 
       console.log(
-        `[NOOKAL] Found ${allAppointments.length} total appointments (limited to ${MAX_APPOINTMENTS})`
+        `[NOOKAL] Found ${allAppointments.length} total appointments`
       );
-
-      return {
-        patients,
-        appointments: allAppointments,
-      };
+      return { patients, appointments: allAppointments };
     } catch (error) {
       console.error("Error fetching Nookal patients with appointments:", error);
       throw error;
