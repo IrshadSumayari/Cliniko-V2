@@ -9,13 +9,19 @@ import { useState, useMemo, useEffect } from "react";
 
 /**
  * A wrapper for the main application view after a user is authenticated and onboarded.
- * It handles navigation between the dashboard and settings.
+ * It handles navigation between the dashboard, settings, and onboarding.
  */
 function AuthenticatedApp() {
-  const [view, setView] = useState<"dashboard" | "settings">("dashboard");
+  const [view, setView] = useState<"dashboard" | "settings" | "onboarding">(
+    "dashboard"
+  );
 
   if (view === "settings") {
     return <Settings onBack={() => setView("dashboard")} />;
+  }
+
+  if (view === "onboarding") {
+    return <OnboardingFlow />;
   }
 
   return <Dashboard onNavigate={setView} />;
@@ -24,18 +30,17 @@ function AuthenticatedApp() {
 export default function HomePage() {
   const { user, loading } = useAuth();
 
-  useEffect(() => {
-    if (loading) {
-      const timer = setTimeout(() => {
-        console.warn("Auth loading too long → clearing storage & reloading");
-        localStorage.clear();
-        sessionStorage.clear();
-        window.location.reload();
-      }, 10000); // 10 seconds
-
-      return () => clearTimeout(timer);
-    }
-  }, [loading]);
+  // REMOVED: localStorage clearing logic that was causing logout issues
+  //
+  // Previous issue: The page was clearing localStorage after 10 seconds of loading,
+  // which caused users to be logged out during long operations like sync.
+  //
+  // Solution: The auth context now properly handles:
+  // 1. User authentication status from Supabase
+  // 2. User onboarding status from database (is_onboarded field)
+  // 3. Proper loading states without clearing user data
+  //
+  // This ensures users stay logged in even after refresh or during long operations.
 
   const content = useMemo(() => {
     if (loading) {
@@ -50,6 +55,8 @@ export default function HomePage() {
       return <LandingPage />;
     }
 
+    // Check if user is onboarded based on database status
+    // This ensures users stay logged in even after refresh
     if (user && !user.isOnboarded) {
       return <OnboardingFlow />;
     }
