@@ -43,6 +43,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const router = useRouter();
 
   // Clear any potentially stale tokens from localStorage
+  // NOTE: This function is now only called when we actually detect invalid tokens,
+  // NOT as a preventive measure to avoid logging out valid users
   const clearStaleTokens = () => {
     try {
       // Clear Supabase-related tokens that might be stale
@@ -69,12 +71,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       
       if (sessionError || !session) {
         console.warn("Session validation failed, user may have expired token");
+        // Only clear tokens when we actually detect they're invalid
+        clearStaleTokens();
         throw new Error("Invalid or expired session");
       }
       
       // Check if the session user matches the authUser
       if (session.user.id !== authUser.id) {
         console.warn("Session user ID mismatch, token may be stale");
+        // Only clear tokens when we actually detect they're invalid
+        clearStaleTokens();
         throw new Error("Session user mismatch");
       }
 
@@ -152,14 +158,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       try {
         console.log("Initializing auth...");
         
-        // Clear any potentially stale tokens from localStorage first
-        clearStaleTokens();
-
+        // DON'T clear tokens before validation - this was causing valid users to get logged out
+        
         // Add a safety timeout to prevent hanging
         safetyTimeoutId = setTimeout(() => {
           if (mounted) {
             console.warn("Auth initialization taking too long, forcing completion");
-            clearStaleTokens(); // Clear stale tokens when timing out
+            clearStaleTokens(); // Only clear tokens when timing out
             setLoading(false);
             setUser(null);
           }
@@ -179,7 +184,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
         if (error) {
           console.error("Error getting session:", error);
-          clearStaleTokens(); // Clear stale tokens on error
+          // Only clear tokens on actual session errors, not as prevention
           if (mounted) {
             setUser(null);
             setLoading(false);
@@ -197,13 +202,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           }
         } else if (mounted) {
           console.log("No session found");
-          clearStaleTokens(); // Clear stale tokens when no session
+          // Only clear tokens when we actually have no session, not as prevention
+          clearStaleTokens();
           setUser(null);
           setLoading(false);
         }
       } catch (error) {
         console.error("Error initializing auth:", error);
-        clearStaleTokens(); // Clear stale tokens on any error
+        // Only clear tokens on actual errors, not as prevention
         if (mounted) {
           setUser(null);
           setLoading(false);
@@ -238,7 +244,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           }
         } else {
           console.log("Auth state change: no authenticated user");
-          clearStaleTokens(); // Clear stale tokens when no session
+          // Only clear tokens when we actually have no session, not as prevention
+          clearStaleTokens();
           if (mounted) {
             setUser(null);
             setLoading(false);
@@ -246,7 +253,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         }
       } catch (error) {
         console.error("Error handling auth state change:", error);
-        clearStaleTokens(); // Clear stale tokens on error
+        // Only clear tokens on actual errors, not as prevention
         if (session?.user && mounted) {
           setUser({ ...session.user, isOnboarded: false });
           setLoading(false);
