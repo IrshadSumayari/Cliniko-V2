@@ -80,6 +80,15 @@ const Settings = ({ onBack }: { onBack: () => void }) => {
       return;
     }
 
+    // Validate API key format based on PMS type
+    if (pmsConnection.software === "Nookal") {
+      const nookalPattern = /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/;
+      if (!nookalPattern.test(pmsConnection.apiKey)) {
+        toast.error("Invalid Nookal API key format. Expected format: xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx");
+        return;
+      }
+    }
+
     const updatedConnection = {
       ...pmsConnection,
       connected: true,

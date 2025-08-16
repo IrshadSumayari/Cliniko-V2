@@ -58,7 +58,13 @@ export class PMSFactory {
       case "halaxy":
         return credentials.apiKey.length > 0
       case "nookal":
-        return credentials.apiKey.length > 0
+        // Nookal API keys follow UUID v4 format: xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx
+        const nookalPattern = /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/
+        const isValidNookal = nookalPattern.test(credentials.apiKey)
+        console.log(`   Nookal key format validation: ${isValidNookal}`)
+        console.log(`   Expected format: xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx`)
+        console.log(`   ✅ Validation result: ${isValidNookal}`)
+        return isValidNookal
       default:
         console.log(`❌ Unsupported PMS type: ${pmsType}`)
         return false

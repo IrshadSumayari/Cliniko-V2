@@ -249,11 +249,11 @@ export async function POST(request: NextRequest) {
       pmsType
     );
 
-    // Update user's onboarding status to true after successful sync
-    await adminSupabase
-      .from("users")
-      .update({ is_onboarded: true })
-      .eq("id", userRecordData.id);
+    // Don't automatically update onboarding status - let user decide when to complete onboarding
+    // await adminSupabase
+    //   .from("users")
+    //   .update({ is_onboarded: true })
+    //   .eq("id", userRecordData.id);
 
     // Log sync completion
     await adminSupabase.from("sync_logs").insert({
