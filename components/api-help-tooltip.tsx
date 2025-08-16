@@ -27,7 +27,7 @@ export default function ApiHelpTooltip({ pmsName }: ApiHelpTooltipProps) {
             "Login to Nookal → Setup",
             "Go to System → API Management",
             "Click 'Create API Key'",
-            "Copy the generated key",
+            "Copy the generated key (format: xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx)",
           ],
           url: "https://help.nookal.com/article/api-access",
         }

@@ -1,238 +1,442 @@
-"use client"
+"use client";
 
-import { useState } from "react"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { Badge } from "@/components/ui/badge"
-import { Separator } from "@/components/ui/separator"
-import { Alert, AlertDescription } from "@/components/ui/alert"
-import { ArrowLeft, SettingsIcon, User, CheckCircle, AlertCircle, Zap, Bell } from "lucide-react"
-import { useAuth } from "@/contexts/auth-context"
-import ApiHelpTooltip from "@/components/api-help-tooltip"
+import { useState, useEffect } from "react";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import {
+  SettingsIcon,
+  User,
+  Building2,
+  Plug,
+  Save,
+  ArrowLeft,
+  CheckCircle,
+  XCircle,
+  Loader2,
+  Crown,
+} from "lucide-react";
+import { useAuth } from "@/contexts/auth-context";
+import { toast } from "sonner";
+import { authenticatedFetch } from "@/lib/utils";
 
-interface SettingsProps {
-  onBack?: () => void
+interface PMSConnection {
+  software: string;
+  apiKey: string;
+  connected: boolean;
+  lastSync: string;
 }
+import { config } from "@/lib/config";
 
-export default function Settings({ onBack }: SettingsProps) {
-  const { user } = useAuth()
-  const [selectedPMS, setSelectedPMS] = useState(user?.pmsType || "")
-  const [apiKey, setApiKey] = useState("")
-  const [isConnecting, setIsConnecting] = useState(false)
-  const [connectionStatus, setConnectionStatus] = useState<"idle" | "success" | "error">("idle")
+// Get the professional plan price ID
+const priceId = config.stripe.priceIds.professional;
+const Settings = ({ onBack }: { onBack: () => void }) => {
+  const { user, signOut } = useAuth();
+  const [upgradeLoading, setUpgradeLoading] = useState(false);
+  const [profile, setProfile] = useState({
+    firstName: user?.user_metadata?.first_name || "",
+    lastName: user?.user_metadata?.last_name || "",
+    email: user?.email || "",
+    clinicName: user?.user_metadata?.clinic_name || "",
+  });
 
-  const pmsOptions = [
-    { value: "cliniko", label: "Cliniko", description: "Popular practice management system" },
-    { value: "nookal", label: "Nookal", description: "Comprehensive clinic management" },
-    { value: "halaxy", label: "Halaxy", description: "All-in-one practice solution" },
-    { value: "other", label: "Other", description: "Contact us for custom integration" },
-  ]
+  const [pmsConnection, setPmsConnection] = useState<PMSConnection>({
+    software: "",
+    apiKey: "",
+    connected: false,
+    lastSync: "",
+  });
 
-  const handleConnect = async () => {
-    if (!selectedPMS || !apiKey) return
+  const [subscriptionStatus] = useState({
+    plan: "Free Trial",
+    daysLeft: 7,
+    usage: 45,
+    limit: 100,
+  });
 
-    setIsConnecting(true)
+  useEffect(() => {
+    // Load PMS connection from localStorage
+    const savedConnection = localStorage.getItem("pms_connection");
+    if (savedConnection) {
+      setPmsConnection(JSON.parse(savedConnection));
+    }
+  }, []);
 
-    // Simulate API connection
-    await new Promise((resolve) => setTimeout(resolve, 2000))
+  const handleProfileSave = () => {
+    // In a real app, this would save to backend
+    toast.success("Profile information has been saved.");
+  };
 
-    // Simulate success/failure
-    const success = Math.random() > 0.3
-    setConnectionStatus(success ? "success" : "error")
-    setIsConnecting(false)
+  const handlePMSConnect = () => {
+    if (!pmsConnection.software || !pmsConnection.apiKey) {
+      toast.error("Please select your software and enter an API key.");
+      return;
+    }
+
+    // Validate API key format based on PMS type
+    if (pmsConnection.software === "Nookal") {
+      const nookalPattern = /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/;
+      if (!nookalPattern.test(pmsConnection.apiKey)) {
+        toast.error("Invalid Nookal API key format. Expected format: xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx");
+        return;
+      }
+    }
+
+    const updatedConnection = {
+      ...pmsConnection,
+      connected: true,
+      lastSync: new Date().toLocaleString(),
+    };
+
+    setPmsConnection(updatedConnection);
+    localStorage.setItem("pms_connection", JSON.stringify(updatedConnection));
+
+    toast.success(`Successfully connected to ${pmsConnection.software}.`);
+  };
+  async function handleUpgrade() {
+    setUpgradeLoading(true);
+    try {
+      const res = await authenticatedFetch("/api/create-checkout-session", {
+        method: "POST",
+        body: JSON.stringify({
+          email: user?.email,
+          userId: user?.id,
+        }),
+      });
+
+      const contentType = res.headers.get("content-type") || "";
+      if (!contentType.includes("application/json")) {
+        throw new Error(
+          `Expected JSON, got ${contentType}. Possible HTML error page.`
+        );
+      }
+
+      const data = await res.json();
+
+      if (!res.ok) {
+        console.error("Upgrade failed:", data.error);
+        toast.error(data.error || "Upgrade failed");
+        setUpgradeLoading(false);
+        return;
+      }
+
+      if (data.url) {
+        window.location.href = data.url;
+      }
+    } catch (error) {
+      console.error("Upgrade error:", error);
+      toast.error("Something went wrong. Please try again.");
+    } finally {
+      setUpgradeLoading(false);
+    }
   }
 
-  const handleTestConnection = async () => {
-    setIsConnecting(true)
-    await new Promise((resolve) => setTimeout(resolve, 1500))
-    setConnectionStatus("success")
-    setIsConnecting(false)
-  }
+  const handlePMSDisconnect = () => {
+    const updatedConnection = {
+      ...pmsConnection,
+      connected: false,
+      lastSync: "",
+    };
+
+    setPmsConnection(updatedConnection);
+    localStorage.setItem("pms_connection", JSON.stringify(updatedConnection));
+
+    toast.success("Your practice management software has been disconnected.");
+  };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50 dark:from-slate-950 dark:via-blue-950 dark:to-indigo-950">
-      {/* Header */}
-      <header className="border-b border-border bg-card/95 backdrop-blur-sm sticky top-0 z-50">
-        <div className="container mx-auto px-6 py-4">
-          <div className="flex items-center gap-4">
-            <Button variant="ghost" size="sm" onClick={onBack}>
-              <ArrowLeft className="h-4 w-4 mr-2" />
-              Back to Dashboard
-            </Button>
-            <Separator orientation="vertical" className="h-6" />
-            <div className="flex items-center gap-2">
-              <SettingsIcon className="h-5 w-5" />
-              <h1 className="text-xl font-semibold">Settings</h1>
+    <div className="min-h-screen bg-gradient-to-b from-background to-accent">
+      <div className="container mx-auto px-6 py-8">
+        {/* Header */}
+        <div className="flex items-center gap-4 mb-8">
+          <Button variant="ghost" size="sm" onClick={onBack}>
+            <ArrowLeft className="h-4 w-4 mr-2" />
+            Back to Dashboard
+          </Button>
+          <div className="flex items-center gap-3">
+            <div className="p-2 bg-primary/10 rounded-lg">
+              <SettingsIcon className="h-6 w-6 text-primary" />
+            </div>
+            <div>
+              <h1 className="text-3xl font-bold">Settings</h1>
+              <p className="text-muted-foreground">
+                Manage your account and preferences
+              </p>
             </div>
           </div>
         </div>
-      </header>
 
-      <main className="container mx-auto px-6 py-8">
-        <Tabs defaultValue="integration" className="space-y-6">
-          <TabsList className="grid w-full grid-cols-3 lg:w-[400px] bg-white/80 dark:bg-slate-800/80 backdrop-blur-sm">
-            <TabsTrigger value="integration">PMS Integration</TabsTrigger>
-            <TabsTrigger value="profile">Profile</TabsTrigger>
-            <TabsTrigger value="notifications">Notifications</TabsTrigger>
-          </TabsList>
+        <div className="grid lg:grid-cols-2 gap-8">
+          {/* Profile Settings */}
+          <Card className="p-6">
+            <div className="flex items-center gap-3 mb-6">
+              <User className="h-5 w-5 text-primary" />
+              <h2 className="text-xl font-semibold">Profile Information</h2>
+            </div>
 
-          <TabsContent value="integration" className="space-y-6">
-            <Card className="bg-white/80 dark:bg-slate-800/80 backdrop-blur-sm border-0 shadow-lg">
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Zap className="h-5 w-5" />
-                  Practice Management System Integration
-                </CardTitle>
-                <CardDescription>Connect your PMS to sync patient data and appointments</CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-6">
-                {/* PMS Selection */}
-                <div className="space-y-2">
-                  <Label htmlFor="pms-select">Select your PMS</Label>
-                  <Select value={selectedPMS} onValueChange={setSelectedPMS}>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Choose your practice management system" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {pmsOptions.map((option) => (
-                        <SelectItem key={option.value} value={option.value}>
-                          <div className="flex flex-col">
-                            <span>{option.label}</span>
-                            <span className="text-xs text-muted-foreground">{option.description}</span>
-                          </div>
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+            <div className="space-y-4">
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="text-sm font-medium text-muted-foreground">
+                    First Name
+                  </label>
+                  <Input
+                    value={profile.firstName}
+                    onChange={(e) =>
+                      setProfile((prev) => ({
+                        ...prev,
+                        firstName: e.target.value,
+                      }))
+                    }
+                  />
                 </div>
+                <div>
+                  <label className="text-sm font-medium text-muted-foreground">
+                    Last Name
+                  </label>
+                  <Input
+                    value={profile.lastName}
+                    onChange={(e) =>
+                      setProfile((prev) => ({
+                        ...prev,
+                        lastName: e.target.value,
+                      }))
+                    }
+                  />
+                </div>
+              </div>
 
-                {/* API Key Input */}
-                {selectedPMS && selectedPMS !== "other" && (
-                  <div className="space-y-2">
-                    <div className="flex items-center gap-2">
-                      <Label htmlFor="api-key">API Key</Label>
-                      <ApiHelpTooltip pmsName={pmsOptions.find((p) => p.value === selectedPMS)?.label || ""} />
-                    </div>
-                    <div className="flex gap-2">
-                      <Input
-                        id="api-key"
-                        type="password"
-                        placeholder="Enter your API key"
-                        value={apiKey}
-                        onChange={(e) => setApiKey(e.target.value)}
-                        className="flex-1"
-                      />
-                      <Button onClick={handleConnect} disabled={!apiKey || isConnecting} className="min-w-[100px]">
-                        {isConnecting ? "Connecting..." : "Connect"}
-                      </Button>
-                    </div>
-                  </div>
+              <div>
+                <label className="text-sm font-medium text-muted-foreground">
+                  Email
+                </label>
+                <Input
+                  type="email"
+                  value={profile.email}
+                  onChange={(e) =>
+                    setProfile((prev) => ({ ...prev, email: e.target.value }))
+                  }
+                />
+              </div>
+
+              <div>
+                <label className="text-sm font-medium text-muted-foreground">
+                  Clinic Name
+                </label>
+                <Input
+                  value={profile.clinicName}
+                  onChange={(e) =>
+                    setProfile((prev) => ({
+                      ...prev,
+                      clinicName: e.target.value,
+                    }))
+                  }
+                />
+              </div>
+
+              <Button onClick={handleProfileSave} className="w-full">
+                <Save className="h-4 w-4 mr-2" />
+                Save Profile
+              </Button>
+            </div>
+          </Card>
+
+          {/* PMS Connection */}
+          <Card className="p-6">
+            <div className="flex items-center justify-between mb-6">
+              <div className="flex items-center gap-3">
+                <Plug className="h-5 w-5 text-primary" />
+                <h2 className="text-xl font-semibold">PMS Connection</h2>
+              </div>
+              {pmsConnection.connected ? (
+                <Badge
+                  variant="secondary"
+                  className="bg-green-100 text-green-800 border-green-200"
+                >
+                  <CheckCircle className="h-3 w-3 mr-1" />
+                  Connected
+                </Badge>
+              ) : (
+                <Badge
+                  variant="secondary"
+                  className="bg-red-100 text-red-800 border-red-200"
+                >
+                  <XCircle className="h-3 w-3 mr-1" />
+                  Not Connected
+                </Badge>
+              )}
+            </div>
+
+            <div className="space-y-4">
+              <div>
+                <label className="text-sm font-medium text-muted-foreground">
+                  Practice Management Software
+                </label>
+                <select
+                  className="w-full mt-1 p-2 border border-border rounded-md bg-background"
+                  value={pmsConnection.software}
+                  onChange={(e) =>
+                    setPmsConnection((prev) => ({
+                      ...prev,
+                      software: e.target.value,
+                    }))
+                  }
+                  disabled={pmsConnection.connected}
+                >
+                  <option value="">Select your clinic</option>
+                  <option value="OptiPlex">Cliniko</option>
+                  <option value="HeroHealth">Halaxy</option>
+                  <option value="Nookal">Nookal</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="text-sm font-medium text-muted-foreground">
+                  API Key
+                </label>
+                <Input
+                  type="password"
+                  placeholder="Enter your API key"
+                  value={pmsConnection.apiKey}
+                  onChange={(e) =>
+                    setPmsConnection((prev) => ({
+                      ...prev,
+                      apiKey: e.target.value,
+                    }))
+                  }
+                  disabled={pmsConnection.connected}
+                />
+              </div>
+
+              {pmsConnection.connected && pmsConnection.lastSync && (
+                <div className="text-sm text-muted-foreground">
+                  Last sync: {pmsConnection.lastSync}
+                </div>
+              )}
+
+              {pmsConnection.connected ? (
+                <Button
+                  variant="outline"
+                  onClick={handlePMSDisconnect}
+                  className="w-full"
+                >
+                  <XCircle className="h-4 w-4 mr-2" />
+                  Disconnect
+                </Button>
+              ) : (
+                <Button onClick={handlePMSConnect} className="w-full">
+                  <Plug className="h-4 w-4 mr-2" />
+                  Connect PMS
+                </Button>
+              )}
+            </div>
+          </Card>
+
+          {/* Subscription Status */}
+          {/* <Card className="p-6">
+            <div className="flex items-center gap-3 mb-6">
+              <CreditCard className="h-5 w-5 text-primary" />
+              <h2 className="text-xl font-semibold">Subscription</h2>
+            </div>
+
+            <div className="space-y-4">
+              <div className="flex items-center justify-between">
+                <span className="text-sm font-medium">Current Plan</span>
+                <Badge variant="outline">{subscriptionStatus.plan}</Badge>
+              </div>
+
+              <div className="flex items-center justify-between">
+                <span className="text-sm font-medium">Days Remaining</span>
+                <span className="text-sm text-muted-foreground">
+                  {subscriptionStatus.daysLeft} days
+                </span>
+              </div>
+
+              <div>
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-sm font-medium">Usage</span>
+                  <span className="text-sm text-muted-foreground">
+                    {subscriptionStatus.usage}/{subscriptionStatus.limit}{" "}
+                    patients
+                  </span>
+                </div>
+                <div className="w-full bg-muted rounded-full h-2">
+                  <div
+                    className="bg-primary h-2 rounded-full transition-all"
+                    style={{
+                      width: `${
+                        (subscriptionStatus.usage / subscriptionStatus.limit) *
+                        100
+                      }%`,
+                    }}
+                  />
+                </div>
+              </div>
+
+              <Button onClick={handleUpgrade} className="w-full">
+                <CreditCard className="h-4 w-4 mr-2" />
+                Upgrade Plan
+              </Button>
+            </div>
+          </Card> */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Crown className="h-5 w-5 text-primary" />
+                Upgrade to Professional
+              </CardTitle>
+              <CardDescription>
+                Unlock all features and get unlimited access
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <span className="text-2xl font-bold">$30</span>
+                  <span className="text-muted-foreground">/month</span>
+                </div>
+                <ul className="space-y-1 text-sm text-muted-foreground">
+                  <li>✓ Unlimited patient matching</li>
+                  <li>✓ Advanced analytics and reporting</li>
+                </ul>
+              </div>
+              <Button
+                onClick={handleUpgrade}
+                disabled={upgradeLoading}
+                className="w-full"
+                size="lg"
+              >
+                {upgradeLoading && (
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                 )}
+                Upgrade Now
+              </Button>
+            </CardContent>
+          </Card>
+          {/* Account Actions */}
+          <Card className="p-6">
+            <div className="flex items-center gap-3 mb-6">
+              <Building2 className="h-5 w-5 text-primary" />
+              <h2 className="text-xl font-semibold">Account Actions</h2>
+            </div>
 
-                {/* Connection Status */}
-                {connectionStatus === "success" && (
-                  <Alert className="border-green-200 bg-green-50 dark:bg-green-950/20">
-                    <CheckCircle className="h-4 w-4 text-green-600" />
-                    <AlertDescription className="text-green-800 dark:text-green-200">
-                      Successfully connected to {pmsOptions.find((p) => p.value === selectedPMS)?.label}! Your data will
-                      sync automatically.
-                    </AlertDescription>
-                  </Alert>
-                )}
-
-                {connectionStatus === "error" && (
-                  <Alert className="border-red-200 bg-red-50 dark:bg-red-950/20">
-                    <AlertCircle className="h-4 w-4 text-red-600" />
-                    <AlertDescription className="text-red-800 dark:text-red-200">
-                      Failed to connect. Please check your API key and try again.
-                    </AlertDescription>
-                  </Alert>
-                )}
-
-                {/* Test Connection */}
-                {connectionStatus === "success" && (
-                  <div className="flex items-center justify-between p-4 rounded-lg bg-slate-50 dark:bg-slate-700/50">
-                    <div className="flex items-center gap-3">
-                      <Badge
-                        variant="default"
-                        className="bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200"
-                      >
-                        <CheckCircle className="h-3 w-3 mr-1" />
-                        Connected
-                      </Badge>
-                      <span className="text-sm">{pmsOptions.find((p) => p.value === selectedPMS)?.label}</span>
-                    </div>
-                    <Button variant="outline" size="sm" onClick={handleTestConnection}>
-                      Test Connection
-                    </Button>
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-          </TabsContent>
-
-          <TabsContent value="profile" className="space-y-6">
-            <Card className="bg-white/80 dark:bg-slate-800/80 backdrop-blur-sm border-0 shadow-lg">
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <User className="h-5 w-5" />
-                  Profile Information
-                </CardTitle>
-                <CardDescription>Update your personal and clinic information</CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-6">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="firstName">First Name</Label>
-                    <Input id="firstName" defaultValue={user?.firstName} />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="lastName">Last Name</Label>
-                    <Input id="lastName" defaultValue={user?.lastName} />
-                  </div>
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="email">Email</Label>
-                  <Input id="email" type="email" defaultValue={user?.email} />
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="clinicName">Clinic Name</Label>
-                  <Input id="clinicName" defaultValue={user?.clinicName} />
-                </div>
-
-                <Button>Save Changes</Button>
-              </CardContent>
-            </Card>
-          </TabsContent>
-
-          <TabsContent value="notifications" className="space-y-6">
-            <Card className="bg-white/80 dark:bg-slate-800/80 backdrop-blur-sm border-0 shadow-lg">
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Bell className="h-5 w-5" />
-                  Notification Preferences
-                </CardTitle>
-                <CardDescription>Configure how you want to receive notifications</CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-6">
-                <div className="text-center py-12">
-                  <Bell className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
-                  <h3 className="text-lg font-semibold mb-2">Notification Settings</h3>
-                  <p className="text-muted-foreground">
-                    Notification preferences will be available after PMS integration
-                  </p>
-                </div>
-              </CardContent>
-            </Card>
-          </TabsContent>
-        </Tabs>
-      </main>
+            <div className="space-y-3">
+              <Button variant="outline" onClick={signOut} className="w-full">
+                Sign Out
+              </Button>
+            </div>
+          </Card>
+        </div>
+      </div>
     </div>
-  )
-}
+  );
+};
+
+export default Settings;

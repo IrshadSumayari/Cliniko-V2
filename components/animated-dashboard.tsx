@@ -103,7 +103,7 @@ const AnimatedDashboard = () => {
   useEffect(() => {
     const interval = setInterval(() => {
       setAnimationStep((prev) => (prev + 1) % 4);
-    }, 3000);
+    }, 10000);
 
     return () => clearInterval(interval);
   }, []);
