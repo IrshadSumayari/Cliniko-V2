@@ -78,16 +78,24 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const refreshUserData = async () => {
     if (!user) return;
+    
+    // Prevent recursive calls
+    if (isLoading) return;
+    
     try {
+      setIsLoading(true);
       const updatedUser = await fetchUserData(user);
       setUser(updatedUser);
     } catch (error) {
       console.error("Error refreshing user data:", error);
+    } finally {
+      setIsLoading(false);
     }
   };
 
   useEffect(() => {
     let mounted = true;
+    let timeoutId: NodeJS.Timeout;
 
     const initializeAuth = async () => {
       try {
@@ -109,7 +117,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         if (session?.user && mounted) {
           console.log("Session found, fetching user data...");
           const userWithData = await fetchUserData(session.user);
-          setUser(userWithData);
+          if (mounted) {
+            setUser(userWithData);
+          }
         } else if (mounted) {
           console.log("No session found");
           setUser(null);
@@ -121,7 +131,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         }
       } finally {
         if (mounted) {
-          setLoading(false);
+          // Add a small delay to prevent rapid state changes
+          timeoutId = setTimeout(() => {
+            if (mounted) {
+              setLoading(false);
+            }
+          }, 100);
         }
       }
     };
@@ -136,25 +151,39 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       try {
         if (session?.user) {
           const userWithData = await fetchUserData(session.user);
-          setUser(userWithData);
+          if (mounted) {
+            setUser(userWithData);
+          }
         } else {
           console.log("No authenticated user");
-          setUser(null);
+          if (mounted) {
+            setUser(null);
+          }
         }
       } catch (error) {
         console.error("Error handling auth state change:", error);
-        if (session?.user) {
+        if (session?.user && mounted) {
           setUser({ ...session.user, isOnboarded: false });
-        } else {
+        } else if (mounted) {
           setUser(null);
         }
       } finally {
-        setLoading(false);
+        if (mounted) {
+          // Add a small delay to prevent rapid state changes
+          timeoutId = setTimeout(() => {
+            if (mounted) {
+              setLoading(false);
+            }
+          }, 100);
+        }
       }
     });
 
     return () => {
       mounted = false;
+      if (timeoutId) {
+        clearTimeout(timeoutId);
+      }
       subscription.unsubscribe();
     };
   }, []);
@@ -318,15 +347,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   const signOut = async () => {
-    setLoading(true);
     try {
       await supabase.auth.signOut();
       setUser(null);
+      // Don't set loading to true during signout to prevent infinite loops
       router.push("/");
     } catch (error) {
       console.error("Error signing out:", error);
-    } finally {
-      setLoading(false);
     }
   };
 
