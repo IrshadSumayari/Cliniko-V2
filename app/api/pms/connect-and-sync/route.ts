@@ -363,7 +363,7 @@ async function performInitialSync(
         `[SERVER] ✅ API call completed: ${patients.length} patients and ${allAppointments.length} appointments from Cliniko`
       );
     } else {
-      // For other PMS systems, fall back to old approach
+      // For other PMS system
       patients = await pmsClient.getPatients(undefined, appointmentTypeIds);
       console.log(
         `[SERVER] Fetched ${patients.length} patients from ${pmsType}`
