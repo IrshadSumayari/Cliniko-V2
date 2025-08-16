@@ -188,6 +188,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }
 
       setUser((prev) => (prev ? { ...prev, isOnboarded } : null));
+
+      // Also refresh user data from database to ensure consistency
+      await refreshUserData();
+
       return true;
     } catch (error) {
       console.error("Error updating onboarding status:", error);

@@ -194,10 +194,16 @@ export async function POST(request: NextRequest) {
     try {
       const region =
         pmsType === "cliniko" ? apiKey.split("-").pop() : undefined;
-      const apiUrl =
-        pmsType === "cliniko"
-          ? `https://api.${region}.cliniko.com/v1`
-          : undefined;
+      let apiUrl: string;
+      if (pmsType === "cliniko") {
+        apiUrl = `https://api.${region}.cliniko.com/v1`;
+      } else if (pmsType === "nookal") {
+        apiUrl = "https://api.nookal.com/production/v2";
+      } else if (pmsType === "halaxy") {
+        apiUrl = "https://api.halaxy.com/v1";
+      } else {
+        throw new Error(`Unsupported PMS type: ${pmsType}`);
+      }
 
       await storeEncryptedApiKey(userRecordData.id, pmsType, apiKey, apiUrl);
       console.log("✅ Credentials stored successfully in database!");
@@ -242,6 +248,12 @@ export async function POST(request: NextRequest) {
       userRecordData.id,
       pmsType
     );
+
+    // Update user's onboarding status to true after successful sync
+    await adminSupabase
+      .from("users")
+      .update({ is_onboarded: true })
+      .eq("id", userRecordData.id);
 
     // Log sync completion
     await adminSupabase.from("sync_logs").insert({
@@ -353,58 +365,76 @@ async function performInitialSync(
       );
     }
 
-    for (const patient of patients) {
+    console.log(`[SERVER] Processing ${patients.length} patients...`);
+    for (let i = 0; i < patients.length; i++) {
+      const patient = patients[i];
       const patientType = patient.patientType;
 
+      if (i % 10 === 0) {
+        console.log(`[SERVER] Processing patient ${i + 1}/${patients.length}`);
+      }
+
       if (patientType === "EPC" || patientType === "WC") {
-        const { data: patientData, error: patientError } = await supabase
-          .from("patients")
-          .upsert(
-            {
-              user_id: userId,
-              pms_patient_id: patient.id,
-              pms_type: pmsType,
-              first_name: patient.firstName,
-              last_name: patient.lastName,
-              email: patient.email,
-              phone: patient.phone,
-              date_of_birth: patient.dateOfBirth,
-              patient_type: patientType,
-              physio_name: patient.physioName,
-              pms_last_modified: patient.lastModified,
-              created_at: new Date().toISOString(),
-              updated_at: new Date().toISOString(),
-            },
-            {
-              onConflict: "user_id,pms_patient_id,pms_type",
-            }
-          )
-          .select(); // Add this to return the inserted/updated data
+        try {
+          const { data: patientData, error: patientError } = await supabase
+            .from("patients")
+            .upsert(
+              {
+                user_id: userId,
+                pms_patient_id: String(patient.id), // Ensure string type
+                pms_type: pmsType,
+                first_name: patient.firstName || "",
+                last_name: patient.lastName || "",
+                email: patient.email || null,
+                phone: patient.phone || null,
+                date_of_birth: patient.dateOfBirth || null,
+                patient_type: patientType,
+                physio_name: patient.physioName || null,
+                pms_last_modified:
+                  patient.lastModified || new Date().toISOString(),
+                created_at: new Date().toISOString(),
+                updated_at: new Date().toISOString(),
+              },
+              {
+                onConflict: "user_id,pms_patient_id,pms_type",
+              }
+            )
+            .select();
 
-        if (patientError) {
-          console.error("[SERVER] Error storing patient:", patientError);
+          if (patientError) {
+            console.error("[SERVER] Error storing patient:", patientError);
+            issues.push(
+              `Failed to store patient: ${patient.firstName} ${patient.lastName}`
+            );
+            continue;
+          }
+
+          if (!patientData || patientData.length === 0) {
+            console.error("[SERVER] No patient data returned from upsert");
+            issues.push(
+              `No data returned for patient: ${patient.firstName} ${patient.lastName}`
+            );
+            continue;
+          }
+
+          if (patientType === "EPC") epcPatients++;
+          if (patientType === "WC") wcPatients++;
+        } catch (error) {
+          console.error("[SERVER] Exception storing patient:", error);
           issues.push(
-            `Failed to store patient: ${patient.firstName} ${patient.lastName}`
+            `Exception storing patient: ${patient.firstName} ${patient.lastName}`
           );
-          continue; // Skip to next patient if there's an error
         }
-
-        if (!patientData || patientData.length === 0) {
-          console.error("[SERVER] No patient data returned from upsert");
-          issues.push(
-            `No data returned for patient: ${patient.firstName} ${patient.lastName}`
-          );
-          continue; // Skip to next patient if no data returned
-        }
-
-        if (patientType === "EPC") epcPatients++;
-        if (patientType === "WC") wcPatients++;
       } else {
         console.log(
           `[SERVER] Skipping patient with type: ${patientType} (not EPC or WC)`
         );
       }
     }
+
+    console.log(
+      `[SERVER] Patient processing complete. EPC: ${epcPatients}, WC: ${wcPatients}`
+    );
 
     // Now process ALL appointments that meet the 3 conditions (outside patient loop)
     let appointmentsToProcess: any[] = [];
@@ -414,15 +444,30 @@ async function performInitialSync(
       appointmentsToProcess = allAppointments;
     } else {
       // For other PMS systems, fetch appointments for each patient
+      console.log("[SERVER] Fetching appointments for EPC/WC patients...");
       for (const patient of patients) {
         if (patient.patientType === "EPC" || patient.patientType === "WC") {
-          const patientAppointments = await pmsClient.getPatientAppointments(
-            patient.id
-          );
-          appointmentsToProcess.push(...patientAppointments);
+          try {
+            const patientAppointments = await pmsClient.getPatientAppointments(
+              patient.id
+            );
+            appointmentsToProcess.push(...patientAppointments);
+          } catch (error) {
+            console.error(
+              `[SERVER] Error fetching appointments for patient ${patient.id}:`,
+              error
+            );
+            issues.push(
+              `Failed to fetch appointments for patient: ${patient.firstName} ${patient.lastName}`
+            );
+          }
         }
       }
     }
+
+    console.log(
+      `[SERVER] Found ${appointmentsToProcess.length} total appointments to process`
+    );
 
     // Apply the 3 conditions to ALL appointments
     const validCompletedAppointments = appointmentsToProcess.filter(
@@ -431,7 +476,6 @@ async function performInitialSync(
         const appointmentDate = new Date(apt.appointment_date || apt.date);
 
         return (
-          // apt.status === "completed" &&
           apt.cancelled_at === null && // cancelled_at = null
           apt.did_not_arrive === false && // did_not_arrive = false
           appointmentDate <= today // appointment_date <= today
@@ -439,56 +483,120 @@ async function performInitialSync(
       }
     );
 
-    // Store all valid appointments
-    for (const appointment of validCompletedAppointments) {
-      // Try to find the patient in our database by PMS patient ID
-      let patientIdForAppointment = null;
+    console.log(
+      `[SERVER] Found ${validCompletedAppointments.length} valid appointments after filtering`
+    );
 
-      const appointmentPatientId =
-        appointment.patientId || appointment.patient_id;
-      if (appointmentPatientId) {
-        // Look up the patient in our database
-        const { data: patientLookup } = await supabase
-          .from("patients")
-          .select("id")
-          .eq("user_id", userId)
-          .eq("pms_patient_id", appointmentPatientId)
-          .eq("pms_type", pmsType)
-          .single();
+    const BATCH_SIZE = 50; // Process appointments in batches to prevent timeouts
+    const totalBatches = Math.ceil(
+      validCompletedAppointments.length / BATCH_SIZE
+    );
 
-        if (patientLookup) {
-          patientIdForAppointment = patientLookup.id;
+    for (let batchIndex = 0; batchIndex < totalBatches; batchIndex++) {
+      const startIndex = batchIndex * BATCH_SIZE;
+      const endIndex = Math.min(
+        startIndex + BATCH_SIZE,
+        validCompletedAppointments.length
+      );
+      const batch = validCompletedAppointments.slice(startIndex, endIndex);
+
+      console.log(
+        `[SERVER] Processing appointment batch ${
+          batchIndex + 1
+        }/${totalBatches} (${batch.length} appointments)`
+      );
+
+      for (let i = 0; i < batch.length; i++) {
+        const appointment = batch[i];
+
+        try {
+          // Try to find the patient in our database by PMS patient ID
+          let patientIdForAppointment = null;
+
+          const appointmentPatientId =
+            appointment.patientId || appointment.patient_id;
+          if (appointmentPatientId) {
+            const { data: patientLookup } = await supabase
+              .from("patients")
+              .select("id")
+              .eq("user_id", userId)
+              .eq("pms_patient_id", String(appointmentPatientId))
+              .eq("pms_type", pmsType)
+              .single();
+
+            if (patientLookup) {
+              patientIdForAppointment = patientLookup.id;
+            }
+          }
+
+          const appointmentId = appointment.id;
+          if (!appointmentId) {
+            console.warn("[SERVER] Skipping appointment with missing ID");
+            continue;
+          }
+
+          // Convert appointment ID to number if it's a string
+          let pmsAppointmentId: number;
+          if (typeof appointmentId === "string") {
+            pmsAppointmentId = Number.parseInt(appointmentId, 10);
+            if (isNaN(pmsAppointmentId)) {
+              console.warn(
+                `[SERVER] Skipping appointment with invalid ID: ${appointmentId}`
+              );
+              continue;
+            }
+          } else {
+            pmsAppointmentId = appointmentId;
+          }
+
+          const appointmentData = {
+            user_id: userId,
+            patient_id: patientIdForAppointment,
+            pms_appointment_id: pmsAppointmentId, // Now properly converted to number
+            pms_type: pmsType,
+            appointment_date: appointment.date || appointment.appointment_date,
+            appointment_type:
+              appointment.type || appointment.appointment_type || null,
+            status: appointment.status || "unknown",
+            practitioner_name:
+              appointment.physioName || appointment.practitioner_name || null,
+            notes: appointment.notes || null,
+            is_completed:
+              appointment.status === "completed" ||
+              appointment.status === "Completed",
+          };
+
+          // Validate required fields
+          if (!appointmentData.appointment_date) {
+            console.warn("[SERVER] Skipping appointment with missing date");
+            continue;
+          }
+
+          const storedAppointment = await storeAppointment(appointmentData);
+          totalAppointments++;
+
+          // Log progress every 25 appointments
+          if (totalAppointments % 25 === 0) {
+            console.log(
+              `[SERVER] Stored ${totalAppointments} appointments so far...`
+            );
+          }
+        } catch (appointmentError) {
+          console.error(
+            "[SERVER] Error storing appointment:",
+            appointmentError
+          );
+          issues.push(`Failed to store appointment ID: ${appointment.id}`);
+          // Continue processing other appointments
         }
-      }
-
-      // Prepare appointment data - matching exact database schema
-      const appointmentData = {
-        user_id: userId,
-        patient_id: patientIdForAppointment, // May be null if patient not found
-        pms_appointment_id: appointment.id,
-        pms_type: pmsType,
-        appointment_date: appointment.date,
-        appointment_type: appointment.type,
-        status: appointment.status,
-        practitioner_name: appointment.physioName,
-        notes: appointment.notes,
-        is_completed: appointment.status === "completed",
-      };
-
-      try {
-        const storedAppointment = await storeAppointment(appointmentData);
-
-        totalAppointments++;
-      } catch (appointmentError) {
-        console.error("[SERVER] Error storing appointment:", appointmentError);
       }
     }
 
     // Add summary for verification
     const totalSyncedRecords = wcPatients + epcPatients + totalAppointments;
-    console.log(`[SERVER] 🎯 TOTAL SYNCED RECORDS: ${totalSyncedRecords}`);
+    console.log(`[SERVER] 🎯 SYNC COMPLETED SUCCESSFULLY!`);
     console.log(
-      `[SERVER] 📊 Breakdown: ${wcPatients} WC patients + ${epcPatients} EPC patients + ${totalAppointments} appointments = ${totalSyncedRecords} total records`
+      `[SERVER] 📊 Final Results: ${wcPatients} WC patients + ${epcPatients} EPC patients + ${totalAppointments} appointments = ${totalSyncedRecords} total records`
     );
 
     return {

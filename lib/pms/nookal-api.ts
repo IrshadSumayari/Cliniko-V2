@@ -11,13 +11,14 @@ export class NookalAPI implements PMSApiInterface {
 
   constructor(credentials: PMSApiCredentials) {
     this.credentials = credentials;
-    this.baseUrl = credentials.apiUrl || "https://api.nookal.com/production/v1";
+    this.baseUrl = credentials.apiUrl || "https://api.nookal.com/production/v2";
+    console.log(`[NOOKAL] Initialized with base URL: ${this.baseUrl}`);
+    console.log(`[NOOKAL] API Key: ${credentials.apiKey.substring(0, 10)}...`);
   }
 
   private async makeRequest(endpoint: string, params?: Record<string, string>) {
     const url = new URL(`${this.baseUrl}${endpoint}`);
 
-    // Nookal requires API key as a parameter
     const allParams = {
       api_key: this.credentials.apiKey,
       ...params,
@@ -27,40 +28,108 @@ export class NookalAPI implements PMSApiInterface {
       url.searchParams.append(key, value);
     });
 
-    const response = await fetch(url.toString(), {
-      headers: {
-        Accept: "application/json",
-        "Content-Type": "application/json",
-      },
-    });
+    console.log(`[NOOKAL] Making request to: ${url.toString()}`);
 
-    if (!response.ok) {
-      throw new Error(
-        `Nookal API error: ${response.status} ${response.statusText}`
-      );
+    try {
+      const response = await fetch(url.toString(), {
+        method: "GET",
+        headers: {
+          Accept: "application/json",
+          "Content-Type": "application/json",
+        },
+      });
+
+      console.log(`[NOOKAL] Response status: ${response.status}`);
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error(
+          `[NOOKAL] HTTP Error: ${response.status} ${response.statusText}`
+        );
+        console.error(`[NOOKAL] Error body: ${errorText}`);
+        throw new Error(
+          `Nookal API error: ${response.status} ${response.statusText}`
+        );
+      }
+
+      const data = await response.json();
+      console.log(`[NOOKAL] Response data structure:`, Object.keys(data));
+
+      if (data.status && data.status !== "success") {
+        console.error(`[NOOKAL] API returned error status: ${data.status}`);
+        throw new Error(`Nookal API error: ${data.message || "Unknown error"}`);
+      }
+
+      return data;
+    } catch (error) {
+      console.error(`[NOOKAL] Request failed:`, error);
+      throw error;
     }
-
-    const data = await response.json();
-
-    // Nookal wraps responses in a status object
-    if (data.status !== "success") {
-      throw new Error(`Nookal API error: ${data.message || "Unknown error"}`);
-    }
-
-    return data;
   }
 
   async testConnection(): Promise<boolean> {
     try {
-      await this.makeRequest("/getLocations");
+      console.log(
+        "[NOOKAL] Testing connection with getAppointments endpoint..."
+      );
+      const response = await this.makeRequest("/getAppointments", {
+        limit: "1",
+      });
+      console.log("[NOOKAL] ✅ Connection test successful!");
       return true;
     } catch (error) {
-      console.error("Nookal connection test failed:", error);
+      console.error("[NOOKAL] ❌ Connection test failed:", error);
       return false;
     }
   }
 
-  async getPatients(lastModified?: string, appointmentTypeIds?: string[]): Promise<PMSPatient[]> {
+  async getAllPatients(): Promise<PMSPatient[]> {
+    try {
+      console.log("[NOOKAL] Fetching all patients...");
+      const response = await this.makeRequest("/getpatients");
+      const patients =
+        response.data?.results?.patients ||
+        response.data?.patients ||
+        response.patients ||
+        [];
+      console.log(`[NOOKAL] Found ${patients.length} total patients`);
+
+      return await this.filterEPCWCPatients(patients);
+    } catch (error) {
+      console.error("Error fetching all Nookal patients:", error);
+      throw error;
+    }
+  }
+
+  async getModifiedPatients(lastModified: Date): Promise<PMSPatient[]> {
+    try {
+      const modifiedSince = lastModified.toISOString().split("T")[0];
+      console.log(
+        `[NOOKAL] Fetching patients modified since: ${modifiedSince}`
+      );
+
+      const response = await this.makeRequest("/getpatients", {
+        modified_since: modifiedSince,
+      });
+
+      const patients =
+        response.data?.results?.patients ||
+        response.data?.patients ||
+        response.patients ||
+        [];
+      console.log(`[NOOKAL] Found ${patients.length} modified patients`);
+
+      return await this.filterEPCWCPatients(patients);
+    } catch (error) {
+      console.error("Error fetching modified Nookal patients:", error);
+      throw error;
+    }
+  }
+
+  async getPatients(
+    lastModified?: string,
+    appointmentTypeIds?: string[]
+  ): Promise<PMSPatient[]> {
     try {
       const params: Record<string, string> = {};
 
@@ -68,14 +137,18 @@ export class NookalAPI implements PMSApiInterface {
         params.modified_since = lastModified;
       }
 
-      // Note: Nookal API doesn't support appointment type filtering like Cliniko
-      // So we'll ignore the appointmentTypeIds parameter for now
       if (appointmentTypeIds && appointmentTypeIds.length > 0) {
-        console.log("⚠️ Nookal API doesn't support appointment type filtering, fetching all patients");
+        console.log(
+          "⚠️ Nookal API doesn't support appointment type filtering, fetching all patients"
+        );
       }
 
-      const response = await this.makeRequest("/getPatients", params);
-      const patients = response.data?.patients || [];
+      const response = await this.makeRequest("/getpatients", params);
+      const patients =
+        response.data?.results?.patients ||
+        response.data?.patients ||
+        response.patients ||
+        [];
 
       return await this.filterEPCWCPatients(patients);
     } catch (error) {
@@ -84,37 +157,114 @@ export class NookalAPI implements PMSApiInterface {
     }
   }
 
+  async getPatientsWithAppointments(
+    lastModified?: string,
+    appointmentTypeIds?: string[]
+  ): Promise<{ patients: PMSPatient[]; appointments: PMSAppointment[] }> {
+    try {
+      console.log("[NOOKAL] Fetching patients with appointments...");
+
+      const patients = await this.getPatients(lastModified, appointmentTypeIds);
+      console.log(`[NOOKAL] Found ${patients.length} EPC/WC patients`);
+
+      const allAppointments: PMSAppointment[] = [];
+
+      for (const patient of patients) {
+        const patientAppointments = await this.getPatientAppointments(
+          patient.id.toString()
+        );
+        allAppointments.push(...patientAppointments);
+      }
+
+      console.log(
+        `[NOOKAL] Found ${allAppointments.length} total appointments`
+      );
+
+      return {
+        patients,
+        appointments: allAppointments,
+      };
+    } catch (error) {
+      console.error("Error fetching Nookal patients with appointments:", error);
+      throw error;
+    }
+  }
+
   private async filterEPCWCPatients(patients: any[]): Promise<PMSPatient[]> {
     const filtered: PMSPatient[] = [];
 
     for (const patient of patients) {
-      const appointments = await this.getPatientAppointments(patient.ID);
+      const appointments = await this.getPatientAppointments(
+        patient.ID || patient.id
+      );
       const patientType = this.determinePatientType(appointments);
 
       if (patientType) {
         filtered.push({
-          id: patient.ID,
-          firstName: patient.FirstName || "",
-          lastName: patient.LastName || "",
-          email: patient.Email,
-          phone: patient.Phone,
-          dateOfBirth: patient.DOB,
-          gender: patient.Gender,
+          id: patient.ID || patient.id,
+          firstName: patient.FirstName || patient.first_name || "",
+          lastName: patient.LastName || patient.last_name || "",
+          email: patient.Email || patient.email,
+          phone: patient.Phone || patient.phone,
+          dateOfBirth: patient.DOB || patient.date_of_birth,
+          gender: patient.Gender || patient.gender,
           address: {
-            line1: patient.Address,
-            suburb: patient.Suburb,
-            state: patient.State,
-            postcode: patient.Postcode,
-            country: patient.Country,
+            line1: patient.Address || patient.address,
+            suburb: patient.Suburb || patient.suburb,
+            state: patient.State || patient.state,
+            postcode: patient.Postcode || patient.postcode,
+            country: patient.Country || patient.country,
           },
           patientType,
-          physioName: patient.PrimaryPractitioner,
-          lastModified: patient.LastModified,
+          physioName:
+            patient.PrimaryPractitioner || patient.primary_practitioner,
+          lastModified: patient.LastModified || patient.last_modified,
         });
       }
     }
 
     return filtered;
+  }
+
+  isEPCPatient(patient: any): boolean {
+    return patient.patientType === "EPC" || patient.patient_type === "EPC";
+  }
+
+  isWCPatient(patient: any): boolean {
+    return patient.patientType === "WC" || patient.patient_type === "WC";
+  }
+
+  isCompletedAppointment(appointment: any): boolean {
+    const status = (
+      appointment.status ||
+      appointment.Status ||
+      ""
+    ).toLowerCase();
+    const cancelled =
+      appointment.cancelled === "1" || appointment.cancelled === true;
+    const dna = appointment.DNA === "1" || appointment.did_not_arrive === true;
+
+    // Check if appointment is up to current date
+    const appointmentDate = new Date(
+      appointment.appointmentDate || appointment.Date || appointment.date
+    );
+    const currentDate = new Date();
+    currentDate.setHours(23, 59, 59, 999); // Include today's appointments
+
+    const isCompleted = status === "completed";
+    const isNotCancelled = !cancelled;
+    const isNotDNA = !dna;
+    const isUpToCurrentDate = appointmentDate <= currentDate;
+
+    console.log(
+      `[NOOKAL] Appointment ${
+        appointment.ID || appointment.id
+      }: status=${status}, cancelled=${cancelled}, DNA=${dna}, date=${appointmentDate.toISOString()}, meets criteria=${
+        isCompleted && isNotCancelled && isNotDNA && isUpToCurrentDate
+      }`
+    );
+
+    return isCompleted && isNotCancelled && isNotDNA && isUpToCurrentDate;
   }
 
   private determinePatientType(
@@ -127,7 +277,8 @@ export class NookalAPI implements PMSApiInterface {
       if (
         type.includes("epc") ||
         notes.includes("epc") ||
-        type.includes("enhanced primary care")
+        type.includes("enhanced primary care") ||
+        type.includes("medicare")
       ) {
         return "EPC";
       }
@@ -136,6 +287,7 @@ export class NookalAPI implements PMSApiInterface {
         type.includes("workers comp") ||
         type.includes("workcover") ||
         type.includes("wc") ||
+        type.includes("work injury") ||
         notes.includes("workers comp")
       ) {
         return "WC";
@@ -154,14 +306,20 @@ export class NookalAPI implements PMSApiInterface {
 
       for (const patientId of patientIds) {
         const appointments = await this.getPatientAppointments(patientId);
-        const completedAppointments = appointments.filter(
+        const filteredAppointments = appointments.filter(
           (apt) =>
-            apt.status === "completed" &&
+            this.isCompletedAppointment(apt) &&
             (!lastModified || apt.lastModified > lastModified)
         );
-        allAppointments.push(...completedAppointments);
+        console.log(
+          `[NOOKAL] Patient ${patientId}: ${appointments.length} total appointments, ${filteredAppointments.length} completed appointments`
+        );
+        allAppointments.push(...filteredAppointments);
       }
 
+      console.log(
+        `[NOOKAL] Total completed appointments across all patients: ${allAppointments.length}`
+      );
       return allAppointments;
     } catch (error) {
       console.error("Error fetching Nookal appointments:", error);
@@ -169,29 +327,78 @@ export class NookalAPI implements PMSApiInterface {
     }
   }
 
-  async getPatientAppointments(patientId: string): Promise<PMSAppointment[]> {
+  async getPatientAppointments(
+    patientId: string,
+    lastModified?: Date
+  ): Promise<PMSAppointment[]> {
     try {
-      const response = await this.makeRequest("/getAppointments", {
+      const params: Record<string, string> = {
         patient_id: patientId,
-      });
+      };
 
-      const appointments = response.data?.appointments || [];
+      if (lastModified) {
+        params.modified_since = lastModified.toISOString().split("T")[0];
+      }
+
+      const response = await this.makeRequest("/getAppointments", params);
+
+      const appointments =
+        response.data?.results?.appointments ||
+        response.data?.appointments ||
+        response.appointments ||
+        [];
 
       return appointments.map((apt: any) => ({
-        id: apt.ID,
-        patientId: patientId,
-        date: apt.Date + " " + apt.StartTime,
-        type: apt.AppointmentType,
-        status: this.mapAppointmentStatus(apt.Status),
-        physioName: apt.Practitioner,
-        durationMinutes: Number.parseInt(apt.Duration) || 0,
-        notes: apt.Notes,
-        lastModified: apt.LastModified,
-        // Add additional fields needed for filtering
-        cancelled_at: apt.CancelledAt || null,
-        did_not_arrive: apt.DidNotArrive || false,
-        appointment_date: apt.Date + " " + apt.StartTime,
-        appointment_type_id: apt.AppointmentTypeID,
+        id: apt.ID || apt.id,
+        patientId: apt.patientID || apt.patient_id || patientId,
+        date:
+          apt.appointmentDate && apt.appointmentStartTime
+            ? `${apt.appointmentDate} ${apt.appointmentStartTime}`
+            : apt.Date
+            ? `${apt.Date} ${apt.StartTime || apt.start_time || ""}`.trim()
+            : apt.date,
+        type:
+          apt.appointmentType || apt.AppointmentType || apt.appointment_type,
+        status: this.mapAppointmentStatus(apt.status || apt.Status, apt),
+        physioName: apt.Practitioner || apt.practitioner,
+        durationMinutes:
+          this.calculateDuration(
+            apt.appointmentStartTime,
+            apt.appointmentEndTime
+          ) ||
+          Number.parseInt(apt.Duration || apt.duration) ||
+          0,
+        notes: apt.Notes || apt.notes,
+        lastModified: apt.lastModified || apt.LastModified || apt.last_modified,
+        cancelled_at:
+          apt.cancelled === "1"
+            ? apt.cancellationDate || apt.cancelled_at
+            : null,
+        did_not_arrive:
+          apt.DNA === "1" || apt.DidNotArrive || apt.did_not_arrive || false,
+        appointment_date:
+          apt.appointmentDate && apt.appointmentStartTime
+            ? `${apt.appointmentDate} ${apt.appointmentStartTime}`
+            : apt.Date
+            ? `${apt.Date} ${apt.StartTime || apt.start_time || ""}`.trim()
+            : apt.date,
+        appointment_type_id:
+          apt.appointmentTypeID ||
+          apt.AppointmentTypeID ||
+          apt.appointment_type_id,
+        appointment_type: apt.appointmentType
+          ? { name: apt.appointmentType }
+          : apt.AppointmentType
+          ? { name: apt.AppointmentType }
+          : null,
+        practitioner: apt.Practitioner ? { name: apt.Practitioner } : null,
+        duration:
+          this.calculateDuration(
+            apt.appointmentStartTime,
+            apt.appointmentEndTime
+          ) ||
+          Number.parseInt(apt.Duration || apt.duration) ||
+          0,
       }));
     } catch (error) {
       console.error(
@@ -203,10 +410,20 @@ export class NookalAPI implements PMSApiInterface {
   }
 
   private mapAppointmentStatus(
-    status: string
+    status: string,
+    appointment: any
   ): "completed" | "cancelled" | "dna" | "scheduled" {
-    const statusLower = status?.toLowerCase() || "";
+    if (appointment.cancelled === "1") {
+      return "cancelled";
+    }
+    if (appointment.DNA === "1") {
+      return "dna";
+    }
+    if (appointment.arrived === "1" && appointment.cancelled !== "1") {
+      return "completed";
+    }
 
+    const statusLower = status?.toLowerCase() || "";
     if (statusLower.includes("completed") || statusLower.includes("attended")) {
       return "completed";
     }
@@ -220,12 +437,35 @@ export class NookalAPI implements PMSApiInterface {
     return "scheduled";
   }
 
+  private calculateDuration(startTime: string, endTime: string): number {
+    if (!startTime || !endTime) return 0;
+
+    try {
+      const start = new Date(`1970-01-01T${startTime}`);
+      const end = new Date(`1970-01-01T${endTime}`);
+      const diffMs = end.getTime() - start.getTime();
+      return Math.round(diffMs / (1000 * 60)); // Convert to minutes
+    } catch {
+      return 0;
+    }
+  }
+
   async getAppointmentTypes(): Promise<any[]> {
     try {
-      console.log("🔍 Fetching appointment types from Nookal...");
+      console.log("🔍 Fetching appointment types from Nookal v2...");
       const response = await this.makeRequest("/getAppointmentTypes");
-      const appointmentTypes = response.data?.appointment_types || [];
-      console.log(`✅ Found ${appointmentTypes.length} appointment types from Nookal`);
+      const appointmentTypes =
+        response.data?.results?.services ||
+        response.data?.services ||
+        response.services ||
+        [];
+      console.log(
+        `✅ Found ${appointmentTypes.length} appointment types from Nookal v2`
+      );
+      console.log(
+        `📋 Sample appointment type names:`,
+        appointmentTypes.slice(0, 3).map((apt: any) => apt.Name || apt.name)
+      );
       return appointmentTypes;
     } catch (error) {
       console.error("❌ Error fetching Nookal appointment types:", error);
@@ -245,35 +485,46 @@ export class NookalAPI implements PMSApiInterface {
     }> = [];
 
     for (const appointmentType of appointmentTypes) {
-      const code = this.extractCodeFromName(appointmentType.Name);
+      const name = appointmentType.Name || appointmentType.name;
+      const id = appointmentType.ID || appointmentType.id;
+      const code = this.extractCodeFromName(name);
 
-      if (code) {
+      if (code && name && id) {
         processedTypes.push({
-          appointment_id: appointmentType.ID,
-          appointment_name: appointmentType.Name,
+          appointment_id: id.toString(),
+          appointment_name: name,
           code: code,
         });
 
-        console.log(`📝 Processed appointment type: ${appointmentType.Name} -> ${code}`);
+        console.log(`📝 Processed appointment type: ${name} -> ${code}`);
       }
     }
 
-    console.log(`✅ Filtered ${processedTypes.length} EPC/WC appointment types from ${appointmentTypes.length} total`);
+    console.log(
+      `✅ Filtered ${processedTypes.length} EPC/WC appointment types from ${appointmentTypes.length} total`
+    );
     return processedTypes;
   }
 
   private extractCodeFromName(name: string): string | null {
     const nameLower = name.toLowerCase();
 
-    if (nameLower.includes("epc") || nameLower.includes("enhanced primary care") || nameLower.includes("medicare")) {
+    if (
+      nameLower.includes("epc") ||
+      nameLower.includes("enhanced primary care") ||
+      nameLower.includes("medicare")
+    ) {
       return "EPC";
     }
 
     if (
+      nameLower.includes("w/c") ||
       nameLower.includes("wc") ||
       nameLower.includes("workers comp") ||
       nameLower.includes("workcover") ||
-      nameLower.includes("work injury")
+      nameLower.includes("work cover") ||
+      nameLower.includes("work injury") ||
+      nameLower.includes("workers compensation")
     ) {
       return "WC";
     }

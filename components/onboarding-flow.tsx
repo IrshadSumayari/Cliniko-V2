@@ -18,6 +18,7 @@ import { useAuth } from "@/contexts/auth-context";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { authenticatedFetch } from "@/lib/utils";
+import { useRouter } from "next/navigation";
 
 type OnboardingStep = "pms" | "api" | "syncing" | "sync-results";
 
@@ -30,6 +31,7 @@ interface SyncResults {
 
 export default function OnboardingFlow() {
   const { updateUserOnboardingStatus, isLoading, user } = useAuth();
+  const router = useRouter();
   const [currentStep, setCurrentStep] = useState<OnboardingStep>("pms");
   const [isProcessing, setIsProcessing] = useState(false);
   const [formData, setFormData] = useState({
@@ -105,18 +107,20 @@ export default function OnboardingFlow() {
       setCurrentStep("sync-results");
     } catch (error) {
       console.error("Sync error:", error);
-      
+
       let errorMessage = "Failed to connect to PMS";
       if (error instanceof Error) {
         if (error.message.includes("Failed to fetch")) {
-          errorMessage = "Network error. Please check your connection and try again.";
+          errorMessage =
+            "Network error. Please check your connection and try again.";
         } else if (error.message.includes("authentication")) {
-          errorMessage = "Authentication error. Please refresh the page and sign in again.";
+          errorMessage =
+            "Authentication error. Please refresh the page and sign in again.";
         } else {
           errorMessage = error.message;
         }
       }
-      
+
       toast.error(errorMessage);
       setCurrentStep("api");
     } finally {
@@ -129,6 +133,8 @@ export default function OnboardingFlow() {
       const success = await updateUserOnboardingStatus(true);
       if (success) {
         toast.success("Setup complete! Welcome to your dashboard.");
+        // Force a page refresh to trigger the auth context update and redirect
+        window.location.reload();
       } else {
         toast.error("Failed to complete setup. Please try again.");
       }
@@ -142,7 +148,10 @@ export default function OnboardingFlow() {
     try {
       toast.info("You can connect your PMS later in settings.");
       const success = await updateUserOnboardingStatus(false);
-      if (!success) {
+      if (success) {
+        // Force a page refresh to trigger the auth context update and redirect
+        window.location.reload();
+      } else {
         toast.error("Failed to update status. Please try again.");
       }
     } catch (error) {

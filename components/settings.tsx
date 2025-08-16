@@ -1,3 +1,5 @@
+"use client";
+
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -8,19 +10,16 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { Separator } from "@/components/ui/separator";
 import { Badge } from "@/components/ui/badge";
 import {
   SettingsIcon,
   User,
   Building2,
   Plug,
-  CreditCard,
   Save,
   ArrowLeft,
   CheckCircle,
   XCircle,
-  RefreshCw,
   Loader2,
   Crown,
 } from "lucide-react";
@@ -282,12 +281,10 @@ const Settings = ({ onBack }: { onBack: () => void }) => {
                   }
                   disabled={pmsConnection.connected}
                 >
-                  <option value="">Select your software</option>
-                  <option value="OptiPlex">OptiPlex</option>
-                  <option value="HeroHealth">HeroHealth</option>
-                  <option value="WriteUpp">WriteUpp</option>
+                  <option value="">Select your clinic</option>
+                  <option value="OptiPlex">Cliniko</option>
+                  <option value="HeroHealth">Halaxy</option>
                   <option value="Nookal">Nookal</option>
-                  <option value="Other">Other</option>
                 </select>
               </div>
 
