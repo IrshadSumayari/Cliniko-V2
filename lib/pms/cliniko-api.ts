@@ -79,10 +79,10 @@ export class ClinikoAPI implements PMSApiInterface {
 
     const responseData = await response.json();
     console.log(`✅ API call successful:`);
-    console.log(`   Response status: ${response.status}`);
-    console.log(
-      `   Response data keys: ${Object.keys(responseData).join(", ")}`
-    );
+    // console.log(`   Response status: ${response.status}`);
+    // console.log(
+    //   `   Response data keys: ${Object.keys(responseData).join(", ")}`
+    // );
 
     // Log specific data counts if available
     if (responseData.bookings) {
@@ -184,7 +184,7 @@ export class ClinikoAPI implements PMSApiInterface {
       );
 
       const params: Record<string, string> = {
-        per_page: "100", // Increased for better performance
+        per_page: "100", // Keep at 100 as per API limit
         "q[]": `appointment_type_id:=${appointmentTypeFilter}`, // Fixed: using the exact working Postman format
       };
 
@@ -193,84 +193,105 @@ export class ClinikoAPI implements PMSApiInterface {
       }
 
       const allBookings: any[] = [];
-      let page = 1;
-      let hasMore = true;
-      let totalPages = 0;
-      const maxPages = 20; // Safety limit to prevent infinite loops
-      const MAX_APPOINTMENTS = 200;
+      const MAX_PARALLEL_PAGES = 5; // Don't overwhelm the API
+      const DELAY_BETWEEN_BATCHES = 100; // 100ms delay between parallel batches
 
-      while (hasMore && page <= maxPages) {
-        params.page = page.toString();
-        console.log(`📄 Fetching page ${page}...`);
+      console.log(`🚀 Starting parallel fetch for unlimited records...`);
+      console.log(`⚡ Using ${MAX_PARALLEL_PAGES} parallel pages for optimal performance`);
 
-        const response = await this.makeRequest("/bookings", params);
-        const bookings = response.bookings || [];
+      let currentPage = 1;
+      let totalPagesFetched = 0;
 
-        console.log(`📋 Found ${bookings.length} bookings on page ${page}`);
+      while (true) {
+        // Calculate how many pages we need to fetch in this batch
+        const pagesToFetch = MAX_PARALLEL_PAGES;
 
-        // Filter bookings by the 3 conditions you specified
-        const validBookings = bookings.filter((booking: any) => {
-          const today = new Date();
-          const createdDate = new Date(booking.created_at);
+        console.log(`🔄 Fetching pages ${currentPage} to ${currentPage + pagesToFetch - 1} in parallel...`);
+        console.log(`📊 Current total: ${allBookings.length} records`);
 
-          // Check the 3 conditions:
-          // 1. cancelled_at is null
-          // 2. did_not_arrive is false
-          // 3. created_date <= today
-          const isValid =
-            !booking.cancelled_at && // cancelled_at is null
-            !booking.did_not_arrive && // did_not_arrive is false
-            createdDate <= today; // created_date <= today
-
-          if (!isValid) {
-            console.log(
-              `❌ Skipping booking ${booking.id}: cancelled_at=${booking.cancelled_at}, did_not_arrive=${booking.did_not_arrive}, created_at=${booking.created_at}`
-            );
-          }
-
-          return isValid;
-        });
-
-        console.log(
-          `✅ Valid bookings on page ${page}: ${validBookings.length}/${bookings.length}`
-        );
-
-        // Check if adding these valid bookings would exceed the limit
-        if (allBookings.length + validBookings.length > MAX_APPOINTMENTS) {
-          // Only add what we can fit within the limit
-          const remainingSlots = MAX_APPOINTMENTS - allBookings.length;
-          const bookingsToAdd = validBookings.slice(0, remainingSlots);
-          allBookings.push(...bookingsToAdd);
-          break; // Stop fetching more pages immediately
+        // Create array of page promises to fetch in parallel
+        const pagePromises = [];
+        for (let i = 0; i < pagesToFetch; i++) {
+          const pageNumber = currentPage + i;
+          pagePromises.push(
+            this.makeRequest("/bookings", {
+              ...params,
+              page: pageNumber.toString(),
+            }).catch(error => {
+              console.error(`❌ Failed to fetch page ${pageNumber}:`, error);
+              return { bookings: [] }; // Return empty on failure, don't break the entire process
+            })
+          );
         }
 
-        // If we haven't reached the limit, add all valid bookings
-        allBookings.push(...validBookings);
+        // Execute all pages in parallel (this is the key performance improvement!)
+        const responses = await Promise.all(pagePromises);
+        totalPagesFetched += pagesToFetch;
 
-        // Check if there are more pages
-        hasMore = response.links?.next !== undefined;
-        totalPages = page;
-        page++;
+        // Process all responses
+        let batchTotalBookings = 0;
+        for (let i = 0; i < responses.length; i++) {
+          const response = responses[i];
+          const pageNumber = currentPage + i;
+          const bookings = response.bookings || [];
 
-        // Safety check to prevent infinite loops
-        if (page > maxPages) {
-          console.log(
-            `⚠️ Reached maximum page limit (${maxPages}), stopping pagination`
-          );
+          console.log(`📋 Page ${pageNumber}: Found ${bookings.length} bookings`);
+
+          // Filter bookings by the 3 conditions you specified
+          const validBookings = bookings.filter((booking: any) => {
+            const today = new Date();
+            const createdDate = new Date(booking.created_at);
+
+            // Check the 3 conditions:
+            // 1. cancelled_at is null
+            // 2. did_not_arrive is false
+            // 3. created_date <= today
+            const isValid =
+              !booking.cancelled_at && // cancelled_at is null
+              !booking.did_not_arrive && // did_not_arrive is false
+              createdDate <= today; // created_date <= today
+
+            return isValid;
+          });
+
+          console.log(`✅ Page ${pageNumber}: ${validBookings.length}/${bookings.length} valid bookings`);
+
+          // Add all valid bookings (no limit)
+          allBookings.push(...validBookings);
+          batchTotalBookings += validBookings.length;
+        }
+
+        console.log(`📈 Batch completed: Added ${batchTotalBookings} valid bookings`);
+        console.log(`📊 Running total: ${allBookings.length} records`);
+
+        // Check if we should continue (look for more pages)
+        const lastResponse = responses[responses.length - 1];
+        const hasMore = lastResponse.links?.next !== undefined;
+
+        if (!hasMore) {
+          console.log(`📄 No more pages available, stopping parallel fetch`);
           break;
         }
 
-        // Add a small delay between requests to be respectful to the API
-        if (hasMore) {
-          await new Promise((resolve) => setTimeout(resolve, 100));
+        // Move to next batch of pages
+        currentPage += pagesToFetch;
+
+        // Safety check to prevent infinite loops
+        if (currentPage > 50) {
+          console.log(`⚠️ Reached maximum page limit (50), stopping parallel fetch`);
+          break;
         }
+
+        // Small delay between batches to be respectful to the API
+        console.log(`⏳ Waiting ${DELAY_BETWEEN_BATCHES}ms before next parallel batch...`);
+        await new Promise((resolve) => setTimeout(resolve, DELAY_BETWEEN_BATCHES));
       }
 
       console.log(
-        `✅ Total synced records: ${allBookings.length} valid bookings from ${totalPages} pages`
+        `✅ Total synced records: ${allBookings.length} valid bookings from ${totalPagesFetched} pages`
       );
       console.log(
-        `📊 Pagination summary: Processed ${totalPages} pages, max limit: ${maxPages}`
+        `🚀 Parallel fetch completed in ${totalPagesFetched} pages with ${MAX_PARALLEL_PAGES} parallel calls per batch`
       );
 
       // Process valid bookings to extract patients
@@ -779,7 +800,7 @@ export class ClinikoAPI implements PMSApiInterface {
       );
 
       const params: Record<string, string> = {
-        per_page: "100", // Increased for better performance
+        per_page: "100", // Keep at 100 as per API limit
         "q[]": `appointment_type_id:=${appointmentTypeFilter}`, // Fixed: using the exact working Postman format
       };
 
@@ -788,91 +809,105 @@ export class ClinikoAPI implements PMSApiInterface {
       }
 
       const allBookings: any[] = [];
-      let page = 1;
-      let hasMore = true;
-      const maxPages = 20; // Safety limit to prevent infinite loops
-      const MAX_APPOINTMENTS = 200;
+      const MAX_PARALLEL_PAGES = 5; // Don't overwhelm the API
+      const DELAY_BETWEEN_BATCHES = 100; // 100ms delay between parallel batches
 
-      while (hasMore && page <= maxPages) {
-        params.page = page.toString();
-        console.log(`📄 Fetching page ${page}...`);
+      console.log(`🚀 Starting parallel fetch for unlimited records...`);
+      console.log(`⚡ Using ${MAX_PARALLEL_PAGES} parallel pages for optimal performance`);
 
-        const response = await this.makeRequest("/bookings", params);
-        const bookings = response.bookings || [];
+      let currentPage = 1;
+      let totalPagesFetched = 0;
 
-        console.log(`📋 Found ${bookings.length} bookings on page ${page}`);
+      while (true) {
+        // Calculate how many pages we need to fetch in this batch
+        const pagesToFetch = MAX_PARALLEL_PAGES;
 
-        // Filter bookings by the 3 conditions you specified
-        const validBookings = bookings.filter((booking: any) => {
-          const today = new Date();
-          const createdDate = new Date(booking.created_at);
+        console.log(`🔄 Fetching pages ${currentPage} to ${currentPage + pagesToFetch - 1} in parallel...`);
+        console.log(`📊 Current total: ${allBookings.length} records`);
 
-          // Check the 3 conditions:
-          // 1. cancelled_at is null
-          // 2. did_not_arrive is false
-          // 3. created_date <= today
-          const isValid =
-            !booking.cancelled_at && // cancelled_at is null
-            !booking.did_not_arrive && // did_not_arrive is false
-            createdDate <= today; // created_date <= today
-
-          if (!isValid) {
-            console.log(
-              `❌ Skipping booking ${booking.id}: cancelled_at=${booking.cancelled_at}, did_not_arrive=${booking.did_not_arrive}, created_at=${booking.created_at}`
-            );
-          }
-
-          return isValid;
-        });
-
-        console.log(
-          `✅ Valid bookings on page ${page}: ${validBookings.length}/${bookings.length}`
-        );
-
-        // Check if adding these valid bookings would exceed the limit
-        if (allBookings.length + validBookings.length > MAX_APPOINTMENTS) {
-          // Only add what we can fit within the limit
-          const remainingSlots = MAX_APPOINTMENTS - allBookings.length;
-          const bookingsToAdd = validBookings.slice(0, remainingSlots);
-          allBookings.push(...bookingsToAdd);
-          break; // Stop fetching more pages immediately
+        // Create array of page promises to fetch in parallel
+        const pagePromises = [];
+        for (let i = 0; i < pagesToFetch; i++) {
+          const pageNumber = currentPage + i;
+          pagePromises.push(
+            this.makeRequest("/bookings", {
+              ...params,
+              page: pageNumber.toString(),
+            }).catch(error => {
+              console.error(`❌ Failed to fetch page ${pageNumber}:`, error);
+              return { bookings: [] }; // Return empty on failure, don't break the entire process
+            })
+          );
         }
 
-        // If we haven't reached the limit, add all valid bookings
-        allBookings.push(...validBookings);
+        // Execute all pages in parallel (this is the key performance improvement!)
+        const responses = await Promise.all(pagePromises);
+        totalPagesFetched += pagesToFetch;
 
-        // Check if there are more pages
-        hasMore = response.links?.next !== undefined;
-        page++;
+        // Process all responses
+        let batchTotalBookings = 0;
+        for (let i = 0; i < responses.length; i++) {
+          const response = responses[i];
+          const pageNumber = currentPage + i;
+          const bookings = response.bookings || [];
 
-        // Safety check to prevent infinite loops
-        if (page > maxPages) {
-          console.log(
-            `⚠️ Reached maximum page limit (${maxPages}), stopping pagination`
-          );
+          console.log(`📋 Page ${pageNumber}: Found ${bookings.length} bookings`);
+
+          // Filter bookings by the 3 conditions you specified
+          const validBookings = bookings.filter((booking: any) => {
+            const today = new Date();
+            const createdDate = new Date(booking.created_at);
+
+            // Check the 3 conditions:
+            // 1. cancelled_at is null
+            // 2. did_not_arrive is false
+            // 3. created_date <= today
+            const isValid =
+              !booking.cancelled_at && // cancelled_at is null
+              !booking.did_not_arrive && // did_not_arrive is false
+              createdDate <= today; // created_date <= today
+
+            return isValid;
+          });
+
+          console.log(`✅ Page ${pageNumber}: ${validBookings.length}/${bookings.length} valid bookings`);
+
+          // Add all valid bookings (no limit)
+          allBookings.push(...validBookings);
+          batchTotalBookings += validBookings.length;
+        }
+
+        console.log(`📈 Batch completed: Added ${batchTotalBookings} valid bookings`);
+        console.log(`📊 Running total: ${allBookings.length} records`);
+
+        // Check if we should continue (look for more pages)
+        const lastResponse = responses[responses.length - 1];
+        const hasMore = lastResponse.links?.next !== undefined;
+
+        if (!hasMore) {
+          console.log(`📄 No more pages available, stopping parallel fetch`);
           break;
         }
 
-        // Add a small delay between requests to be respectful to the API
-        if (hasMore) {
-          await new Promise((resolve) => setTimeout(resolve, 100));
-        }
-      }
+        // Move to next batch of pages
+        currentPage += pagesToFetch;
 
-      // Ensure we don't exceed the appointment limit
-      if (allBookings.length > MAX_APPOINTMENTS) {
-        allBookings.splice(MAX_APPOINTMENTS);
+        // Safety check to prevent infinite loops
+        if (currentPage > 50) {
+          console.log(`⚠️ Reached maximum page limit (50), stopping parallel fetch`);
+          break;
+        }
+
+        // Small delay between batches to be respectful to the API
+        console.log(`⏳ Waiting ${DELAY_BETWEEN_BATCHES}ms before next parallel batch...`);
+        await new Promise((resolve) => setTimeout(resolve, DELAY_BETWEEN_BATCHES));
       }
 
       console.log(
-        `✅ Total synced records: ${allBookings.length} valid bookings from ${
-          page - 1
-        } pages`
+        `✅ Total synced records: ${allBookings.length} valid bookings from ${totalPagesFetched} pages`
       );
       console.log(
-        `📊 Pagination summary: Processed ${
-          page - 1
-        } pages, max limit: ${maxPages}`
+        `🚀 Parallel fetch completed in ${totalPagesFetched} pages with ${MAX_PARALLEL_PAGES} parallel calls per batch`
       );
 
       // Process valid bookings to extract patients

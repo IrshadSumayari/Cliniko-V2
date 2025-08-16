@@ -148,37 +148,20 @@ export class HalaxyAPI implements PMSApiInterface {
   ): Promise<PMSAppointment[]> {
     try {
       const allAppointments: PMSAppointment[] = [];
-      const MAX_APPOINTMENTS = 200;
 
       for (const patientId of patientIds) {
-        if (allAppointments.length >= MAX_APPOINTMENTS) {
-          break;
-        }
-
-        const appointments = await this.getPatientAppointments(patientId);
+        const appointments = await this.getPatientAppointments(patientId)
         const completedAppointments = appointments.filter(
-          (apt) =>
-            apt.status === "completed" &&
-            (!lastModified || apt.lastModified > lastModified)
-        );
-
-        // Add appointments up to the limit
-        const remainingSlots = MAX_APPOINTMENTS - allAppointments.length;
-        const appointmentsToAdd = completedAppointments.slice(
-          0,
-          remainingSlots
-        );
-        allAppointments.push(...appointmentsToAdd);
-
-        if (allAppointments.length >= MAX_APPOINTMENTS) {
-          break;
-        }
+          (apt) => apt.status === "completed" && (!lastModified || apt.lastModified > lastModified),
+        )
+        
+        // Add all appointments (no limit)
+        allAppointments.push(...completedAppointments);
       }
 
       console.log(
-        `✅ Halaxy sync completed: ${allAppointments.length} appointments (limited to ${MAX_APPOINTMENTS})`
+        `✅ Halaxy sync completed: ${allAppointments.length} appointments`
       );
-
       return allAppointments;
     } catch (error) {
       console.error("Error fetching Halaxy appointments:", error);

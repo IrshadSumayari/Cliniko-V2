@@ -146,7 +146,7 @@ export default function OnboardingFlow() {
         try {
           const result = await Promise.race([
             apiCallPromise,
-            new Promise((resolve) => setTimeout(resolve, 8000)),
+            new Promise((resolve) => setTimeout(resolve, 1200)),
           ]);
 
           if (result && typeof result === "object" && "ok" in result) {

@@ -6,14 +6,11 @@ import {
   storeEncryptedApiKey,
   createAdminClient,
   storeAppointmentTypes,
-  storeAppointment,
 } from "@/lib/supabase/server-admin";
 import { config } from "@/lib/config";
 
 export async function POST(request: NextRequest) {
   try {
-    const MAX_APPOINTMENTS = 200;
-
     const { pmsType, apiKey } = await request.json();
 
     if (!pmsType || !apiKey) {
@@ -242,8 +239,7 @@ export async function POST(request: NextRequest) {
       adminSupabase,
       userRecordData.id,
       pmsClient,
-      pmsType,
-      MAX_APPOINTMENTS
+      pmsType
     );
 
     const appointmentTypesCount = await getAppointmentTypesCount(
@@ -316,8 +312,7 @@ async function performInitialSync(
   supabase: any,
   userId: string,
   pmsClient: any,
-  pmsType: string,
-  maxAppointments: number
+  pmsType: string
 ) {
   const issues: string[] = [];
   let wcPatients = 0;
@@ -327,7 +322,7 @@ async function performInitialSync(
   try {
     console.log("[SERVER] Starting initial sync for user:", userId);
     console.log("[SERVER] PMS Type:", pmsType);
-    console.log("[SERVER] Max appointments limit:", maxAppointments);
+    console.log("[SERVER] Max appointments limit: Unlimited"); // Updated log message
 
     // First, get the stored appointment type IDs for this user and PMS
     const { data: userAppointmentTypes, error: typesError } = await supabase
@@ -371,69 +366,50 @@ async function performInitialSync(
     }
 
     console.log(`[SERVER] Processing ${patients.length} patients...`);
-    for (let i = 0; i < patients.length; i++) {
-      const patient = patients[i];
-      const patientType = patient.patientType;
+    
+    // BULK INSERT: Process all patients at once instead of one by one
+    const patientsToInsert = patients
+      .filter(patient => patient.patientType === "EPC" || patient.patientType === "WC")
+      .map(patient => ({
+        user_id: userId,
+        pms_patient_id: String(patient.id),
+        pms_type: pmsType,
+        first_name: patient.firstName || "",
+        last_name: patient.lastName || "",
+        email: patient.email || null,
+        phone: patient.phone || null,
+        date_of_birth: patient.dateOfBirth || null,
+        patient_type: patient.patientType,
+        physio_name: patient.physioName || null,
+        pms_last_modified: patient.lastModified || new Date().toISOString(),
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      }));
 
-      if (i % 10 === 0) {
-        console.log(`[SERVER] Processing patient ${i + 1}/${patients.length}`);
-      }
+    if (patientsToInsert.length > 0) {
+      try {
+        console.log(`[SERVER] Bulk inserting ${patientsToInsert.length} patients...`);
+        const { data: insertedPatients, error: bulkPatientError } = await supabase
+          .from("patients")
+          .upsert(patientsToInsert, {
+            onConflict: "user_id,pms_patient_id,pms_type",
+            ignoreDuplicates: false
+          })
+          .select();
 
-      if (patientType === "EPC" || patientType === "WC") {
-        try {
-          const { data: patientData, error: patientError } = await supabase
-            .from("patients")
-            .upsert(
-              {
-                user_id: userId,
-                pms_patient_id: String(patient.id), // Ensure string type
-                pms_type: pmsType,
-                first_name: patient.firstName || "",
-                last_name: patient.lastName || "",
-                email: patient.email || null,
-                phone: patient.phone || null,
-                date_of_birth: patient.dateOfBirth || null,
-                patient_type: patientType,
-                physio_name: patient.physioName || null,
-                pms_last_modified:
-                  patient.lastModified || new Date().toISOString(),
-                created_at: new Date().toISOString(),
-                updated_at: new Date().toISOString(),
-              },
-              {
-                onConflict: "user_id,pms_patient_id,pms_type",
-              }
-            )
-            .select();
-
-          if (patientError) {
-            console.error("[SERVER] Error storing patient:", patientError);
-            issues.push(
-              `Failed to store patient: ${patient.firstName} ${patient.lastName}`
-            );
-            continue;
-          }
-
-          if (!patientData || patientData.length === 0) {
-            console.error("[SERVER] No patient data returned from upsert");
-            issues.push(
-              `No data returned for patient: ${patient.firstName} ${patient.lastName}`
-            );
-            continue;
-          }
-
-          if (patientType === "EPC") epcPatients++;
-          if (patientType === "WC") wcPatients++;
-        } catch (error) {
-          console.error("[SERVER] Exception storing patient:", error);
-          issues.push(
-            `Exception storing patient: ${patient.firstName} ${patient.lastName}`
-          );
+        if (bulkPatientError) {
+          console.error("[SERVER] Bulk patient insert error:", bulkPatientError);
+          issues.push("Failed to bulk insert patients");
+        } else {
+          console.log(`[SERVER] ✅ Successfully bulk inserted ${insertedPatients?.length || 0} patients`);
+          
+          // Count EPC vs WC patients
+          epcPatients = patientsToInsert.filter(p => p.patient_type === "EPC").length;
+          wcPatients = patientsToInsert.filter(p => p.patient_type === "WC").length;
         }
-      } else {
-        console.log(
-          `[SERVER] Skipping patient with type: ${patientType} (not EPC or WC)`
-        );
+      } catch (error) {
+        console.error("[SERVER] Exception in bulk patient insert:", error);
+        issues.push("Exception in bulk patient insert");
       }
     }
 
@@ -474,9 +450,7 @@ async function performInitialSync(
       `[SERVER] Found ${appointmentsToProcess.length} total appointments to process`
     );
 
-    if (appointmentsToProcess.length > maxAppointments) {
-      appointmentsToProcess = appointmentsToProcess.slice(0, maxAppointments);
-    }
+    // Removed maxAppointments check
 
     // Apply the 3 conditions to ALL appointments
     const validCompletedAppointments = appointmentsToProcess.filter(
@@ -496,108 +470,99 @@ async function performInitialSync(
       `[SERVER] Found ${validCompletedAppointments.length} valid appointments after filtering`
     );
 
-    const BATCH_SIZE = 50; // Process appointments in batches to prevent timeouts
-    const totalBatches = Math.ceil(
-      validCompletedAppointments.length / BATCH_SIZE
-    );
+    // OPTIMIZATION: Get all patient IDs in one query to avoid individual lookups
+    console.log("[SERVER] Fetching patient mappings for bulk appointment insert...");
+    const { data: patientMappings, error: mappingError } = await supabase
+      .from("patients")
+      .select("id, pms_patient_id")
+      .eq("user_id", userId)
+      .eq("pms_type", pmsType);
 
-    for (let batchIndex = 0; batchIndex < totalBatches; batchIndex++) {
-      const startIndex = batchIndex * BATCH_SIZE;
-      const endIndex = Math.min(
-        startIndex + BATCH_SIZE,
-        validCompletedAppointments.length
-      );
-      const batch = validCompletedAppointments.slice(startIndex, endIndex);
+    if (mappingError) {
+      console.error("[SERVER] Error fetching patient mappings:", mappingError);
+      issues.push("Failed to fetch patient mappings");
+    } else {
+      console.log(`[SERVER] Found ${patientMappings?.length || 0} patient mappings`);
+    }
 
-      console.log(
-        `[SERVER] Processing appointment batch ${
-          batchIndex + 1
-        }/${totalBatches} (${batch.length} appointments)`
-      );
+    // Create a fast lookup map
+    const patientIdMap = new Map();
+    if (patientMappings) {
+      patientMappings.forEach((p: any) => {
+        patientIdMap.set(String(p.pms_patient_id), p.id);
+      });
+    }
 
-      for (let i = 0; i < batch.length; i++) {
-        const appointment = batch[i];
+    // BULK INSERT: Prepare all appointments for bulk insert
+    const appointmentsToInsert = validCompletedAppointments
+      .map(appointment => {
+        const appointmentPatientId = appointment.patientId || appointment.patient_id;
+        const patientIdForAppointment = patientIdMap.get(String(appointmentPatientId)) || null;
+        
+        const appointmentId = appointment.id;
+        if (!appointmentId) return null;
 
-        try {
-          // Try to find the patient in our database by PMS patient ID
-          let patientIdForAppointment = null;
-
-          const appointmentPatientId =
-            appointment.patientId || appointment.patient_id;
-          if (appointmentPatientId) {
-            const { data: patientLookup } = await supabase
-              .from("patients")
-              .select("id")
-              .eq("user_id", userId)
-              .eq("pms_patient_id", String(appointmentPatientId))
-              .eq("pms_type", pmsType)
-              .single();
-
-            if (patientLookup) {
-              patientIdForAppointment = patientLookup.id;
-            }
-          }
-
-          const appointmentId = appointment.id;
-          if (!appointmentId) {
-            console.warn("[SERVER] Skipping appointment with missing ID");
-            continue;
-          }
-
-          // Convert appointment ID to number if it's a string
-          let pmsAppointmentId: number;
-          if (typeof appointmentId === "string") {
-            pmsAppointmentId = Number.parseInt(appointmentId, 10);
-            if (isNaN(pmsAppointmentId)) {
-              console.warn(
-                `[SERVER] Skipping appointment with invalid ID: ${appointmentId}`
-              );
-              continue;
-            }
-          } else {
-            pmsAppointmentId = appointmentId;
-          }
-
-          const appointmentData = {
-            user_id: userId,
-            patient_id: patientIdForAppointment,
-            pms_appointment_id: pmsAppointmentId, // Now properly converted to number
-            pms_type: pmsType,
-            appointment_date: appointment.date || appointment.appointment_date,
-            appointment_type:
-              appointment.type || appointment.appointment_type || null,
-            status: appointment.status || "unknown",
-            practitioner_name:
-              appointment.physioName || appointment.practitioner_name || null,
-            notes: appointment.notes || null,
-            is_completed:
-              appointment.status === "completed" ||
-              appointment.status === "Completed",
-          };
-
-          // Validate required fields
-          if (!appointmentData.appointment_date) {
-            console.warn("[SERVER] Skipping appointment with missing date");
-            continue;
-          }
-
-          const storedAppointment = await storeAppointment(appointmentData);
-          totalAppointments++;
-
-          // Log progress every 25 appointments
-          if (totalAppointments % 25 === 0) {
-            console.log(
-              `[SERVER] Stored ${totalAppointments} appointments so far...`
-            );
-          }
-        } catch (appointmentError) {
-          console.error(
-            "[SERVER] Error storing appointment:",
-            appointmentError
-          );
-          issues.push(`Failed to store appointment ID: ${appointment.id}`);
-          // Continue processing other appointments
+        // Convert appointment ID to number if it's a string
+        let pmsAppointmentId: number;
+        if (typeof appointmentId === "string") {
+          pmsAppointmentId = Number.parseInt(appointmentId, 10);
+          if (isNaN(pmsAppointmentId)) return null;
+        } else {
+          pmsAppointmentId = appointmentId;
         }
+
+        if (!appointment.date && !appointment.appointment_date) return null;
+
+        return {
+          user_id: userId,
+          patient_id: patientIdForAppointment,
+          pms_appointment_id: pmsAppointmentId,
+          pms_type: pmsType,
+          appointment_date: appointment.date || appointment.appointment_date,
+          appointment_type: appointment.type || appointment.appointment_type || null,
+          status: appointment.status || "unknown",
+          practitioner_name: appointment.physioName || appointment.practitioner_name || null,
+          notes: appointment.notes || null,
+          is_completed: appointment.status === "completed" || appointment.status === "Completed",
+        };
+      })
+      .filter(Boolean); // Remove null entries
+
+    console.log(`[SERVER] Prepared ${appointmentsToInsert.length} appointments for bulk insert`);
+
+    // BULK INSERT: Insert all appointments at once
+    if (appointmentsToInsert.length > 0) {
+      try {
+        console.log(`[SERVER] Bulk inserting ${appointmentsToInsert.length} appointments...`);
+        
+        // Use larger batch size for better performance
+        const BATCH_SIZE = 200;
+        const totalBatches = Math.ceil(appointmentsToInsert.length / BATCH_SIZE);
+        
+        for (let batchIndex = 0; batchIndex < totalBatches; batchIndex++) {
+          const startIndex = batchIndex * BATCH_SIZE;
+          const endIndex = Math.min(startIndex + BATCH_SIZE, appointmentsToInsert.length);
+          const batch = appointmentsToInsert.slice(startIndex, endIndex);
+          
+          console.log(`[SERVER] Processing batch ${batchIndex + 1}/${totalBatches} (${batch.length} appointments)`);
+          
+          const { error: batchError } = await supabase
+            .from("appointments")
+            .insert(batch);
+          
+          if (batchError) {
+            console.error(`[SERVER] Batch ${batchIndex + 1} insert error:`, batchError);
+            issues.push(`Failed to insert batch ${batchIndex + 1}`);
+          } else {
+            totalAppointments += batch.length;
+            console.log(`[SERVER] ✅ Batch ${batchIndex + 1} completed: ${batch.length} appointments inserted`);
+          }
+        }
+        
+        console.log(`[SERVER] ✅ All appointments bulk inserted successfully: ${totalAppointments} total`);
+      } catch (error) {
+        console.error("[SERVER] Exception in bulk appointment insert:", error);
+        issues.push("Exception in bulk appointment insert");
       }
     }
 
