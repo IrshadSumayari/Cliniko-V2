@@ -31,6 +31,7 @@ interface AuthContextType {
   updateUserOnboardingStatus: (isOnboarded: boolean) => Promise<boolean>;
   isLoading: boolean;
   refreshUserData: () => Promise<void>;
+  clearStaleTokens: () => void; // Add manual cleanup function
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -41,14 +42,54 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [isLoading, setIsLoading] = useState(false);
   const router = useRouter();
 
+  // Clear any potentially stale tokens from localStorage
+  const clearStaleTokens = () => {
+    try {
+      // Clear Supabase-related tokens that might be stale
+      localStorage.removeItem('sb-iyielcnhqudbzuisswwl-auth-token');
+      localStorage.removeItem('supabase.auth.token');
+      // Clear any other potential stale auth data
+      Object.keys(localStorage).forEach(key => {
+        if (key.includes('supabase') || key.includes('auth')) {
+          localStorage.removeItem(key);
+        }
+      });
+      console.log("Cleared potentially stale tokens from localStorage");
+    } catch (error) {
+      console.warn("Error clearing localStorage:", error);
+    }
+  };
+
   const fetchUserData = async (authUser: User): Promise<AuthUser> => {
     try {
       console.log("Fetching user data for:", authUser.id);
-      const { data: userData, error } = await supabase
+      
+      // First, validate that the current session is still valid
+      const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+      
+      if (sessionError || !session) {
+        console.warn("Session validation failed, user may have expired token");
+        throw new Error("Invalid or expired session");
+      }
+      
+      // Check if the session user matches the authUser
+      if (session.user.id !== authUser.id) {
+        console.warn("Session user ID mismatch, token may be stale");
+        throw new Error("Session user mismatch");
+      }
+
+      // Add a safety timeout for database queries
+      const timeoutPromise = new Promise<never>((_, reject) => {
+        setTimeout(() => reject(new Error("Database query timeout")), 10000); // 10 seconds
+      });
+      
+      const queryPromise = supabase
         .from("users")
         .select("is_onboarded")
         .eq("auth_user_id", authUser.id)
         .single();
+
+      const { data: userData, error } = await Promise.race([queryPromise, timeoutPromise]);
 
       if (error) {
         console.error("Error fetching user data:", error);
@@ -72,16 +113,26 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       };
     } catch (error) {
       console.error("Error fetching user data:", error);
+      // If it's a timeout error, log it specifically
+      if (error instanceof Error && error.message === "Database query timeout") {
+        console.warn("Database query timed out, defaulting to not onboarded");
+      }
+      // If it's a session validation error, we should sign out the user
+      if (error instanceof Error && (error.message === "Invalid or expired session" || error.message === "Session user mismatch")) {
+        console.warn("Session validation failed, signing out user");
+        // Don't call signOut here to avoid infinite loops, just return null
+        return { ...authUser, isOnboarded: false };
+      }
       return { ...authUser, isOnboarded: false };
     }
   };
 
   const refreshUserData = async () => {
     if (!user) return;
-    
+
     // Prevent recursive calls
     if (isLoading) return;
-    
+
     try {
       setIsLoading(true);
       const updatedUser = await fetchUserData(user);
@@ -95,18 +146,40 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     let mounted = true;
-    let timeoutId: NodeJS.Timeout;
+    let safetyTimeoutId: NodeJS.Timeout;
 
     const initializeAuth = async () => {
       try {
         console.log("Initializing auth...");
+        
+        // Clear any potentially stale tokens from localStorage first
+        clearStaleTokens();
+
+        // Add a safety timeout to prevent hanging
+        safetyTimeoutId = setTimeout(() => {
+          if (mounted) {
+            console.warn("Auth initialization taking too long, forcing completion");
+            clearStaleTokens(); // Clear stale tokens when timing out
+            setLoading(false);
+            setUser(null);
+          }
+        }, 15000); // 15 seconds safety timeout
+
+        console.log("Getting Supabase session...");
         const {
           data: { session },
           error,
         } = await supabase.auth.getSession();
+        console.log("Session retrieved:", session ? "found" : "not found");
+
+        // Clear safety timeout if we get here
+        if (safetyTimeoutId) {
+          clearTimeout(safetyTimeoutId);
+        }
 
         if (error) {
           console.error("Error getting session:", error);
+          clearStaleTokens(); // Clear stale tokens on error
           if (mounted) {
             setUser(null);
             setLoading(false);
@@ -117,26 +190,33 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         if (session?.user && mounted) {
           console.log("Session found, fetching user data...");
           const userWithData = await fetchUserData(session.user);
+          console.log("User data fetched, setting user state...");
           if (mounted) {
             setUser(userWithData);
+            setLoading(false);
           }
         } else if (mounted) {
           console.log("No session found");
+          clearStaleTokens(); // Clear stale tokens when no session
           setUser(null);
+          setLoading(false);
         }
       } catch (error) {
         console.error("Error initializing auth:", error);
+        clearStaleTokens(); // Clear stale tokens on any error
         if (mounted) {
           setUser(null);
+          setLoading(false);
         }
       } finally {
         if (mounted) {
-          // Add a small delay to prevent rapid state changes
-          timeoutId = setTimeout(() => {
-            if (mounted) {
-              setLoading(false);
-            }
-          }, 100);
+          // Clear safety timeout
+          if (safetyTimeoutId) {
+            clearTimeout(safetyTimeoutId);
+          }
+          
+          // Set loading to false immediately instead of using timeout
+          setLoading(false);
         }
       }
     };
@@ -150,40 +230,40 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
       try {
         if (session?.user) {
+          console.log("Auth state change: user session found");
           const userWithData = await fetchUserData(session.user);
           if (mounted) {
             setUser(userWithData);
+            setLoading(false);
           }
         } else {
-          console.log("No authenticated user");
+          console.log("Auth state change: no authenticated user");
+          clearStaleTokens(); // Clear stale tokens when no session
           if (mounted) {
             setUser(null);
+            setLoading(false);
           }
         }
       } catch (error) {
         console.error("Error handling auth state change:", error);
+        clearStaleTokens(); // Clear stale tokens on error
         if (session?.user && mounted) {
           setUser({ ...session.user, isOnboarded: false });
+          setLoading(false);
         } else if (mounted) {
           setUser(null);
-        }
-      } finally {
-        if (mounted) {
-          // Add a small delay to prevent rapid state changes
-          timeoutId = setTimeout(() => {
-            if (mounted) {
-              setLoading(false);
-            }
-          }, 100);
+          setLoading(false);
         }
       }
     });
 
     return () => {
       mounted = false;
-      if (timeoutId) {
-        clearTimeout(timeoutId);
+      if (safetyTimeoutId) {
+        clearTimeout(safetyTimeoutId);
       }
+      // Clear any remaining stale tokens on unmount
+      clearStaleTokens();
       subscription.unsubscribe();
     };
   }, []);
@@ -369,6 +449,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         updateUserOnboardingStatus,
         isLoading,
         refreshUserData,
+        clearStaleTokens,
       }}
     >
       {children}
