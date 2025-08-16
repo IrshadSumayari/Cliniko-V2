@@ -78,10 +78,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const refreshUserData = async () => {
     if (!user) return;
-
+    
     // Prevent recursive calls
     if (isLoading) return;
-
+    
     try {
       setIsLoading(true);
       const updatedUser = await fetchUserData(user);
