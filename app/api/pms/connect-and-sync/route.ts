@@ -1,13 +1,10 @@
 import { type NextRequest, NextResponse } from "next/server";
-import { createServerClient } from "@supabase/ssr";
-import { cookies } from "next/headers";
 import { PMSFactory } from "@/lib/pms/factory";
 import {
   storeEncryptedApiKey,
   createAdminClient,
   storeAppointmentTypes,
 } from "@/lib/supabase/server-admin";
-import { config } from "@/lib/config";
 
 export async function POST(request: NextRequest) {
   try {
@@ -39,45 +36,20 @@ export async function POST(request: NextRequest) {
       token ? `${token.substring(0, 20)}...` : "missing"
     );
 
-    // Create Supabase client with cookies (required by createServerClient)
-    const cookieStore = cookies();
-    const supabase = createServerClient(
-      config.supabase.url,
-      config.supabase.anonKey,
-      {
-        cookies: {
-          get(name: string) {
-            const value = cookieStore.get(name)?.value;
-            return value;
-          },
-          set(name: string, value: string, options: any) {
-            cookieStore.set({ name, value, ...options });
-          },
-          remove(name: string, options: any) {
-            cookieStore.set({ name, value: "", ...options });
-          },
-        },
-      }
-    );
-
-    // Set the auth token in the client
-    const {
-      data: { user },
-      error: authError,
-    } = await supabase.auth.getUser(token);
+    // Use createAdminClient for token-based authentication (NO COOKIES)
+    const adminSupabase = createAdminClient();
+    
+    // Validate the token and get user
+    const { data: { user }, error: authError } = await adminSupabase.auth.getUser(token);
 
     console.log("User data:", user ? `${user.email} (${user.id})` : "missing");
     console.log("Auth error:", authError?.message || "none");
 
     if (authError || !user) {
-      console.error("Authentication failed - no valid session found");
-      console.log(
-        "This usually means the client-side session hasn't been established on the server"
-      );
+      console.error("Authentication failed - invalid token");
       return NextResponse.json(
         {
-          error:
-            "Authentication required. Please refresh the page and try again.",
+          error: "Authentication failed. Please provide a valid token.",
         },
         { status: 401 }
       );
@@ -93,16 +65,15 @@ export async function POST(request: NextRequest) {
       apiKey ? `${apiKey.substring(0, 10)}...` : "missing"
     );
 
-    const adminSupabase = createAdminClient();
     console.log("Ensuring user record exists...");
+    
+    let userRecordData: any;
 
     const { data: existingUser, error: userCheckError } = await adminSupabase
       .from("users")
       .select("id, auth_user_id")
       .eq("auth_user_id", userId)
       .single();
-
-    let userRecordData: any;
 
     if (userCheckError || !existingUser) {
       console.log("User record not found, creating...");
