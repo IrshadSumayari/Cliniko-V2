@@ -12,6 +12,8 @@ import { config } from "@/lib/config";
 
 export async function POST(request: NextRequest) {
   try {
+    const MAX_APPOINTMENTS = 200;
+
     const { pmsType, apiKey } = await request.json();
 
     if (!pmsType || !apiKey) {
@@ -240,7 +242,8 @@ export async function POST(request: NextRequest) {
       adminSupabase,
       userRecordData.id,
       pmsClient,
-      pmsType
+      pmsType,
+      MAX_APPOINTMENTS
     );
 
     const appointmentTypesCount = await getAppointmentTypesCount(
@@ -313,7 +316,8 @@ async function performInitialSync(
   supabase: any,
   userId: string,
   pmsClient: any,
-  pmsType: string
+  pmsType: string,
+  maxAppointments: number
 ) {
   const issues: string[] = [];
   let wcPatients = 0;
@@ -323,6 +327,7 @@ async function performInitialSync(
   try {
     console.log("[SERVER] Starting initial sync for user:", userId);
     console.log("[SERVER] PMS Type:", pmsType);
+    console.log("[SERVER] Max appointments limit:", maxAppointments);
 
     // First, get the stored appointment type IDs for this user and PMS
     const { data: userAppointmentTypes, error: typesError } = await supabase
@@ -468,6 +473,10 @@ async function performInitialSync(
     console.log(
       `[SERVER] Found ${appointmentsToProcess.length} total appointments to process`
     );
+
+    if (appointmentsToProcess.length > maxAppointments) {
+      appointmentsToProcess = appointmentsToProcess.slice(0, maxAppointments);
+    }
 
     // Apply the 3 conditions to ALL appointments
     const validCompletedAppointments = appointmentsToProcess.filter(
