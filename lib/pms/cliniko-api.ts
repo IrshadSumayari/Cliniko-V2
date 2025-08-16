@@ -197,6 +197,7 @@ export class ClinikoAPI implements PMSApiInterface {
       let hasMore = true;
       let totalPages = 0;
       const maxPages = 20; // Safety limit to prevent infinite loops
+      const MAX_APPOINTMENTS = 200;
 
       while (hasMore && page <= maxPages) {
         params.page = page.toString();
@@ -234,6 +235,16 @@ export class ClinikoAPI implements PMSApiInterface {
           `✅ Valid bookings on page ${page}: ${validBookings.length}/${bookings.length}`
         );
 
+        // Check if adding these valid bookings would exceed the limit
+        if (allBookings.length + validBookings.length > MAX_APPOINTMENTS) {
+          // Only add what we can fit within the limit
+          const remainingSlots = MAX_APPOINTMENTS - allBookings.length;
+          const bookingsToAdd = validBookings.slice(0, remainingSlots);
+          allBookings.push(...bookingsToAdd);
+          break; // Stop fetching more pages immediately
+        }
+
+        // If we haven't reached the limit, add all valid bookings
         allBookings.push(...validBookings);
 
         // Check if there are more pages
@@ -779,8 +790,8 @@ export class ClinikoAPI implements PMSApiInterface {
       const allBookings: any[] = [];
       let page = 1;
       let hasMore = true;
-      let totalPages = 0;
       const maxPages = 20; // Safety limit to prevent infinite loops
+      const MAX_APPOINTMENTS = 200;
 
       while (hasMore && page <= maxPages) {
         params.page = page.toString();
@@ -818,11 +829,20 @@ export class ClinikoAPI implements PMSApiInterface {
           `✅ Valid bookings on page ${page}: ${validBookings.length}/${bookings.length}`
         );
 
+        // Check if adding these valid bookings would exceed the limit
+        if (allBookings.length + validBookings.length > MAX_APPOINTMENTS) {
+          // Only add what we can fit within the limit
+          const remainingSlots = MAX_APPOINTMENTS - allBookings.length;
+          const bookingsToAdd = validBookings.slice(0, remainingSlots);
+          allBookings.push(...bookingsToAdd);
+          break; // Stop fetching more pages immediately
+        }
+
+        // If we haven't reached the limit, add all valid bookings
         allBookings.push(...validBookings);
 
         // Check if there are more pages
         hasMore = response.links?.next !== undefined;
-        totalPages = page;
         page++;
 
         // Safety check to prevent infinite loops
@@ -839,11 +859,20 @@ export class ClinikoAPI implements PMSApiInterface {
         }
       }
 
+      // Ensure we don't exceed the appointment limit
+      if (allBookings.length > MAX_APPOINTMENTS) {
+        allBookings.splice(MAX_APPOINTMENTS);
+      }
+
       console.log(
-        `✅ Total synced records: ${allBookings.length} valid bookings from ${totalPages} pages`
+        `✅ Total synced records: ${allBookings.length} valid bookings from ${
+          page - 1
+        } pages`
       );
       console.log(
-        `📊 Pagination summary: Processed ${totalPages} pages, max limit: ${maxPages}`
+        `📊 Pagination summary: Processed ${
+          page - 1
+        } pages, max limit: ${maxPages}`
       );
 
       // Process valid bookings to extract patients

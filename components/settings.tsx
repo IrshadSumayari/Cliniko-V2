@@ -26,6 +26,7 @@ import {
 import { useAuth } from "@/contexts/auth-context";
 import { toast } from "sonner";
 import { authenticatedFetch } from "@/lib/utils";
+import { supabase } from "@/integrations/supabase/client";
 
 interface PMSConnection {
   software: string;
@@ -33,18 +34,43 @@ interface PMSConnection {
   connected: boolean;
   lastSync: string;
 }
+
+interface UserProfile {
+  id: string;
+  first_name: string;
+  last_name: string;
+  email: string;
+  clinic_name: string;
+  pms_type?: string;
+  pms_connected?: boolean;
+  pms_last_sync?: string;
+  created_at: string;
+  updated_at: string;
+}
+
 import { config } from "@/lib/config";
 
 // Get the professional plan price ID
 const priceId = config.stripe.priceIds.professional;
+
 const Settings = ({ onBack }: { onBack: () => void }) => {
   const { user, signOut } = useAuth();
   const [upgradeLoading, setUpgradeLoading] = useState(false);
-  const [profile, setProfile] = useState({
-    firstName: user?.user_metadata?.first_name || "",
-    lastName: user?.user_metadata?.last_name || "",
-    email: user?.email || "",
-    clinicName: user?.user_metadata?.clinic_name || "",
+  const [isLoading, setIsLoading] = useState(true);
+  const [isSaving, setIsSaving] = useState(false);
+  const [isConnecting, setIsConnecting] = useState(false);
+  
+  const [profile, setProfile] = useState<UserProfile>({
+    id: "",
+    first_name: "",
+    last_name: "",
+    email: "",
+    clinic_name: "",
+    pms_type: "",
+    pms_connected: false,
+    pms_last_sync: "",
+    created_at: "",
+    updated_at: "",
   });
 
   const [pmsConnection, setPmsConnection] = useState<PMSConnection>({
@@ -61,20 +87,123 @@ const Settings = ({ onBack }: { onBack: () => void }) => {
     limit: 100,
   });
 
-  useEffect(() => {
-    // Load PMS connection from localStorage
-    const savedConnection = localStorage.getItem("pms_connection");
-    if (savedConnection) {
-      setPmsConnection(JSON.parse(savedConnection));
-    }
-  }, []);
+  // Fetch user profile from database
+  const fetchUserProfile = async () => {
+    if (!user?.id) return;
+    
+    try {
+      setIsLoading(true);
+      const response = await authenticatedFetch(`/api/user/profile`, {
+        method: "GET",
+      });
 
-  const handleProfileSave = () => {
-    // In a real app, this would save to backend
-    toast.success("Profile information has been saved.");
+      if (!response.ok) {
+        throw new Error("Failed to fetch user profile");
+      }
+
+      const userData = await response.json();
+      
+      console.log("Profile data received:", userData);
+      
+      // Update profile state with database data
+      setProfile(userData);
+      
+      // Now fetch PMS credentials with the updated profile data
+      await fetchPMSCredentials(userData);
+      
+    } catch (error) {
+      console.error("Error fetching user profile:", error);
+      toast.error("Failed to load profile data");
+    } finally {
+      setIsLoading(false);
+    }
   };
 
-  const handlePMSConnect = () => {
+  // Fetch PMS credentials from database
+  const fetchPMSCredentials = async (profileData?: UserProfile) => {
+    if (!user?.id) return;
+    
+    try {
+      const response = await authenticatedFetch(`/api/user/pms-credentials`, {
+        method: "GET",
+      });
+
+      if (!response.ok) {
+        throw new Error("Failed to fetch PMS credentials");
+      }
+
+      const credentials = await response.json();
+      
+      console.log("PMS credentials received:", credentials);
+      console.log("Profile data for PMS update:", profileData || profile);
+      
+      // Update PMS connection state with credentials from database
+      setPmsConnection({
+        software: credentials.pms_type ? credentials.pms_type.charAt(0).toUpperCase() + credentials.pms_type.slice(1) : "",
+        apiKey: credentials.api_key ? "••••••••••••••••" : "", // Show masked version for encrypted key
+        connected: !!credentials.pms_type,
+        lastSync: credentials.pms_last_sync || "",
+      });
+      
+      console.log("Updated PMS connection state:", {
+        software: credentials.pms_type ? credentials.pms_type.charAt(0).toUpperCase() + credentials.pms_type.slice(1) : "",
+        connected: !!credentials.pms_type,
+        lastSync: credentials.pms_last_sync || ""
+      });
+      
+    } catch (error) {
+      console.error("Error fetching PMS credentials:", error);
+      // Don't show error toast for credentials, just log it
+    }
+  };
+
+  useEffect(() => {
+    fetchUserProfile();
+  }, [user?.id]);
+
+  // Debug: Log profile data changes
+  useEffect(() => {
+    console.log("Profile state updated:", profile);
+  }, [profile]);
+
+  // Debug: Log PMS connection changes
+  useEffect(() => {
+    console.log("PMS connection state updated:", pmsConnection);
+  }, [pmsConnection]);
+
+  const handleProfileSave = async () => {
+    if (!user?.id) return;
+    
+    try {
+      setIsSaving(true);
+      
+      const response = await authenticatedFetch("/api/user/profile", {
+        method: "PUT",
+        body: JSON.stringify({
+          first_name: profile.first_name,
+          last_name: profile.last_name,
+        }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || "Failed to update profile");
+      }
+
+      toast.success("Profile information has been saved successfully!");
+      
+      // Refresh profile data
+      await fetchUserProfile();
+      
+    } catch (error) {
+      console.error("Error saving profile:", error);
+      toast.error(error instanceof Error ? error.message : "Failed to save profile");
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const handlePMSConnect = async () => {
     if (!pmsConnection.software || !pmsConnection.apiKey) {
       toast.error("Please select your software and enter an API key.");
       return;
@@ -89,17 +218,108 @@ const Settings = ({ onBack }: { onBack: () => void }) => {
       }
     }
 
-    const updatedConnection = {
-      ...pmsConnection,
-      connected: true,
-      lastSync: new Date().toLocaleString(),
-    };
+    try {
+      setIsConnecting(true);
+      
+      // Test the connection first
+      const testResponse = await authenticatedFetch("/api/pms/test-connection", {
+        method: "POST",
+        body: JSON.stringify({
+          pmsType: pmsConnection.software.toLowerCase(),
+          apiKey: pmsConnection.apiKey,
+        }),
+      });
 
-    setPmsConnection(updatedConnection);
-    localStorage.setItem("pms_connection", JSON.stringify(updatedConnection));
+      if (!testResponse.ok) {
+        const errorData = await testResponse.json();
+        throw new Error(errorData.error || "Failed to connect to PMS");
+      }
 
-    toast.success(`Successfully connected to ${pmsConnection.software}.`);
+      // If connection test passes, save to database
+      const saveResponse = await authenticatedFetch("/api/user/pms-connection", {
+        method: "POST",
+        body: JSON.stringify({
+          pms_type: pmsConnection.software.toLowerCase(), // Convert to lowercase for database
+          api_key: pmsConnection.apiKey,
+        }),
+      });
+
+      if (!saveResponse.ok) {
+        const errorData = await saveResponse.json();
+        throw new Error(errorData.error || "Failed to save PMS connection");
+      }
+
+      // Update local state
+      const updatedConnection = {
+        ...pmsConnection,
+        connected: true,
+        lastSync: new Date().toLocaleString(),
+        apiKey: "", // Clear API key from state for security
+      };
+
+      setPmsConnection(updatedConnection);
+      
+      // Update profile state
+      setProfile(prev => ({
+        ...prev,
+        pms_type: pmsConnection.software,
+        pms_connected: true,
+        pms_last_sync: new Date().toISOString(),
+      }));
+
+      // Refresh profile and credentials data
+      await fetchUserProfile();
+
+      toast.success(`Successfully connected to ${pmsConnection.software}.`);
+      
+    } catch (error) {
+      console.error("Error connecting PMS:", error);
+      toast.error(error instanceof Error ? error.message : "Failed to connect to PMS");
+    } finally {
+      setIsConnecting(false);
+    }
   };
+
+  const handlePMSDisconnect = async () => {
+    try {
+      const response = await authenticatedFetch("/api/user/pms-connection", {
+        method: "DELETE",
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || "Failed to disconnect PMS");
+      }
+
+      // Update local state
+      const updatedConnection = {
+        ...pmsConnection,
+        connected: false,
+        lastSync: "",
+        apiKey: "",
+      };
+
+      setPmsConnection(updatedConnection);
+      
+      // Update profile state
+      setProfile(prev => ({
+        ...prev,
+        pms_type: "",
+        pms_connected: false,
+        pms_last_sync: "",
+      }));
+
+      // Refresh profile and credentials data
+      await fetchUserProfile();
+
+      toast.success("Your practice management software has been disconnected.");
+      
+    } catch (error) {
+      console.error("Error disconnecting PMS:", error);
+      toast.error(error instanceof Error ? error.message : "Failed to disconnect PMS");
+    }
+  };
+
   async function handleUpgrade() {
     setUpgradeLoading(true);
     try {
@@ -138,18 +358,16 @@ const Settings = ({ onBack }: { onBack: () => void }) => {
     }
   }
 
-  const handlePMSDisconnect = () => {
-    const updatedConnection = {
-      ...pmsConnection,
-      connected: false,
-      lastSync: "",
-    };
-
-    setPmsConnection(updatedConnection);
-    localStorage.setItem("pms_connection", JSON.stringify(updatedConnection));
-
-    toast.success("Your practice management software has been disconnected.");
-  };
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-gradient-to-b from-background to-accent flex items-center justify-center">
+        <div className="text-center">
+          <Loader2 className="h-8 w-8 animate-spin mx-auto mb-4" />
+          <p>Loading your profile...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-background to-accent">
@@ -188,11 +406,11 @@ const Settings = ({ onBack }: { onBack: () => void }) => {
                     First Name
                   </label>
                   <Input
-                    value={profile.firstName}
+                    value={profile.first_name}
                     onChange={(e) =>
                       setProfile((prev) => ({
                         ...prev,
-                        firstName: e.target.value,
+                        first_name: e.target.value,
                       }))
                     }
                   />
@@ -202,11 +420,11 @@ const Settings = ({ onBack }: { onBack: () => void }) => {
                     Last Name
                   </label>
                   <Input
-                    value={profile.lastName}
+                    value={profile.last_name}
                     onChange={(e) =>
                       setProfile((prev) => ({
                         ...prev,
-                        lastName: e.target.value,
+                        last_name: e.target.value,
                       }))
                     }
                   />
@@ -220,30 +438,25 @@ const Settings = ({ onBack }: { onBack: () => void }) => {
                 <Input
                   type="email"
                   value={profile.email}
-                  onChange={(e) =>
-                    setProfile((prev) => ({ ...prev, email: e.target.value }))
-                  }
+                  disabled
+                  className="bg-muted"
                 />
+                <p className="text-xs text-muted-foreground mt-1">
+                  Email cannot be changed
+                </p>
               </div>
 
-              <div>
-                <label className="text-sm font-medium text-muted-foreground">
-                  Clinic Name
-                </label>
-                <Input
-                  value={profile.clinicName}
-                  onChange={(e) =>
-                    setProfile((prev) => ({
-                      ...prev,
-                      clinicName: e.target.value,
-                    }))
-                  }
-                />
-              </div>
-
-              <Button onClick={handleProfileSave} className="w-full">
-                <Save className="h-4 w-4 mr-2" />
-                Save Profile
+              <Button 
+                onClick={handleProfileSave} 
+                className="w-full"
+                disabled={isSaving}
+              >
+                {isSaving ? (
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                ) : (
+                  <Save className="h-4 w-4 mr-2" />
+                )}
+                {isSaving ? "Saving..." : "Save Profile"}
               </Button>
             </div>
           </Card>
@@ -290,11 +503,16 @@ const Settings = ({ onBack }: { onBack: () => void }) => {
                   }
                   disabled={pmsConnection.connected}
                 >
-                  <option value="">Select your clinic</option>
-                  <option value="OptiPlex">Cliniko</option>
-                  <option value="HeroHealth">Halaxy</option>
+                  <option value="">Select your PMS</option>
+                  <option value="Cliniko">Cliniko</option>
+                  <option value="Halaxy">Halaxy</option>
                   <option value="Nookal">Nookal</option>
                 </select>
+                {pmsConnection.connected && (
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Currently connected to {pmsConnection.software}
+                  </p>
+                )}
               </div>
 
               <div>
@@ -303,7 +521,7 @@ const Settings = ({ onBack }: { onBack: () => void }) => {
                 </label>
                 <Input
                   type="password"
-                  placeholder="Enter your API key"
+                  placeholder={pmsConnection.connected ? "API key is encrypted and stored securely" : "Enter your API key"}
                   value={pmsConnection.apiKey}
                   onChange={(e) =>
                     setPmsConnection((prev) => ({
@@ -313,11 +531,16 @@ const Settings = ({ onBack }: { onBack: () => void }) => {
                   }
                   disabled={pmsConnection.connected}
                 />
+                {pmsConnection.connected && (
+                  <p className="text-xs text-muted-foreground mt-1">
+                    API key is encrypted and stored securely in the database
+                  </p>
+                )}
               </div>
 
               {pmsConnection.connected && pmsConnection.lastSync && (
                 <div className="text-sm text-muted-foreground">
-                  Last sync: {pmsConnection.lastSync}
+                  Last sync: {new Date(pmsConnection.lastSync).toLocaleString()}
                 </div>
               )}
 
@@ -331,61 +554,23 @@ const Settings = ({ onBack }: { onBack: () => void }) => {
                   Disconnect
                 </Button>
               ) : (
-                <Button onClick={handlePMSConnect} className="w-full">
-                  <Plug className="h-4 w-4 mr-2" />
-                  Connect PMS
+                <Button 
+                  onClick={handlePMSConnect} 
+                  className="w-full"
+                  disabled={isConnecting || !pmsConnection.software || !pmsConnection.apiKey}
+                >
+                  {isConnecting ? (
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  ) : (
+                    <Plug className="h-4 w-4 mr-2" />
+                  )}
+                  {isConnecting ? "Connecting..." : "Connect PMS"}
                 </Button>
               )}
             </div>
           </Card>
 
-          {/* Subscription Status */}
-          {/* <Card className="p-6">
-            <div className="flex items-center gap-3 mb-6">
-              <CreditCard className="h-5 w-5 text-primary" />
-              <h2 className="text-xl font-semibold">Subscription</h2>
-            </div>
-
-            <div className="space-y-4">
-              <div className="flex items-center justify-between">
-                <span className="text-sm font-medium">Current Plan</span>
-                <Badge variant="outline">{subscriptionStatus.plan}</Badge>
-              </div>
-
-              <div className="flex items-center justify-between">
-                <span className="text-sm font-medium">Days Remaining</span>
-                <span className="text-sm text-muted-foreground">
-                  {subscriptionStatus.daysLeft} days
-                </span>
-              </div>
-
-              <div>
-                <div className="flex items-center justify-between mb-2">
-                  <span className="text-sm font-medium">Usage</span>
-                  <span className="text-sm text-muted-foreground">
-                    {subscriptionStatus.usage}/{subscriptionStatus.limit}{" "}
-                    patients
-                  </span>
-                </div>
-                <div className="w-full bg-muted rounded-full h-2">
-                  <div
-                    className="bg-primary h-2 rounded-full transition-all"
-                    style={{
-                      width: `${
-                        (subscriptionStatus.usage / subscriptionStatus.limit) *
-                        100
-                      }%`,
-                    }}
-                  />
-                </div>
-              </div>
-
-              <Button onClick={handleUpgrade} className="w-full">
-                <CreditCard className="h-4 w-4 mr-2" />
-                Upgrade Plan
-              </Button>
-            </div>
-          </Card> */}
+          {/* Upgrade Card */}
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
@@ -420,6 +605,7 @@ const Settings = ({ onBack }: { onBack: () => void }) => {
               </Button>
             </CardContent>
           </Card>
+
           {/* Account Actions */}
           <Card className="p-6">
             <div className="flex items-center gap-3 mb-6">

@@ -38,7 +38,7 @@ export default function OnboardingFlow() {
   const [syncProgress, setSyncProgress] = useState({
     progress: 0,
     message: "",
-    currentStage: ""
+    currentStage: "",
   });
   const [formData, setFormData] = useState({
     selectedPMS: "",
@@ -59,7 +59,7 @@ export default function OnboardingFlow() {
     setSyncProgress({
       progress: 0,
       message: "",
-      currentStage: ""
+      currentStage: "",
     });
   };
 
@@ -71,9 +71,12 @@ export default function OnboardingFlow() {
 
     // Validate API key format based on PMS type
     if (formData.selectedPMS === "Nookal") {
-      const nookalPattern = /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/;
+      const nookalPattern =
+        /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/;
       if (!nookalPattern.test(formData.apiKey)) {
-        toast.error("Invalid Nookal API key format. Expected format: xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx");
+        toast.error(
+          "Invalid Nookal API key format. Expected format: xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
+        );
         return;
       }
     }
@@ -100,53 +103,111 @@ export default function OnboardingFlow() {
     resetSyncProgress();
 
     try {
-      // Simple progress simulation without complex timeouts
+      // Start with 0% progress
       setSyncProgress({
-        progress: 10,
-        message: "Connecting to PMS...",
-        currentStage: "connecting"
+        progress: 0,
+        message: "Initializing connection...",
+        currentStage: "initializing",
       });
 
-      await new Promise(resolve => setTimeout(resolve, 1000));
-
-      setSyncProgress({
-        progress: 25,
-        message: "Fetching appointment types...",
-        currentStage: "appointment-types"
-      });
-
-      await new Promise(resolve => setTimeout(resolve, 1000));
-
-      setSyncProgress({
-        progress: 50,
-        message: "Fetching patients...",
-        currentStage: "patients"
-      });
-
-      await new Promise(resolve => setTimeout(resolve, 1000));
-
-      setSyncProgress({
-        progress: 75,
-        message: "Fetching appointments...",
-        currentStage: "appointments"
-      });
-
-      await new Promise(resolve => setTimeout(resolve, 1000));
-
-      setSyncProgress({
-        progress: 90,
-        message: "Finalizing sync...",
-        currentStage: "finalizing"
-      });
-
-      // Make the actual API call
-      const response = await authenticatedFetch("/api/pms/connect-and-sync", {
+      // Make the API call immediately at 0%
+      const apiCallPromise = authenticatedFetch("/api/pms/connect-and-sync", {
         method: "POST",
         body: JSON.stringify({
           pmsType: formData.selectedPMS.toLowerCase(),
           apiKey: formData.apiKey,
         }),
       });
+
+      // Start progress simulation
+      setSyncProgress({
+        progress: 10,
+        message: "Connecting to PMS...",
+        currentStage: "connecting",
+      });
+
+      await new Promise((resolve) => setTimeout(resolve, 1000));
+
+      setSyncProgress({
+        progress: 25,
+        message: "Fetching appointment types...",
+        currentStage: "appointment-types",
+      });
+
+      await new Promise((resolve) => setTimeout(resolve, 1000));
+
+      setSyncProgress({
+        progress: 30,
+        message: "Fetching patients...",
+        currentStage: "patients",
+      });
+
+      for (let progress = 31; progress <= 90; progress++) {
+        try {
+          const result = await Promise.race([
+            apiCallPromise,
+            new Promise((resolve) => setTimeout(resolve, 8000)),
+          ]);
+
+          if (result && typeof result === "object" && "ok" in result) {
+            setSyncProgress({
+              progress: 100,
+              message: "Sync completed successfully!",
+              currentStage: "complete",
+            });
+
+            await new Promise((resolve) => setTimeout(resolve, 500));
+
+            // Process the API response
+            const response = result as Response;
+            const responseData = await response.json();
+
+            if (!response.ok) {
+              if (response.status === 401) {
+                toast.error(
+                  "Authentication expired. Please refresh the page and try again."
+                );
+                return;
+              }
+              throw new Error(responseData.error || "Failed to connect to PMS");
+            }
+
+            setSyncResults({
+              wcPatients: responseData.wcPatients || 0,
+              epcPatients: responseData.epcPatients || 0,
+              totalAppointments: responseData.totalAppointments || 0,
+              issues: responseData.issues || [],
+            });
+
+            toast.success("Successfully connected and synced data!");
+            setCurrentStep("sync-results");
+            return;
+          }
+        } catch (error) {
+          if (error && typeof error === "object" && "message" in error) {
+            throw error;
+          }
+        }
+
+        setSyncProgress({
+          progress: progress,
+          message:
+            progress < 60
+              ? "Processing patient data..."
+              : "Processing appointment data...",
+          currentStage:
+            progress < 60 ? "patients-processing" : "appointments-processing",
+        });
+      }
+
+      setSyncProgress({
+        progress: 90,
+        message: "Waiting for sync to complete...",
+        currentStage: "waiting",
+      });
+
+      // Wait for the API call to complete
+      const response = await apiCallPromise;
 
       const result = await response.json();
 
@@ -164,10 +225,10 @@ export default function OnboardingFlow() {
       setSyncProgress({
         progress: 100,
         message: "Sync completed successfully!",
-        currentStage: "complete"
+        currentStage: "complete",
       });
 
-      await new Promise(resolve => setTimeout(resolve, 1000));
+      await new Promise((resolve) => setTimeout(resolve, 1000));
 
       setSyncResults({
         wcPatients: result.wcPatients || 0,
@@ -178,11 +239,12 @@ export default function OnboardingFlow() {
 
       toast.success("Successfully connected and synced data!");
       setCurrentStep("sync-results");
-
     } catch (error) {
       console.error("Error during sync:", error);
-      toast.error(error instanceof Error ? error.message : "Failed to sync data");
-      
+      toast.error(
+        error instanceof Error ? error.message : "Failed to sync data"
+      );
+
       // Reset progress on error
       resetSyncProgress();
       setCurrentStep("api");
@@ -193,7 +255,7 @@ export default function OnboardingFlow() {
 
   const handleCompleteOnboarding = async () => {
     if (isCompleting) return; // Prevent multiple clicks
-    
+
     setIsCompleting(true);
     try {
       const success = await updateUserOnboardingStatus(true);
@@ -216,7 +278,7 @@ export default function OnboardingFlow() {
 
   const handleSkip = async () => {
     if (isCompleting) return; // Prevent multiple clicks
-    
+
     setIsCompleting(true);
     try {
       toast.info("You can connect your PMS later in settings.");
@@ -242,7 +304,7 @@ export default function OnboardingFlow() {
     const currentIndex = steps.indexOf(currentStep);
     if (currentIndex > 0) {
       setCurrentStep(steps[currentIndex - 1]);
-      
+
       // Reset progress when going back to API step
       if (steps[currentIndex - 1] === "api") {
         resetSyncProgress();
@@ -513,7 +575,7 @@ export default function OnboardingFlow() {
                   {syncProgress.progress}%
                 </span>
               </div>
-              
+
               <div className="w-full bg-muted rounded-full h-2 mb-6">
                 <div
                   className="bg-primary h-2 rounded-full transition-all duration-500 ease-out"

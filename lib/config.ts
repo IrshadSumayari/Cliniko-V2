@@ -30,7 +30,10 @@ export const config = {
     },
   },
   app: {
-    url: "https://cliniko-v2.vercel.app",
+    url:
+      process.env.NODE_ENV === "development"
+        ? "http://localhost:3000"
+        : "https://cliniko-v2.vercel.app",
   },
   cron: {
     secret: "your-cron-secret-key-here",
