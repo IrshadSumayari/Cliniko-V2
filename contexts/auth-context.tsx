@@ -187,10 +187,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         return false;
       }
 
+      // Update local state directly without calling refreshUserData to prevent loops
       setUser((prev) => (prev ? { ...prev, isOnboarded } : null));
-
-      // Also refresh user data from database to ensure consistency
-      await refreshUserData();
 
       return true;
     } catch (error) {

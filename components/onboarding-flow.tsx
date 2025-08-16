@@ -99,156 +99,47 @@ export default function OnboardingFlow() {
     setCurrentStep("syncing");
     resetSyncProgress();
 
-    // Start dummy progress
-    let progressInterval: NodeJS.Timeout | undefined;
-    let apiCompleted = false;
-    let apiResult: any = null;
-    
     try {
-      // Start progress
-      // Stage 1: Initial connection (1-5%)
+      // Simple progress simulation without complex timeouts
       setSyncProgress({
-        progress: 1,
-        message: "Initializing connection...",
+        progress: 10,
+        message: "Connecting to PMS...",
         currentStage: "connecting"
       });
 
       await new Promise(resolve => setTimeout(resolve, 1000));
 
       setSyncProgress({
-        progress: 5,
-        message: "Connection established!",
-        currentStage: "connected"
-      });
-
-      // Stage 2: Loading appointment types (5-15%) over 10 seconds
-      setSyncProgress({
-        progress: 5,
-        message: "Loading appointment types and categories...",
-        currentStage: "appointment-types"
-      });
-
-      await new Promise(resolve => setTimeout(resolve, 2000));
-
-      setSyncProgress({
-        progress: 10,
-        message: "Appointment types loaded successfully!",
-        currentStage: "appointment-types"
-      });
-
-      await new Promise(resolve => setTimeout(resolve, 2000));
-
-      setSyncProgress({
-        progress: 15,
-        message: "Appointment types completed!",
-        currentStage: "appointment-types"
-      });
-
-      // Stage 3: Getting patients (15-30%)
-      setSyncProgress({
-        progress: 15,
-        message: "Fetching patient records...",
-        currentStage: "patients"
-      });
-
-      await new Promise(resolve => setTimeout(resolve, 2000));
-
-      setSyncProgress({
-        progress: 20,
-        message: "Processing patient data...",
-        currentStage: "patients"
-      });
-
-      await new Promise(resolve => setTimeout(resolve, 2000));
-
-      setSyncProgress({
         progress: 25,
-        message: "Patient records processed!",
-        currentStage: "patients"
+        message: "Fetching appointment types...",
+        currentStage: "appointment-types"
       });
 
-      await new Promise(resolve => setTimeout(resolve, 2000));
+      await new Promise(resolve => setTimeout(resolve, 1000));
 
       setSyncProgress({
-        progress: 30,
-        message: "Patients completed!",
+        progress: 50,
+        message: "Fetching patients...",
         currentStage: "patients"
       });
 
-      // Stage 4: Incremental progress (30-90%) - 1% every 8 seconds
-      let currentProgress = 30;
-      progressInterval = setInterval(() => {
-        if (currentProgress < 90) {
-          currentProgress += 1;
-          setSyncProgress({
-            progress: currentProgress,
-            message: "Processing data and organizing records...",
-            currentStage: "processing"
-          });
-        }
-      }, 8000); // 1% every 8 seconds
+      await new Promise(resolve => setTimeout(resolve, 1000));
 
-      // Wait for progress to reach 90% OR API to complete
-      while (currentProgress < 90) {
-        await new Promise(resolve => setTimeout(resolve, 1000)); // Check every second
-        
-        // Check if API has completed
-        try {
-          // Try to get the API result without waiting
-          const apiResponse = await authenticatedFetch("/api/pms/connect-and-sync", {
-            method: "POST",
-            body: JSON.stringify({
-              pmsType: formData.selectedPMS.toLowerCase(),
-              apiKey: formData.apiKey,
-            }),
-          });
+      setSyncProgress({
+        progress: 75,
+        message: "Fetching appointments...",
+        currentStage: "appointments"
+      });
 
-          const result = await apiResponse.json();
+      await new Promise(resolve => setTimeout(resolve, 1000));
 
-          if (apiResponse.ok) {
-            // API completed successfully, jump to 100%
-            if (progressInterval) {
-              clearInterval(progressInterval);
-            }
-            
-            setSyncProgress({
-              progress: 100,
-              message: "Sync completed successfully!",
-              currentStage: "complete"
-            });
-
-            await new Promise(resolve => setTimeout(resolve, 1000));
-
-            setSyncResults({
-              wcPatients: result.wcPatients || 0,
-              epcPatients: result.epcPatients || 0,
-              totalAppointments: result.totalAppointments || 0,
-              issues: result.issues || [],
-            });
-
-            toast.success("Successfully connected and synced data!");
-            setCurrentStep("sync-results");
-            return; // Exit the function early
-          }
-        } catch (error) {
-          // API not ready yet, continue with progress
-          console.log("API not ready yet, continuing progress...");
-        }
-      }
-
-      // Clear the interval
-      if (progressInterval) {
-        clearInterval(progressInterval);
-      }
-
-      // Progress reached 90%, stick there until API completes
       setSyncProgress({
         progress: 90,
-        message: "Finalizing data organization...",
+        message: "Finalizing sync...",
         currentStage: "finalizing"
       });
 
-      // Now make the actual API call
+      // Make the actual API call
       const response = await authenticatedFetch("/api/pms/connect-and-sync", {
         method: "POST",
         body: JSON.stringify({
@@ -269,7 +160,7 @@ export default function OnboardingFlow() {
         throw new Error(result.error || "Failed to connect to PMS");
       }
 
-      // Complete the progress (90-100%)
+      // Success - complete the progress
       setSyncProgress({
         progress: 100,
         message: "Sync completed successfully!",
@@ -289,33 +180,13 @@ export default function OnboardingFlow() {
       setCurrentStep("sync-results");
 
     } catch (error) {
-      console.error("Sync error:", error);
-
-      // Clear interval if there's an error
-      if (progressInterval) {
-        clearInterval(progressInterval);
-      }
-
-      let errorMessage = "Failed to connect to PMS";
-      if (error instanceof Error) {
-        if (error.message.includes("Failed to fetch")) {
-          errorMessage =
-            "Network error. Please check your connection and try again.";
-        } else if (error.message.includes("authentication")) {
-          errorMessage =
-            "Authentication error. Please refresh the page and sign in again.";
-        } else {
-          errorMessage = error.message;
-        }
-      }
-
-      toast.error(errorMessage);
+      console.error("Error during sync:", error);
+      toast.error(error instanceof Error ? error.message : "Failed to sync data");
+      
+      // Reset progress on error
+      resetSyncProgress();
       setCurrentStep("api");
     } finally {
-      // Clear interval in finally block
-      if (progressInterval) {
-        clearInterval(progressInterval);
-      }
       setIsProcessing(false);
     }
   };
