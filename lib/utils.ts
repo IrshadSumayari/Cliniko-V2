@@ -14,30 +14,37 @@ export async function authenticatedFetch(
   options: RequestInit = {}
 ): Promise<Response> {
   try {
-    // Get the current session and access token
-    const { createClient } = await import("@supabase/supabase-js");
-    const { config } = await import("@/lib/config");
+    // Get access token from localStorage
+    let accessToken: string | null = null;
     
-    const supabase = createClient(config.supabase.url, config.supabase.anonKey);
-    const { data: { session }, error: sessionError } = await supabase.auth.getSession();
-    
-    if (sessionError) {
-      console.error("Session error:", sessionError);
-      throw new Error("Failed to get authentication session. Please sign in again.");
+    try {
+      // Check for Supabase auth token
+      const supabaseToken = localStorage.getItem('sb-iyielcnhqudbzuisswwl-auth-token');
+      if (supabaseToken) {
+        const parsed = JSON.parse(supabaseToken);
+        accessToken = parsed.access_token || null;
+      }
+      
+      // Fallback to generic auth token
+      if (!accessToken) {
+        accessToken = localStorage.getItem('supabase.auth.token');
+      }
+    } catch (error) {
+      console.warn("Error getting access token from localStorage:", error);
     }
     
-    if (!session?.access_token) {
-      console.error("No session or access token found");
+    if (!accessToken) {
+      console.error("No access token found in localStorage");
       throw new Error("No authentication token found. Please sign in again.");
     }
 
     console.log("Making authenticated request to:", url);
-    console.log("Token available:", session.access_token ? "Yes" : "No");
+    console.log("Token available:", accessToken ? "Yes" : "No");
 
     // Merge headers to include authorization
     const headers = {
       "Content-Type": "application/json",
-      "Authorization": `Bearer ${session.access_token}`,
+      "Authorization": `Bearer ${accessToken}`,
       ...options.headers,
     };
 

@@ -78,10 +78,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const refreshUserData = async () => {
     if (!user) return;
-    
+
     // Prevent recursive calls
     if (isLoading) return;
-    
+
     try {
       setIsLoading(true);
       const updatedUser = await fetchUserData(user);
@@ -93,35 +93,64 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
+  const getAccessToken = (): string | null => {
+    try {
+      const supabaseToken = localStorage.getItem(
+        "sb-iyielcnhqudbzuisswwl-auth-token"
+      );
+      if (supabaseToken) {
+        const parsed = JSON.parse(supabaseToken);
+        return parsed.access_token || null;
+      }
+
+      return localStorage.getItem("supabase.auth.token");
+    } catch (error) {
+      console.warn("Error getting access token:", error);
+      return null;
+    }
+  };
+
+  const validateTokenAndGetUser = async (): Promise<User | null> => {
+    try {
+      const token = getAccessToken();
+      if (!token) {
+        return null;
+      }
+
+      const {
+        data: { user },
+        error,
+      } = await supabase.auth.getUser(token);
+
+      if (error || !user) {
+        console.warn("Token validation failed:", error);
+        return null;
+      }
+
+      return user;
+    } catch (error) {
+      console.error("Error validating token:", error);
+      return null;
+    }
+  };
+
   useEffect(() => {
     let mounted = true;
     let timeoutId: NodeJS.Timeout;
 
     const initializeAuth = async () => {
       try {
-        console.log("Initializing auth...");
-        const {
-          data: { session },
-          error,
-        } = await supabase.auth.getSession();
+        console.log("Initializing token-based auth...");
+        const authUser = await validateTokenAndGetUser();
 
-        if (error) {
-          console.error("Error getting session:", error);
-          if (mounted) {
-            setUser(null);
-            setLoading(false);
-          }
-          return;
-        }
-
-        if (session?.user && mounted) {
-          console.log("Session found, fetching user data...");
-          const userWithData = await fetchUserData(session.user);
+        if (authUser && mounted) {
+          console.log("Valid token found, fetching user data...");
+          const userWithData = await fetchUserData(authUser);
           if (mounted) {
             setUser(userWithData);
           }
         } else if (mounted) {
-          console.log("No session found");
+          console.log("No valid token found");
           setUser(null);
         }
       } catch (error) {
@@ -145,19 +174,23 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     const {
       data: { subscription },
-    } = supabase.auth.onAuthStateChange(async (_, session) => {
+    } = supabase.auth.onAuthStateChange(async (event, session) => {
       if (!mounted) return;
 
       try {
-        if (session?.user) {
+        if (event === "SIGNED_IN" && session?.user) {
           const userWithData = await fetchUserData(session.user);
           if (mounted) {
             setUser(userWithData);
           }
-        } else {
-          console.log("No authenticated user");
+        } else if (event === "SIGNED_OUT") {
           if (mounted) {
             setUser(null);
+          }
+        } else if (event === "TOKEN_REFRESHED" && session?.user) {
+          const userWithData = await fetchUserData(session.user);
+          if (mounted) {
+            setUser(userWithData);
           }
         }
       } catch (error) {
