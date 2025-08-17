@@ -12,7 +12,9 @@ import { useState, useMemo, useEffect } from "react";
  * It handles navigation between the dashboard, settings, and onboarding.
  */
 function AuthenticatedApp() {
-  const [view, setView] = useState<"dashboard" | "settings" | "onboarding">("dashboard");
+  const [view, setView] = useState<"dashboard" | "settings" | "onboarding">(
+    "dashboard"
+  );
 
   if (view === "settings") {
     return <Settings onBack={() => setView("dashboard")} />;
@@ -27,19 +29,6 @@ function AuthenticatedApp() {
 
 export default function HomePage() {
   const { user, loading } = useAuth();
-
-  useEffect(() => {
-    if (loading) {
-      const timer = setTimeout(() => {
-        console.warn("Auth loading too long → clearing storage & reloading");
-        localStorage.clear();
-        sessionStorage.clear();
-        window.location.reload();
-      }, 10000); // 10 seconds
-
-      return () => clearTimeout(timer);
-    }
-  }, [loading]);
 
   const content = useMemo(() => {
     if (loading) {

@@ -81,23 +81,7 @@ export default function OnboardingFlow() {
       }
     }
 
-    console.log("Checking client-side session before API call...");
-    const {
-      data: { session },
-      error: sessionError,
-    } = await supabase.auth.getSession();
-
-    if (sessionError || !session) {
-      console.error(
-        "Client-side session missing:",
-        sessionError?.message || "No session"
-      );
-      toast.error("Session expired. Please refresh the page and try again.");
-      return;
-    }
-
-    console.log("Client-side session found:", session.user.email);
-
+    // Remove session check - we're using token-based auth now
     setIsProcessing(true);
     setCurrentStep("syncing");
     resetSyncProgress();
