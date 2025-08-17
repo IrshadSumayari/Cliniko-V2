@@ -21,16 +21,16 @@ export async function POST(request: NextRequest) {
   try {
     // Get the authorization header
     const authHeader = request.headers.get("authorization");
-    
+
     if (!authHeader || !authHeader.startsWith("Bearer ")) {
       return NextResponse.json(
         { error: "Authentication required. Please provide a valid token." },
-        { status: 401 }
+        { status: 401 },
       );
     }
 
     const token = authHeader.replace("Bearer ", "");
-    
+
     // Verify the token and get user
     const supabase = createClient(supabaseUrl, supabaseServiceKey, {
       auth: {
@@ -39,12 +39,15 @@ export async function POST(request: NextRequest) {
       },
     });
 
-    const { data: { user }, error: authError } = await supabase.auth.getUser(token);
-    
+    const {
+      data: { user },
+      error: authError,
+    } = await supabase.auth.getUser(token);
+
     if (authError || !user) {
       return NextResponse.json(
         { error: "Invalid authentication token." },
-        { status: 401 }
+        { status: 401 },
       );
     }
 
@@ -52,7 +55,7 @@ export async function POST(request: NextRequest) {
     if (!userId) {
       return NextResponse.json(
         { error: "User ID is required" },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
@@ -60,7 +63,7 @@ export async function POST(request: NextRequest) {
     if (user.id !== userId) {
       return NextResponse.json(
         { error: "Unauthorized access to this user's data." },
-        { status: 403 }
+        { status: 403 },
       );
     }
 
@@ -71,7 +74,7 @@ export async function POST(request: NextRequest) {
       console.error("NEXT_PUBLIC_STRIPE_PROFESSIONAL_PRICE_ID not configured");
       return NextResponse.json(
         { error: "Stripe configuration error - missing price ID" },
-        { status: 500 }
+        { status: 500 },
       );
     }
 
@@ -89,8 +92,8 @@ export async function POST(request: NextRequest) {
         },
       ],
       mode: "subscription",
-              success_url: `${config.app.url}/?session_id={CHECKOUT_SESSION_ID}`,
-        cancel_url: `${config.app.url}/`,
+      success_url: `${config.app.url}/?session_id={CHECKOUT_SESSION_ID}`,
+      cancel_url: `${config.app.url}/`,
       metadata: {
         userId: userId,
         planType: "professional",
@@ -114,7 +117,7 @@ export async function POST(request: NextRequest) {
         error: "Failed to create checkout session",
         details: error.message,
       },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }

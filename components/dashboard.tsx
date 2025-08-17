@@ -62,7 +62,7 @@ const Dashboard = ({ onNavigate }: DashboardProps) => {
   const [selectedClients, setSelectedClients] = useState<number[]>([]);
   const [showApiHelp, setShowApiHelp] = useState(false);
   const [showPendingReason, setShowPendingReason] = useState<number | null>(
-    null
+    null,
   );
   const [showTutorial, setShowTutorial] = useState(false);
   const [clientsData, setClientsData] = useState([
@@ -236,7 +236,7 @@ const Dashboard = ({ onNavigate }: DashboardProps) => {
 
   const handleDischarge = (clientId: number, clientName: string) => {
     const clientToArchive = clientsData.find(
-      (client) => client.id === clientId
+      (client) => client.id === clientId,
     );
     if (clientToArchive) {
       setArchivedClients((prev) => [
@@ -254,8 +254,8 @@ const Dashboard = ({ onNavigate }: DashboardProps) => {
   const handleMoveToPending = (clientId: number, clientName: string) => {
     setClientsData((prev) =>
       prev.map((client) =>
-        client.id === clientId ? { ...client, status: "pending" } : client
-      )
+        client.id === clientId ? { ...client, status: "pending" } : client,
+      ),
     );
     toast({
       title: "Moved to Pending",
@@ -266,8 +266,8 @@ const Dashboard = ({ onNavigate }: DashboardProps) => {
   const handleMoveBackToActive = (clientId: number, clientName: string) => {
     setClientsData((prev) =>
       prev.map((client) =>
-        client.id === clientId ? { ...client, status: "good" } : client
-      )
+        client.id === clientId ? { ...client, status: "good" } : client,
+      ),
     );
     toast({
       title: "Moved Back to Active",
@@ -307,14 +307,14 @@ const Dashboard = ({ onNavigate }: DashboardProps) => {
 
   const getUniquePhysios = () => {
     const allPhysios = [...clientsData, ...archivedClients].map(
-      (client) => client.physio
+      (client) => client.physio,
     );
     return [...new Set(allPhysios)];
   };
 
   const getUniqueLocations = () => {
     const allLocations = [...clientsData, ...archivedClients].map(
-      (client) => client.location
+      (client) => client.location,
     );
     return [...new Set(allLocations)];
   };
@@ -329,12 +329,12 @@ const Dashboard = ({ onNavigate }: DashboardProps) => {
       case "action-needed":
         baseClients = clientsData.filter(
           (client) =>
-            client.status === "warning" || client.status === "critical"
+            client.status === "warning" || client.status === "critical",
         );
         break;
       case "pending":
         baseClients = clientsData.filter(
-          (client) => client.status === "pending"
+          (client) => client.status === "pending",
         );
         break;
       case "archived":
@@ -475,10 +475,10 @@ const Dashboard = ({ onNavigate }: DashboardProps) => {
                           client.status === "critical"
                             ? "bg-gradient-to-br from-red-500 to-red-600"
                             : client.status === "warning"
-                            ? "bg-gradient-to-br from-amber-500 to-orange-500"
-                            : client.status === "pending"
-                            ? "bg-gradient-to-br from-blue-500 to-indigo-500"
-                            : "bg-gradient-to-br from-emerald-500 to-green-500"
+                              ? "bg-gradient-to-br from-amber-500 to-orange-500"
+                              : client.status === "pending"
+                                ? "bg-gradient-to-br from-blue-500 to-indigo-500"
+                                : "bg-gradient-to-br from-emerald-500 to-green-500"
                         } flex items-center justify-center`}
                       >
                         {client.status === "critical" && (
@@ -509,8 +509,8 @@ const Dashboard = ({ onNavigate }: DashboardProps) => {
                                   client.urgency === "critical"
                                     ? "bg-red-500/20 animate-pulse border border-red-500/30"
                                     : client.urgency === "high"
-                                    ? "bg-amber-500/20 border border-amber-500/30"
-                                    : "bg-blue-500/20 border border-blue-500/30"
+                                      ? "bg-amber-500/20 border border-amber-500/30"
+                                      : "bg-blue-500/20 border border-blue-500/30"
                                 } hover:scale-110 transition-transform duration-300`}
                               >
                                 <AlertTriangle
@@ -518,8 +518,8 @@ const Dashboard = ({ onNavigate }: DashboardProps) => {
                                     client.urgency === "critical"
                                       ? "text-red-600"
                                       : client.urgency === "high"
-                                      ? "text-amber-600"
-                                      : "text-blue-600"
+                                        ? "text-amber-600"
+                                        : "text-blue-600"
                                   }`}
                                 />
                               </div>
@@ -571,15 +571,15 @@ const Dashboard = ({ onNavigate }: DashboardProps) => {
                           client.status === "critical"
                             ? "bg-gradient-to-r from-red-500 to-red-600"
                             : client.status === "warning"
-                            ? "bg-gradient-to-r from-amber-500 to-orange-500"
-                            : client.status === "pending"
-                            ? "bg-gradient-to-r from-blue-500 to-indigo-500"
-                            : "bg-gradient-to-r from-emerald-500 to-green-500"
+                              ? "bg-gradient-to-r from-amber-500 to-orange-500"
+                              : client.status === "pending"
+                                ? "bg-gradient-to-r from-blue-500 to-indigo-500"
+                                : "bg-gradient-to-r from-emerald-500 to-green-500"
                         }`}
                         style={{
                           width: `${getProgressPercentage(
                             client.sessionsUsed,
-                            client.totalSessions
+                            client.totalSessions,
                           )}%`,
                           animationDelay: `${index * 0.1}s`,
                         }}
@@ -1044,7 +1044,7 @@ const Dashboard = ({ onNavigate }: DashboardProps) => {
                       {
                         clientsData.filter(
                           (c) =>
-                            c.status === "warning" || c.status === "critical"
+                            c.status === "warning" || c.status === "critical",
                         ).length
                       }
                     </Badge>

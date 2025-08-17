@@ -75,7 +75,7 @@ export default function OnboardingFlow() {
         /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/;
       if (!nookalPattern.test(formData.apiKey)) {
         toast.error(
-          "Invalid Nookal API key format. Expected format: xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
+          "Invalid Nookal API key format. Expected format: xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx",
         );
         return;
       }
@@ -149,7 +149,7 @@ export default function OnboardingFlow() {
             if (!response.ok) {
               if (response.status === 401) {
                 toast.error(
-                  "Authentication expired. Please refresh the page and try again."
+                  "Authentication expired. Please refresh the page and try again.",
                 );
                 return;
               }
@@ -198,7 +198,7 @@ export default function OnboardingFlow() {
       if (!response.ok) {
         if (response.status === 401) {
           toast.error(
-            "Authentication expired. Please refresh the page and try again."
+            "Authentication expired. Please refresh the page and try again.",
           );
           return;
         }
@@ -226,7 +226,7 @@ export default function OnboardingFlow() {
     } catch (error) {
       console.error("Error during sync:", error);
       toast.error(
-        error instanceof Error ? error.message : "Failed to sync data"
+        error instanceof Error ? error.message : "Failed to sync data",
       );
 
       // Reset progress on error
@@ -428,7 +428,7 @@ export default function OnboardingFlow() {
                         </Badge>
                         <p className="text-sm flex-1">{instruction}</p>
                       </div>
-                    )
+                    ),
                   )}
                 </div>
 
@@ -439,7 +439,7 @@ export default function OnboardingFlow() {
                   onClick={() =>
                     window.open(
                       `https://${formData.selectedPMS.toLowerCase()}.com/docs/api`,
-                      "_blank"
+                      "_blank",
                     )
                   }
                 >

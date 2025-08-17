@@ -240,7 +240,7 @@ const AnimatedDashboard = () => {
                           <h4 className="font-semibold">{patient.name}</h4>
                           <Badge
                             className={`text-xs ${getProgramBadgeClass(
-                              patient.program
+                              patient.program,
                             )}`}
                           >
                             {patient.program}

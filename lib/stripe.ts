@@ -18,7 +18,7 @@ export async function createStripeCustomer(email: string, name: string) {
 
 export async function createSubscription(
   customerId: string,
-  planId: keyof typeof STRIPE_PLANS
+  planId: keyof typeof STRIPE_PLANS,
 ) {
   const plan = STRIPE_PLANS[planId];
 
@@ -64,7 +64,7 @@ export async function createCheckoutSession(
   customerId: string,
   planId: keyof typeof STRIPE_PLANS,
   successUrl: string,
-  cancelUrl: string
+  cancelUrl: string,
 ) {
   const plan = STRIPE_PLANS[planId];
 
@@ -86,8 +86,8 @@ export async function createCheckoutSession(
         plan === "price_basic"
           ? 0
           : plan === "price_professional"
-          ? 2900
-          : 7900,
+            ? 2900
+            : 7900,
       currency: "aud",
       recurring: {
         interval: "month",

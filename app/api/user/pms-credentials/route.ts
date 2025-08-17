@@ -6,17 +6,26 @@ export async function GET(request: NextRequest) {
     // Get the authorization header
     const authHeader = request.headers.get("authorization");
     if (!authHeader || !authHeader.startsWith("Bearer ")) {
-      return NextResponse.json({ error: "Missing or invalid authorization header" }, { status: 401 });
+      return NextResponse.json(
+        { error: "Missing or invalid authorization header" },
+        { status: 401 },
+      );
     }
 
     const token = authHeader.substring(7); // Remove "Bearer " prefix
-    
+
     // Create admin client to verify the token and get user info
     const supabase = createAdminClient();
-    const { data: { user }, error: authError } = await supabase.auth.getUser(token);
-    
+    const {
+      data: { user },
+      error: authError,
+    } = await supabase.auth.getUser(token);
+
     if (authError || !user) {
-      return NextResponse.json({ error: "Invalid or expired token" }, { status: 401 });
+      return NextResponse.json(
+        { error: "Invalid or expired token" },
+        { status: 401 },
+      );
     }
 
     // First, check if user exists in users table
@@ -26,9 +35,12 @@ export async function GET(request: NextRequest) {
       .eq("auth_user_id", user.id)
       .single();
 
-    if (userError && userError.code !== 'PGRST116') {
+    if (userError && userError.code !== "PGRST116") {
       console.error("Error checking user record:", userError);
-      return NextResponse.json({ error: "Failed to verify user record" }, { status: 500 });
+      return NextResponse.json(
+        { error: "Failed to verify user record" },
+        { status: 500 },
+      );
     }
 
     let userId = user.id;
@@ -44,9 +56,12 @@ export async function GET(request: NextRequest) {
       .eq("is_active", true)
       .single();
 
-    if (apiKeyError && apiKeyError.code !== 'PGRST116') {
+    if (apiKeyError && apiKeyError.code !== "PGRST116") {
       console.error("Error fetching PMS API keys:", apiKeyError);
-      return NextResponse.json({ error: "Failed to fetch PMS credentials" }, { status: 500 });
+      return NextResponse.json(
+        { error: "Failed to fetch PMS credentials" },
+        { status: 500 },
+      );
     }
 
     // Also check profiles table for PMS connection status
@@ -56,7 +71,7 @@ export async function GET(request: NextRequest) {
       .eq("id", user.id)
       .single();
 
-    if (profileError && profileError.code !== 'PGRST116') {
+    if (profileError && profileError.code !== "PGRST116") {
       console.error("Error fetching profile PMS data:", profileError);
     }
 
@@ -68,7 +83,7 @@ export async function GET(request: NextRequest) {
         api_url: apiKeyData.api_url,
         clinic_id: apiKeyData.clinic_id,
         pms_connected: profileData?.pms_connected || false,
-        pms_last_sync: profileData?.pms_last_sync || null
+        pms_last_sync: profileData?.pms_last_sync || null,
       });
     }
 
@@ -80,7 +95,7 @@ export async function GET(request: NextRequest) {
         api_url: null,
         clinic_id: null,
         pms_connected: profileData.pms_connected || false,
-        pms_last_sync: profileData.pms_last_sync || null
+        pms_last_sync: profileData.pms_last_sync || null,
       });
     }
 
@@ -91,11 +106,13 @@ export async function GET(request: NextRequest) {
       api_url: null,
       clinic_id: null,
       pms_connected: false,
-      pms_last_sync: null
+      pms_last_sync: null,
     });
-
   } catch (error) {
     console.error("PMS credentials GET error:", error);
-    return NextResponse.json({ error: "Internal server error" }, { status: 500 });
+    return NextResponse.json(
+      { error: "Internal server error" },
+      { status: 500 },
+    );
   }
 }

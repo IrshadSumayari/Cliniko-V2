@@ -89,7 +89,7 @@ export type Database = {
             isOneToOne: false;
             referencedRelation: "users";
             referencedColumns: ["id"];
-          }
+          },
         ];
       };
       patients: {
@@ -145,7 +145,7 @@ export type Database = {
             isOneToOne: false;
             referencedRelation: "users";
             referencedColumns: ["id"];
-          }
+          },
         ];
       };
       appointments: {
@@ -208,7 +208,7 @@ export type Database = {
             isOneToOne: false;
             referencedRelation: "patients";
             referencedColumns: ["id"];
-          }
+          },
         ];
       };
       appointment_types: {
@@ -249,7 +249,7 @@ export type Database = {
             isOneToOne: false;
             referencedRelation: "users";
             referencedColumns: ["id"];
-          }
+          },
         ];
       };
       sync_logs: {
@@ -302,7 +302,7 @@ export type Database = {
             isOneToOne: false;
             referencedRelation: "users";
             referencedColumns: ["id"];
-          }
+          },
         ];
       };
       sync_errors: {
@@ -350,7 +350,7 @@ export type Database = {
             isOneToOne: false;
             referencedRelation: "sync_logs";
             referencedColumns: ["id"];
-          }
+          },
         ];
       };
       sync_controls: {
@@ -394,7 +394,7 @@ export type Database = {
             isOneToOne: false;
             referencedRelation: "users";
             referencedColumns: ["id"];
-          }
+          },
         ];
       };
     };

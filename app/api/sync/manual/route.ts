@@ -9,7 +9,7 @@ export async function POST(request: NextRequest) {
     if (!userId || !pmsType || !action) {
       return NextResponse.json(
         { error: "Missing required fields" },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
@@ -27,7 +27,7 @@ export async function POST(request: NextRequest) {
       case "force_full":
         const syncId = await scheduler.forceFullSync(
           userId,
-          pmsType as PMSType
+          pmsType as PMSType,
         );
         return NextResponse.json({
           success: true,
@@ -44,7 +44,7 @@ export async function POST(request: NextRequest) {
       {
         error: error instanceof Error ? error.message : "Internal server error",
       },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }

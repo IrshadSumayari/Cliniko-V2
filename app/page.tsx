@@ -13,7 +13,7 @@ import { useState, useMemo, useEffect } from "react";
  */
 function AuthenticatedApp() {
   const [view, setView] = useState<"dashboard" | "settings" | "onboarding">(
-    "dashboard"
+    "dashboard",
   );
 
   if (view === "settings") {
@@ -29,7 +29,6 @@ function AuthenticatedApp() {
 
 export default function HomePage() {
   const { user, loading } = useAuth();
-
   const content = useMemo(() => {
     if (loading) {
       return (

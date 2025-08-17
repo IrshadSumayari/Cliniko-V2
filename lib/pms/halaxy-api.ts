@@ -33,7 +33,7 @@ export class HalaxyAPI implements PMSApiInterface {
 
     if (!response.ok) {
       throw new Error(
-        `Halaxy API error: ${response.status} ${response.statusText}`
+        `Halaxy API error: ${response.status} ${response.statusText}`,
       );
     }
 
@@ -52,7 +52,7 @@ export class HalaxyAPI implements PMSApiInterface {
 
   async getPatients(
     lastModified?: string,
-    appointmentTypeIds?: string[]
+    appointmentTypeIds?: string[],
   ): Promise<PMSPatient[]> {
     try {
       const params: Record<string, string> = {
@@ -67,7 +67,7 @@ export class HalaxyAPI implements PMSApiInterface {
       // So we'll ignore the appointmentTypeIds parameter for now
       if (appointmentTypeIds && appointmentTypeIds.length > 0) {
         console.log(
-          "⚠️ Halaxy API doesn't support appointment type filtering, fetching all patients"
+          "⚠️ Halaxy API doesn't support appointment type filtering, fetching all patients",
         );
       }
 
@@ -115,7 +115,7 @@ export class HalaxyAPI implements PMSApiInterface {
   }
 
   private determinePatientType(
-    appointments: PMSAppointment[]
+    appointments: PMSAppointment[],
   ): "EPC" | "WC" | null {
     for (const appointment of appointments) {
       const type = appointment.type?.toLowerCase() || "";
@@ -144,23 +144,25 @@ export class HalaxyAPI implements PMSApiInterface {
 
   async getAllAppointments(
     patientIds: string[],
-    lastModified?: string
+    lastModified?: string,
   ): Promise<PMSAppointment[]> {
     try {
       const allAppointments: PMSAppointment[] = [];
 
       for (const patientId of patientIds) {
-        const appointments = await this.getPatientAppointments(patientId)
+        const appointments = await this.getPatientAppointments(patientId);
         const completedAppointments = appointments.filter(
-          (apt) => apt.status === "completed" && (!lastModified || apt.lastModified > lastModified),
-        )
-        
+          (apt) =>
+            apt.status === "completed" &&
+            (!lastModified || apt.lastModified > lastModified),
+        );
+
         // Add all appointments (no limit)
         allAppointments.push(...completedAppointments);
       }
 
       console.log(
-        `✅ Halaxy sync completed: ${allAppointments.length} appointments`
+        `✅ Halaxy sync completed: ${allAppointments.length} appointments`,
       );
       return allAppointments;
     } catch (error) {
@@ -172,7 +174,7 @@ export class HalaxyAPI implements PMSApiInterface {
   async getPatientAppointments(patientId: string): Promise<PMSAppointment[]> {
     try {
       const response = await this.makeRequest(
-        `/patients/${patientId}/appointments`
+        `/patients/${patientId}/appointments`,
       );
       const appointments = response.data || [];
 
@@ -195,14 +197,14 @@ export class HalaxyAPI implements PMSApiInterface {
     } catch (error) {
       console.error(
         `Error fetching Halaxy appointments for patient ${patientId}:`,
-        error
+        error,
       );
       return [];
     }
   }
 
   private mapAppointmentStatus(
-    status: string
+    status: string,
   ): "completed" | "cancelled" | "dna" | "scheduled" {
     const statusLower = status?.toLowerCase() || "";
 
@@ -225,7 +227,7 @@ export class HalaxyAPI implements PMSApiInterface {
       const response = await this.makeRequest("/appointment-types");
       const appointmentTypes = response.data || [];
       console.log(
-        `✅ Found ${appointmentTypes.length} appointment types from Halaxy`
+        `✅ Found ${appointmentTypes.length} appointment types from Halaxy`,
       );
       return appointmentTypes;
     } catch (error) {
@@ -256,13 +258,13 @@ export class HalaxyAPI implements PMSApiInterface {
         });
 
         console.log(
-          `📝 Processed appointment type: ${appointmentType.name} -> ${code}`
+          `📝 Processed appointment type: ${appointmentType.name} -> ${code}`,
         );
       }
     }
 
     console.log(
-      `✅ Filtered ${processedTypes.length} EPC/WC appointment types from ${appointmentTypes.length} total`
+      `✅ Filtered ${processedTypes.length} EPC/WC appointment types from ${appointmentTypes.length} total`,
     );
     return processedTypes;
   }

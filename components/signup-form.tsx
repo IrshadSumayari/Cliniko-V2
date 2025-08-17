@@ -86,7 +86,7 @@ const SignupForm = () => {
         formData.password,
         formData.firstName,
         formData.lastName,
-        formData.clinicName
+        formData.clinicName,
       );
       if (result.success) {
         toast.success("Account created!", {

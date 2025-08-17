@@ -1,8 +1,8 @@
-import { type ClassValue, clsx } from "clsx"
-import { twMerge } from "tailwind-merge"
+import { type ClassValue, clsx } from "clsx";
+import { twMerge } from "tailwind-merge";
 
 export function cn(...inputs: ClassValue[]) {
-  return twMerge(clsx(inputs))
+  return twMerge(clsx(inputs));
 }
 
 /**
@@ -11,28 +11,30 @@ export function cn(...inputs: ClassValue[]) {
  */
 export async function authenticatedFetch(
   url: string,
-  options: RequestInit = {}
+  options: RequestInit = {},
 ): Promise<Response> {
   try {
     // Get access token from localStorage
     let accessToken: string | null = null;
-    
+
     try {
       // Check for Supabase auth token
-      const supabaseToken = localStorage.getItem('sb-iyielcnhqudbzuisswwl-auth-token');
+      const supabaseToken = localStorage.getItem(
+        "sb-iyielcnhqudbzuisswwl-auth-token",
+      );
       if (supabaseToken) {
         const parsed = JSON.parse(supabaseToken);
         accessToken = parsed.access_token || null;
       }
-      
+
       // Fallback to generic auth token
       if (!accessToken) {
-        accessToken = localStorage.getItem('supabase.auth.token');
+        accessToken = localStorage.getItem("supabase.auth.token");
       }
     } catch (error) {
       console.warn("Error getting access token from localStorage:", error);
     }
-    
+
     if (!accessToken) {
       console.error("No access token found in localStorage");
       throw new Error("No authentication token found. Please sign in again.");
@@ -44,7 +46,7 @@ export async function authenticatedFetch(
     // Merge headers to include authorization
     const headers = {
       "Content-Type": "application/json",
-      "Authorization": `Bearer ${accessToken}`,
+      Authorization: `Bearer ${accessToken}`,
       ...options.headers,
     };
 
@@ -55,8 +57,14 @@ export async function authenticatedFetch(
     });
 
     if (!response.ok) {
-      console.error("API request failed:", response.status, response.statusText);
-      throw new Error(`API request failed: ${response.status} ${response.statusText}`);
+      console.error(
+        "API request failed:",
+        response.status,
+        response.statusText,
+      );
+      throw new Error(
+        `API request failed: ${response.status} ${response.statusText}`,
+      );
     }
 
     return response;

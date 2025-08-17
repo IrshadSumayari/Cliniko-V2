@@ -44,11 +44,11 @@ export class NookalAPI implements PMSApiInterface {
       if (!response.ok) {
         const errorText = await response.text();
         console.error(
-          `[NOOKAL] HTTP Error: ${response.status} ${response.statusText}`
+          `[NOOKAL] HTTP Error: ${response.status} ${response.statusText}`,
         );
         console.error(`[NOOKAL] Error body: ${errorText}`);
         throw new Error(
-          `Nookal API error: ${response.status} ${response.statusText}`
+          `Nookal API error: ${response.status} ${response.statusText}`,
         );
       }
 
@@ -70,7 +70,7 @@ export class NookalAPI implements PMSApiInterface {
   async testConnection(): Promise<boolean> {
     try {
       console.log(
-        "[NOOKAL] Testing connection with getAppointments endpoint..."
+        "[NOOKAL] Testing connection with getAppointments endpoint...",
       );
       const response = await this.makeRequest("/getAppointments", {
         limit: "1",
@@ -105,7 +105,7 @@ export class NookalAPI implements PMSApiInterface {
     try {
       const modifiedSince = lastModified.toISOString().split("T")[0];
       console.log(
-        `[NOOKAL] Fetching patients modified since: ${modifiedSince}`
+        `[NOOKAL] Fetching patients modified since: ${modifiedSince}`,
       );
 
       const response = await this.makeRequest("/getpatients", {
@@ -128,7 +128,7 @@ export class NookalAPI implements PMSApiInterface {
 
   async getPatients(
     lastModified?: string,
-    appointmentTypeIds?: string[]
+    appointmentTypeIds?: string[],
   ): Promise<PMSPatient[]> {
     try {
       const params: Record<string, string> = {};
@@ -139,7 +139,7 @@ export class NookalAPI implements PMSApiInterface {
 
       if (appointmentTypeIds && appointmentTypeIds.length > 0) {
         console.log(
-          "⚠️ Nookal API doesn't support appointment type filtering, fetching all patients"
+          "⚠️ Nookal API doesn't support appointment type filtering, fetching all patients",
         );
       }
 
@@ -159,7 +159,7 @@ export class NookalAPI implements PMSApiInterface {
 
   async getPatientsWithAppointments(
     lastModified?: string,
-    appointmentTypeIds?: string[]
+    appointmentTypeIds?: string[],
   ): Promise<{ patients: PMSPatient[]; appointments: PMSAppointment[] }> {
     try {
       console.log("[NOOKAL] Fetching patients with appointments...");
@@ -171,15 +171,15 @@ export class NookalAPI implements PMSApiInterface {
 
       for (const patient of patients) {
         const patientAppointments = await this.getPatientAppointments(
-          patient.id.toString()
+          patient.id.toString(),
         );
-        
+
         // Add all appointments (no limit)
         allAppointments.push(...patientAppointments);
       }
 
       console.log(
-        `[NOOKAL] Found ${allAppointments.length} total appointments`
+        `[NOOKAL] Found ${allAppointments.length} total appointments`,
       );
       return { patients, appointments: allAppointments };
     } catch (error) {
@@ -193,7 +193,7 @@ export class NookalAPI implements PMSApiInterface {
 
     for (const patient of patients) {
       const appointments = await this.getPatientAppointments(
-        patient.ID || patient.id
+        patient.ID || patient.id,
       );
       const patientType = this.determinePatientType(appointments);
 
@@ -244,7 +244,7 @@ export class NookalAPI implements PMSApiInterface {
 
     // Check if appointment is up to current date
     const appointmentDate = new Date(
-      appointment.appointmentDate || appointment.Date || appointment.date
+      appointment.appointmentDate || appointment.Date || appointment.date,
     );
     const currentDate = new Date();
     currentDate.setHours(23, 59, 59, 999); // Include today's appointments
@@ -259,14 +259,14 @@ export class NookalAPI implements PMSApiInterface {
         appointment.ID || appointment.id
       }: status=${status}, cancelled=${cancelled}, DNA=${dna}, date=${appointmentDate.toISOString()}, meets criteria=${
         isCompleted && isNotCancelled && isNotDNA && isUpToCurrentDate
-      }`
+      }`,
     );
 
     return isCompleted && isNotCancelled && isNotDNA && isUpToCurrentDate;
   }
 
   private determinePatientType(
-    appointments: PMSAppointment[]
+    appointments: PMSAppointment[],
   ): "EPC" | "WC" | null {
     for (const appointment of appointments) {
       const type = appointment.type?.toLowerCase() || "";
@@ -297,7 +297,7 @@ export class NookalAPI implements PMSApiInterface {
 
   async getAppointments(
     patientIds: string[],
-    lastModified?: string
+    lastModified?: string,
   ): Promise<PMSAppointment[]> {
     try {
       const allAppointments: PMSAppointment[] = [];
@@ -307,16 +307,16 @@ export class NookalAPI implements PMSApiInterface {
         const filteredAppointments = appointments.filter(
           (apt) =>
             this.isCompletedAppointment(apt) &&
-            (!lastModified || apt.lastModified > lastModified)
+            (!lastModified || apt.lastModified > lastModified),
         );
         console.log(
-          `[NOOKAL] Patient ${patientId}: ${appointments.length} total appointments, ${filteredAppointments.length} completed appointments`
+          `[NOOKAL] Patient ${patientId}: ${appointments.length} total appointments, ${filteredAppointments.length} completed appointments`,
         );
         allAppointments.push(...filteredAppointments);
       }
 
       console.log(
-        `[NOOKAL] Total completed appointments across all patients: ${allAppointments.length}`
+        `[NOOKAL] Total completed appointments across all patients: ${allAppointments.length}`,
       );
       return allAppointments;
     } catch (error) {
@@ -327,7 +327,7 @@ export class NookalAPI implements PMSApiInterface {
 
   async getPatientAppointments(
     patientId: string,
-    lastModified?: Date
+    lastModified?: Date,
   ): Promise<PMSAppointment[]> {
     try {
       const params: Record<string, string> = {
@@ -353,8 +353,8 @@ export class NookalAPI implements PMSApiInterface {
           apt.appointmentDate && apt.appointmentStartTime
             ? `${apt.appointmentDate} ${apt.appointmentStartTime}`
             : apt.Date
-            ? `${apt.Date} ${apt.StartTime || apt.start_time || ""}`.trim()
-            : apt.date,
+              ? `${apt.Date} ${apt.StartTime || apt.start_time || ""}`.trim()
+              : apt.date,
         type:
           apt.appointmentType || apt.AppointmentType || apt.appointment_type,
         status: this.mapAppointmentStatus(apt.status || apt.Status, apt),
@@ -362,7 +362,7 @@ export class NookalAPI implements PMSApiInterface {
         durationMinutes:
           this.calculateDuration(
             apt.appointmentStartTime,
-            apt.appointmentEndTime
+            apt.appointmentEndTime,
           ) ||
           Number.parseInt(apt.Duration || apt.duration) ||
           0,
@@ -378,8 +378,8 @@ export class NookalAPI implements PMSApiInterface {
           apt.appointmentDate && apt.appointmentStartTime
             ? `${apt.appointmentDate} ${apt.appointmentStartTime}`
             : apt.Date
-            ? `${apt.Date} ${apt.StartTime || apt.start_time || ""}`.trim()
-            : apt.date,
+              ? `${apt.Date} ${apt.StartTime || apt.start_time || ""}`.trim()
+              : apt.date,
         appointment_type_id:
           apt.appointmentTypeID ||
           apt.AppointmentTypeID ||
@@ -387,13 +387,13 @@ export class NookalAPI implements PMSApiInterface {
         appointment_type: apt.appointmentType
           ? { name: apt.appointmentType }
           : apt.AppointmentType
-          ? { name: apt.AppointmentType }
-          : null,
+            ? { name: apt.AppointmentType }
+            : null,
         practitioner: apt.Practitioner ? { name: apt.Practitioner } : null,
         duration:
           this.calculateDuration(
             apt.appointmentStartTime,
-            apt.appointmentEndTime
+            apt.appointmentEndTime,
           ) ||
           Number.parseInt(apt.Duration || apt.duration) ||
           0,
@@ -401,7 +401,7 @@ export class NookalAPI implements PMSApiInterface {
     } catch (error) {
       console.error(
         `Error fetching Nookal appointments for patient ${patientId}:`,
-        error
+        error,
       );
       return [];
     }
@@ -409,7 +409,7 @@ export class NookalAPI implements PMSApiInterface {
 
   private mapAppointmentStatus(
     status: string,
-    appointment: any
+    appointment: any,
   ): "completed" | "cancelled" | "dna" | "scheduled" {
     if (appointment.cancelled === "1") {
       return "cancelled";
@@ -458,11 +458,11 @@ export class NookalAPI implements PMSApiInterface {
         response.services ||
         [];
       console.log(
-        `✅ Found ${appointmentTypes.length} appointment types from Nookal v2`
+        `✅ Found ${appointmentTypes.length} appointment types from Nookal v2`,
       );
       console.log(
         `📋 Sample appointment type names:`,
-        appointmentTypes.slice(0, 3).map((apt: any) => apt.Name || apt.name)
+        appointmentTypes.slice(0, 3).map((apt: any) => apt.Name || apt.name),
       );
       return appointmentTypes;
     } catch (error) {
@@ -499,7 +499,7 @@ export class NookalAPI implements PMSApiInterface {
     }
 
     console.log(
-      `✅ Filtered ${processedTypes.length} EPC/WC appointment types from ${appointmentTypes.length} total`
+      `✅ Filtered ${processedTypes.length} EPC/WC appointment types from ${appointmentTypes.length} total`,
     );
     return processedTypes;
   }

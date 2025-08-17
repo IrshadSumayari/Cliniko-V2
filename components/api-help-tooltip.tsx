@@ -1,11 +1,16 @@
-"use client"
+"use client";
 
-import { HelpCircle, ExternalLink } from "lucide-react"
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
-import { Button } from "@/components/ui/button"
+import { HelpCircle, ExternalLink } from "lucide-react";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
+import { Button } from "@/components/ui/button";
 
 interface ApiHelpTooltipProps {
-  pmsName: string
+  pmsName: string;
 }
 
 export default function ApiHelpTooltip({ pmsName }: ApiHelpTooltipProps) {
@@ -20,7 +25,7 @@ export default function ApiHelpTooltip({ pmsName }: ApiHelpTooltipProps) {
             "Copy the key (starts with 'ck_')",
           ],
           url: "https://support.cliniko.com/hc/en-us/articles/115003485526-API-Keys",
-        }
+        };
       case "Nookal":
         return {
           steps: [
@@ -30,7 +35,7 @@ export default function ApiHelpTooltip({ pmsName }: ApiHelpTooltipProps) {
             "Copy the generated key (format: xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx)",
           ],
           url: "https://help.nookal.com/article/api-access",
-        }
+        };
       case "Halaxy":
         return {
           steps: [
@@ -40,16 +45,16 @@ export default function ApiHelpTooltip({ pmsName }: ApiHelpTooltipProps) {
             "Copy the key (starts with 'hx_')",
           ],
           url: "https://help.halaxy.com/api-integration",
-        }
+        };
       default:
         return {
           steps: ["Contact your PMS provider for API access"],
           url: "",
-        }
+        };
     }
-  }
+  };
 
-  const helpContent = getHelpContent()
+  const helpContent = getHelpContent();
 
   return (
     <TooltipProvider>
@@ -61,7 +66,9 @@ export default function ApiHelpTooltip({ pmsName }: ApiHelpTooltipProps) {
         </TooltipTrigger>
         <TooltipContent className="max-w-xs p-4">
           <div className="space-y-3">
-            <h4 className="font-semibold text-sm">Where to find your {pmsName} API key:</h4>
+            <h4 className="font-semibold text-sm">
+              Where to find your {pmsName} API key:
+            </h4>
             <ol className="text-xs space-y-1">
               {helpContent.steps.map((step, index) => (
                 <li key={index} className="flex gap-2">
@@ -85,5 +92,5 @@ export default function ApiHelpTooltip({ pmsName }: ApiHelpTooltipProps) {
         </TooltipContent>
       </Tooltip>
     </TooltipProvider>
-  )
+  );
 }

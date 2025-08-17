@@ -11,6 +11,8 @@ DROP TABLE IF EXISTS sync_controls CASCADE;
 DROP TABLE IF EXISTS appointments CASCADE;
 DROP TABLE IF EXISTS patients CASCADE;
 DROP TABLE IF EXISTS pms_api_keys CASCADE;
+DROP TABLE IF EXISTS pms_credentials CASCADE;
+DROP TABLE IF EXISTS profiles CASCADE;
 -- Don't drop users table as it might contain important data
 
 -- Create users table (if not exists)
@@ -25,6 +27,31 @@ CREATE TABLE IF NOT EXISTS users (
     pms_type TEXT,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+-- Create profiles table for user profile information
+CREATE TABLE profiles (
+    id UUID PRIMARY KEY REFERENCES auth.users(id) ON DELETE CASCADE,
+    email TEXT NOT NULL,
+    first_name TEXT,
+    last_name TEXT,
+    clinic_name TEXT,
+    pms_type TEXT,
+    pms_connected BOOLEAN DEFAULT FALSE,
+    pms_last_sync TIMESTAMP WITH TIME ZONE,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+-- Create PMS credentials table for storing API keys securely
+CREATE TABLE pms_credentials (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+    pms_type TEXT NOT NULL,
+    api_key TEXT NOT NULL,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    UNIQUE(user_id, pms_type)
 );
 
 -- Create pms_api_keys table
@@ -141,6 +168,10 @@ CREATE TABLE sync_controls (
 
 -- Create indexes for better performance
 CREATE INDEX idx_users_auth_user_id ON users(auth_user_id);
+CREATE INDEX idx_profiles_user_id ON profiles(id);
+CREATE INDEX idx_profiles_email ON profiles(email);
+CREATE INDEX idx_pms_credentials_user_id ON pms_credentials(user_id);
+CREATE INDEX idx_pms_credentials_pms_type ON pms_credentials(pms_type);
 CREATE INDEX idx_pms_api_keys_user_id ON pms_api_keys(user_id);
 CREATE INDEX idx_patients_user_id ON patients(user_id);
 CREATE INDEX idx_patients_type ON patients(patient_type);
@@ -152,6 +183,8 @@ CREATE INDEX idx_sync_errors_user_id ON sync_errors(user_id);
 
 -- Enable Row Level Security on all tables
 ALTER TABLE users ENABLE ROW LEVEL SECURITY;
+ALTER TABLE profiles ENABLE ROW LEVEL SECURITY;
+ALTER TABLE pms_credentials ENABLE ROW LEVEL SECURITY;
 ALTER TABLE pms_api_keys ENABLE ROW LEVEL SECURITY;
 ALTER TABLE patients ENABLE ROW LEVEL SECURITY;
 ALTER TABLE appointments ENABLE ROW LEVEL SECURITY;
@@ -168,6 +201,29 @@ CREATE POLICY "Users can update own record" ON users
 
 CREATE POLICY "Users can insert own record" ON users
     FOR INSERT WITH CHECK (auth_user_id = auth.uid());
+
+-- Create RLS policies for profiles table
+CREATE POLICY "Users can view own profile" ON profiles
+    FOR SELECT USING (auth.uid() = id);
+
+CREATE POLICY "Users can update own profile" ON profiles
+    FOR UPDATE USING (auth.uid() = id);
+
+CREATE POLICY "Users can insert own profile" ON profiles
+    FOR INSERT WITH CHECK (auth.uid() = id);
+
+-- Create RLS policies for pms_credentials table
+CREATE POLICY "Users can view own PMS credentials" ON pms_credentials
+    FOR SELECT USING (auth.uid() = user_id);
+
+CREATE POLICY "Users can insert own PMS credentials" ON pms_credentials
+    FOR INSERT WITH CHECK (auth.uid() = user_id);
+
+CREATE POLICY "Users can update own PMS credentials" ON pms_credentials
+    FOR UPDATE USING (auth.uid() = user_id);
+
+CREATE POLICY "Users can delete own PMS credentials" ON pms_credentials
+    FOR DELETE USING (auth.uid() = user_id);
 
 -- Create RLS policies for pms_api_keys table
 CREATE POLICY "Users can manage own API keys" ON pms_api_keys
@@ -207,6 +263,14 @@ CREATE TRIGGER update_users_updated_at
     BEFORE UPDATE ON users
     FOR EACH ROW
     EXECUTE FUNCTION update_updated_at_column();
+
+CREATE TRIGGER update_profiles_updated_at 
+    BEFORE UPDATE ON profiles 
+    FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+
+CREATE TRIGGER update_pms_credentials_updated_at 
+    BEFORE UPDATE ON pms_credentials 
+    FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 
 CREATE TRIGGER update_pms_api_keys_updated_at
     BEFORE UPDATE ON pms_api_keys

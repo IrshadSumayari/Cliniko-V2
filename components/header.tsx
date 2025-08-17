@@ -1,12 +1,12 @@
-"use client"
+"use client";
 
-import { Button } from "@/components/ui/button"
-import { ThemeToggle } from "@/components/theme-toggle"
-import Link from "next/link"
+import { Button } from "@/components/ui/button";
+import { ThemeToggle } from "@/components/theme-toggle";
+import Link from "next/link";
 
 interface HeaderProps {
-  onLogin?: () => void
-  onSignup?: () => void
+  onLogin?: () => void;
+  onSignup?: () => void;
 }
 
 const Header = ({ onLogin, onSignup }: HeaderProps) => {
@@ -16,13 +16,22 @@ const Header = ({ onLogin, onSignup }: HeaderProps) => {
         <span className="text-xl font-semibold">MyPhysioFlow</span>
       </a>
       <nav className="ml-auto flex items-center gap-4 sm:gap-6">
-        <a className="text-sm font-medium hover:underline underline-offset-4" href="#features">
+        <a
+          className="text-sm font-medium hover:underline underline-offset-4"
+          href="#features"
+        >
           Features
         </a>
-        <a className="text-sm font-medium hover:underline underline-offset-4" href="#pricing">
+        <a
+          className="text-sm font-medium hover:underline underline-offset-4"
+          href="#pricing"
+        >
           Pricing
         </a>
-        <a className="text-sm font-medium hover:underline underline-offset-4" href="#support">
+        <a
+          className="text-sm font-medium hover:underline underline-offset-4"
+          href="#support"
+        >
           Support
         </a>
         <ThemeToggle />
@@ -34,7 +43,7 @@ const Header = ({ onLogin, onSignup }: HeaderProps) => {
         </Button>
       </nav>
     </header>
-  )
-}
+  );
+};
 
-export default Header
+export default Header;

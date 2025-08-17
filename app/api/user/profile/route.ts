@@ -6,17 +6,26 @@ export async function GET(request: NextRequest) {
     // Get the authorization header
     const authHeader = request.headers.get("authorization");
     if (!authHeader || !authHeader.startsWith("Bearer ")) {
-      return NextResponse.json({ error: "Missing or invalid authorization header" }, { status: 401 });
+      return NextResponse.json(
+        { error: "Missing or invalid authorization header" },
+        { status: 401 },
+      );
     }
 
     const token = authHeader.substring(7); // Remove "Bearer " prefix
-    
+
     // Create admin client to verify the token and get user info
     const supabase = createAdminClient();
-    const { data: { user }, error: authError } = await supabase.auth.getUser(token);
-    
+    const {
+      data: { user },
+      error: authError,
+    } = await supabase.auth.getUser(token);
+
     if (authError || !user) {
-      return NextResponse.json({ error: "Invalid or expired token" }, { status: 401 });
+      return NextResponse.json(
+        { error: "Invalid or expired token" },
+        { status: 401 },
+      );
     }
 
     // Fetch user profile from the profiles table
@@ -28,13 +37,19 @@ export async function GET(request: NextRequest) {
 
     if (profileError) {
       console.error("Error fetching profile:", profileError);
-      
+
       // If it's a "no rows" error, we'll create a profile
-      if (profileError.code === 'PGRST116') {
-        console.log("No profile found, creating default profile for user:", user.id);
+      if (profileError.code === "PGRST116") {
+        console.log(
+          "No profile found, creating default profile for user:",
+          user.id,
+        );
       } else {
         // For other errors, return an error response
-        return NextResponse.json({ error: "Failed to fetch profile" }, { status: 500 });
+        return NextResponse.json(
+          { error: "Failed to fetch profile" },
+          { status: 500 },
+        );
       }
     }
 
@@ -43,9 +58,9 @@ export async function GET(request: NextRequest) {
       console.log("Creating default profile for user:", {
         id: user.id,
         email: user.email,
-        metadata: user.user_metadata
+        metadata: user.user_metadata,
       });
-      
+
       const { data: newProfile, error: createError } = await supabase
         .from("profiles")
         .insert({
@@ -65,7 +80,10 @@ export async function GET(request: NextRequest) {
 
       if (createError) {
         console.error("Error creating profile:", createError);
-        return NextResponse.json({ error: "Failed to create profile" }, { status: 500 });
+        return NextResponse.json(
+          { error: "Failed to create profile" },
+          { status: 500 },
+        );
       }
 
       console.log("Successfully created profile:", newProfile);
@@ -75,7 +93,10 @@ export async function GET(request: NextRequest) {
     return NextResponse.json(profile);
   } catch (error) {
     console.error("Profile GET error:", error);
-    return NextResponse.json({ error: "Internal server error" }, { status: 500 });
+    return NextResponse.json(
+      { error: "Internal server error" },
+      { status: 500 },
+    );
   }
 }
 
@@ -84,17 +105,26 @@ export async function PUT(request: NextRequest) {
     // Get the authorization header
     const authHeader = request.headers.get("authorization");
     if (!authHeader || !authHeader.startsWith("Bearer ")) {
-      return NextResponse.json({ error: "Missing or invalid authorization header" }, { status: 401 });
+      return NextResponse.json(
+        { error: "Missing or invalid authorization header" },
+        { status: 401 },
+      );
     }
 
     const token = authHeader.substring(7); // Remove "Bearer " prefix
-    
+
     // Create admin client to verify the token and get user info
     const supabase = createAdminClient();
-    const { data: { user }, error: authError } = await supabase.auth.getUser(token);
-    
+    const {
+      data: { user },
+      error: authError,
+    } = await supabase.auth.getUser(token);
+
     if (authError || !user) {
-      return NextResponse.json({ error: "Invalid or expired token" }, { status: 401 });
+      return NextResponse.json(
+        { error: "Invalid or expired token" },
+        { status: 401 },
+      );
     }
 
     const body = await request.json();
@@ -102,9 +132,12 @@ export async function PUT(request: NextRequest) {
 
     // Validate required fields
     if (!first_name || !last_name) {
-      return NextResponse.json({ 
-        error: "First name and last name are required" 
-      }, { status: 400 });
+      return NextResponse.json(
+        {
+          error: "First name and last name are required",
+        },
+        { status: 400 },
+      );
     }
 
     // Update user profile - only first_name and last_name
@@ -121,16 +154,22 @@ export async function PUT(request: NextRequest) {
 
     if (updateError) {
       console.error("Error updating profile:", updateError);
-      return NextResponse.json({ error: "Failed to update profile" }, { status: 500 });
+      return NextResponse.json(
+        { error: "Failed to update profile" },
+        { status: 500 },
+      );
     }
 
     // Also update user metadata in auth.users
-    const { error: metadataError } = await supabase.auth.admin.updateUserById(user.id, {
-      user_metadata: {
-        first_name,
-        last_name,
-      }
-    });
+    const { error: metadataError } = await supabase.auth.admin.updateUserById(
+      user.id,
+      {
+        user_metadata: {
+          first_name,
+          last_name,
+        },
+      },
+    );
 
     if (metadataError) {
       console.error("Error updating user metadata:", metadataError);
@@ -140,6 +179,9 @@ export async function PUT(request: NextRequest) {
     return NextResponse.json(updatedProfile);
   } catch (error) {
     console.error("Profile PUT error:", error);
-    return NextResponse.json({ error: "Internal server error" }, { status: 500 });
+    return NextResponse.json(
+      { error: "Internal server error" },
+      { status: 500 },
+    );
   }
 }

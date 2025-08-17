@@ -1,8 +1,14 @@
-import { AlertCircle, ArrowLeft } from 'lucide-react'
-import { Button } from '@/components/ui/button'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
-import { Alert, AlertDescription } from '@/components/ui/alert'
-import Link from 'next/link'
+import { AlertCircle, ArrowLeft } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import Link from "next/link";
 
 export default function AuthCodeError() {
   return (
@@ -40,13 +46,11 @@ export default function AuthCodeError() {
               </Link>
             </Button>
             <Button variant="outline" asChild>
-              <Link href="/signup">
-                Try Again
-              </Link>
+              <Link href="/signup">Try Again</Link>
             </Button>
           </div>
         </CardContent>
       </Card>
     </div>
-  )
+  );
 }

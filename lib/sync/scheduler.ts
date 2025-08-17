@@ -27,7 +27,7 @@ class SyncScheduler {
       },
       {
         onConflict: "user_id,pms_type",
-      }
+      },
     );
 
     if (error) {
@@ -37,7 +37,7 @@ class SyncScheduler {
 
   async resumeUserSync(userId: string, pmsType: PMSType): Promise<void> {
     console.log(
-      `[SCHEDULER] Resuming sync for user ${userId}, PMS: ${pmsType}`
+      `[SCHEDULER] Resuming sync for user ${userId}, PMS: ${pmsType}`,
     );
 
     const { error } = await this.supabase.from("sync_controls").upsert(
@@ -50,7 +50,7 @@ class SyncScheduler {
       },
       {
         onConflict: "user_id,pms_type",
-      }
+      },
     );
 
     if (error) {
@@ -60,7 +60,7 @@ class SyncScheduler {
 
   async forceFullSync(userId: string, pmsType: PMSType): Promise<string> {
     console.log(
-      `[SCHEDULER] Starting force full sync for user ${userId}, PMS: ${pmsType}`
+      `[SCHEDULER] Starting force full sync for user ${userId}, PMS: ${pmsType}`,
     );
 
     // Create sync log entry
@@ -90,7 +90,7 @@ class SyncScheduler {
 
   async runManualSync(userId: string, pmsType: PMSType): Promise<string> {
     console.log(
-      `[SCHEDULER] Starting manual sync for user ${userId}, PMS: ${pmsType}`
+      `[SCHEDULER] Starting manual sync for user ${userId}, PMS: ${pmsType}`,
     );
 
     // Create sync log entry
@@ -114,7 +114,7 @@ class SyncScheduler {
     this.performIncrementalSync(userId, pmsType, syncLog.id).catch((error) => {
       console.error(
         `[SCHEDULER] Manual sync failed for user ${userId}:`,
-        error
+        error,
       );
     });
 
@@ -124,7 +124,7 @@ class SyncScheduler {
   private async performFullSync(
     userId: string,
     pmsType: PMSType,
-    syncLogId: string
+    syncLogId: string,
   ): Promise<void> {
     try {
       console.log(`[SCHEDULER] Performing full sync for user ${userId}`);
@@ -174,7 +174,7 @@ class SyncScheduler {
                 },
                 {
                   onConflict: "user_id,pms_patient_id,pms_type",
-                }
+                },
               );
 
             if (!patientError) {
@@ -183,16 +183,16 @@ class SyncScheduler {
               // Sync appointments for this patient
               try {
                 const appointments = await pmsClient.getPatientAppointments(
-                  patientData.id
+                  patientData.id,
                 );
                 const completedAppointments = appointments.filter((apt: any) =>
-                  pmsClient.isCompletedAppointment(apt)
+                  pmsClient.isCompletedAppointment(apt),
                 );
 
                 for (const appointment of completedAppointments) {
                   const appointmentData = this.mapAppointmentProperties(
                     appointment,
-                    pmsType
+                    pmsType,
                   );
 
                   const { error: appointmentError } = await this.supabase
@@ -213,7 +213,7 @@ class SyncScheduler {
                       },
                       {
                         onConflict: "user_id,pms_appointment_id,pms_type",
-                      }
+                      },
                     );
 
                   if (!appointmentError) {
@@ -222,12 +222,12 @@ class SyncScheduler {
                 }
               } catch (appointmentError) {
                 issues.push(
-                  `Could not sync appointments for patient ${patientData.id}`
+                  `Could not sync appointments for patient ${patientData.id}`,
                 );
               }
             } else {
               issues.push(
-                `Could not update patient ${patientData.id}: ${patientError.message}`
+                `Could not update patient ${patientData.id}: ${patientError.message}`,
               );
             }
           }
@@ -235,7 +235,7 @@ class SyncScheduler {
           issues.push(
             `Error processing patient ${
               patient.id || "unknown"
-            }: ${patientError}`
+            }: ${patientError}`,
           );
         }
       }
@@ -263,11 +263,11 @@ class SyncScheduler {
         },
         {
           onConflict: "user_id,pms_type",
-        }
+        },
       );
 
       console.log(
-        `[SCHEDULER] Full sync completed for user ${userId}: ${patientsUpdated} patients, ${appointmentsUpdated} appointments`
+        `[SCHEDULER] Full sync completed for user ${userId}: ${patientsUpdated} patients, ${appointmentsUpdated} appointments`,
       );
     } catch (error) {
       console.error(`[SCHEDULER] Full sync failed for user ${userId}:`, error);
@@ -291,7 +291,7 @@ class SyncScheduler {
   private async performIncrementalSync(
     userId: string,
     pmsType: PMSType,
-    syncLogId: string
+    syncLogId: string,
   ): Promise<void> {
     try {
       console.log(`[SCHEDULER] Performing incremental sync for user ${userId}`);
@@ -320,7 +320,7 @@ class SyncScheduler {
       // Get modified patients since last sync
       const modifiedPatients = await pmsClient.getModifiedPatients(lastSyncAt);
       console.log(
-        `[SCHEDULER] Found ${modifiedPatients.length} modified patients`
+        `[SCHEDULER] Found ${modifiedPatients.length} modified patients`,
       );
 
       let patientsUpdated = 0;
@@ -355,7 +355,7 @@ class SyncScheduler {
                 },
                 {
                   onConflict: "user_id,pms_patient_id,pms_type",
-                }
+                },
               );
 
             if (!patientError) {
@@ -365,16 +365,16 @@ class SyncScheduler {
               try {
                 const appointments = await pmsClient.getPatientAppointments(
                   patientData.id,
-                  lastSyncAt
+                  lastSyncAt,
                 );
                 const completedAppointments = appointments.filter((apt: any) =>
-                  pmsClient.isCompletedAppointment(apt)
+                  pmsClient.isCompletedAppointment(apt),
                 );
 
                 for (const appointment of completedAppointments) {
                   const appointmentData = this.mapAppointmentProperties(
                     appointment,
-                    pmsType
+                    pmsType,
                   );
 
                   const { error: appointmentError } = await this.supabase
@@ -395,7 +395,7 @@ class SyncScheduler {
                       },
                       {
                         onConflict: "user_id,pms_appointment_id,pms_type",
-                      }
+                      },
                     );
 
                   if (!appointmentError) {
@@ -404,12 +404,12 @@ class SyncScheduler {
                 }
               } catch (appointmentError) {
                 issues.push(
-                  `Could not sync appointments for patient ${patientData.id}`
+                  `Could not sync appointments for patient ${patientData.id}`,
                 );
               }
             } else {
               issues.push(
-                `Could not update patient ${patientData.id}: ${patientError.message}`
+                `Could not update patient ${patientData.id}: ${patientError.message}`,
               );
             }
           }
@@ -417,7 +417,7 @@ class SyncScheduler {
           issues.push(
             `Error processing patient ${
               patient.id || "unknown"
-            }: ${patientError}`
+            }: ${patientError}`,
           );
         }
       }
@@ -445,16 +445,16 @@ class SyncScheduler {
         },
         {
           onConflict: "user_id,pms_type",
-        }
+        },
       );
 
       console.log(
-        `[SCHEDULER] Incremental sync completed for user ${userId}: ${patientsUpdated} patients, ${appointmentsUpdated} appointments`
+        `[SCHEDULER] Incremental sync completed for user ${userId}: ${patientsUpdated} patients, ${appointmentsUpdated} appointments`,
       );
     } catch (error) {
       console.error(
         `[SCHEDULER] Incremental sync failed for user ${userId}:`,
-        error
+        error,
       );
 
       // Update sync log with failure

@@ -19,7 +19,7 @@ export async function GET(request: Request) {
         cookies: {
           getAll: () => cookieStore.getAll(),
         },
-      }
+      },
     );
 
     const { error, data } = await supabase.auth.exchangeCodeForSession(code);

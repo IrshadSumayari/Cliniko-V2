@@ -23,7 +23,7 @@ interface AuthContextType {
     password: string,
     firstName?: string,
     lastName?: string,
-    clinicName?: string
+    clinicName?: string,
   ) => Promise<AuthResult>;
   signIn: (email: string, password: string) => Promise<AuthResult>;
   signInWithGoogle: () => Promise<AuthResult>;
@@ -56,7 +56,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         // Don't sign them out - they are still authenticated
         if (error.code === "PGRST116") {
           console.log(
-            "User not found in database, defaulting to not onboarded"
+            "User not found in database, defaulting to not onboarded",
           );
           return { ...authUser, isOnboarded: false };
         }
@@ -96,7 +96,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const getAccessToken = (): string | null => {
     try {
       const supabaseToken = localStorage.getItem(
-        "sb-iyielcnhqudbzuisswwl-auth-token"
+        "sb-iyielcnhqudbzuisswwl-auth-token",
       );
       if (supabaseToken) {
         const parsed = JSON.parse(supabaseToken);
@@ -222,7 +222,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const updateUserOnboardingStatus = async (
-    isOnboarded: boolean
+    isOnboarded: boolean,
   ): Promise<boolean> => {
     if (!user) {
       console.error("No user found to update onboarding status");
@@ -235,7 +235,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         "Updating onboarding status to:",
         isOnboarded,
         "for user:",
-        user.id
+        user.id,
       );
 
       const { data, error } = await supabase
@@ -313,7 +313,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     password: string,
     firstName?: string,
     lastName?: string,
-    clinicName?: string
+    clinicName?: string,
   ): Promise<AuthResult> => {
     setIsLoading(true);
     try {
@@ -342,7 +342,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const signIn = async (
     email: string,
-    password: string
+    password: string,
   ): Promise<AuthResult> => {
     setIsLoading(true);
     try {

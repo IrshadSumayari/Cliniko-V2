@@ -4,5 +4,5 @@ import { config } from "@/lib/config";
 
 export const supabase = createClient<Database>(
   config.supabase.url,
-  config.supabase.anonKey
+  config.supabase.anonKey,
 );

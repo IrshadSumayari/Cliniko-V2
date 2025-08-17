@@ -55,7 +55,7 @@ export async function storeEncryptedApiKey(
   pmsType: "cliniko" | "halaxy" | "nookal",
   apiKey: string,
   apiUrl?: string,
-  clinicId?: string
+  clinicId?: string,
 ) {
   try {
     console.log("[SERVER] Starting API key encryption...");
@@ -109,7 +109,7 @@ export async function storeEncryptedApiKey(
         },
         {
           onConflict: "user_id,pms_type",
-        }
+        },
       )
       .select();
 
@@ -130,7 +130,7 @@ export async function storeEncryptedApiKey(
     throw new Error(
       `Failed to encrypt and store API key: ${
         error instanceof Error ? error.message : "Unknown error"
-      }`
+      }`,
     );
   }
 }
@@ -171,7 +171,7 @@ export async function storeAppointmentTypes(
     appointment_id: string;
     appointment_name: string;
     code: string;
-  }>
+  }>,
 ) {
   try {
     console.log("[SERVER] Starting appointment types storage...");
@@ -208,7 +208,7 @@ export async function storeAppointmentTypes(
     }
 
     console.log(
-      `[SERVER] Successfully stored/updated ${data.length} appointment types in database`
+      `[SERVER] Successfully stored/updated ${data.length} appointment types in database`,
     );
     return data;
   } catch (error) {
@@ -216,7 +216,7 @@ export async function storeAppointmentTypes(
     throw new Error(
       `Failed to store appointment types: ${
         error instanceof Error ? error.message : "Unknown error"
-      }`
+      }`,
     );
   }
 }
@@ -238,7 +238,7 @@ export async function storeAppointment(appointmentData: {
     console.log("[SERVER] Starting appointment storage...");
     console.log(
       "[SERVER] Appointment data:",
-      JSON.stringify(appointmentData, null, 2)
+      JSON.stringify(appointmentData, null, 2),
     );
 
     const supabase = createAdminClient();

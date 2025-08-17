@@ -19,7 +19,7 @@ export async function POST(request: NextRequest) {
       console.error("No Stripe signature found");
       return NextResponse.json(
         { error: "No signature provided" },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
@@ -45,7 +45,7 @@ export async function POST(request: NextRequest) {
       console.error("Webhook signature verification failed:", err.message);
       return NextResponse.json(
         { error: `Webhook signature verification failed: ${err.message}` },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
@@ -97,7 +97,7 @@ export async function POST(request: NextRequest) {
         error: "Webhook processing failed",
         details: error.message,
       },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }

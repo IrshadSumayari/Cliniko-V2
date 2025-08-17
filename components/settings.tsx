@@ -59,7 +59,7 @@ const Settings = ({ onBack }: { onBack: () => void }) => {
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [isConnecting, setIsConnecting] = useState(false);
-  
+
   const [profile, setProfile] = useState<UserProfile>({
     id: "",
     first_name: "",
@@ -90,7 +90,7 @@ const Settings = ({ onBack }: { onBack: () => void }) => {
   // Fetch user profile from database
   const fetchUserProfile = async () => {
     if (!user?.id) return;
-    
+
     try {
       setIsLoading(true);
       const response = await authenticatedFetch(`/api/user/profile`, {
@@ -102,15 +102,14 @@ const Settings = ({ onBack }: { onBack: () => void }) => {
       }
 
       const userData = await response.json();
-      
+
       console.log("Profile data received:", userData);
-      
+
       // Update profile state with database data
       setProfile(userData);
-      
+
       // Now fetch PMS credentials with the updated profile data
       await fetchPMSCredentials(userData);
-      
     } catch (error) {
       console.error("Error fetching user profile:", error);
       toast.error("Failed to load profile data");
@@ -122,7 +121,7 @@ const Settings = ({ onBack }: { onBack: () => void }) => {
   // Fetch PMS credentials from database
   const fetchPMSCredentials = async (profileData?: UserProfile) => {
     if (!user?.id) return;
-    
+
     try {
       const response = await authenticatedFetch(`/api/user/pms-credentials`, {
         method: "GET",
@@ -133,24 +132,29 @@ const Settings = ({ onBack }: { onBack: () => void }) => {
       }
 
       const credentials = await response.json();
-      
+
       console.log("PMS credentials received:", credentials);
       console.log("Profile data for PMS update:", profileData || profile);
-      
+
       // Update PMS connection state with credentials from database
       setPmsConnection({
-        software: credentials.pms_type ? credentials.pms_type.charAt(0).toUpperCase() + credentials.pms_type.slice(1) : "",
+        software: credentials.pms_type
+          ? credentials.pms_type.charAt(0).toUpperCase() +
+            credentials.pms_type.slice(1)
+          : "",
         apiKey: credentials.api_key ? "••••••••••••••••" : "", // Show masked version for encrypted key
         connected: !!credentials.pms_type,
         lastSync: credentials.pms_last_sync || "",
       });
-      
+
       console.log("Updated PMS connection state:", {
-        software: credentials.pms_type ? credentials.pms_type.charAt(0).toUpperCase() + credentials.pms_type.slice(1) : "",
+        software: credentials.pms_type
+          ? credentials.pms_type.charAt(0).toUpperCase() +
+            credentials.pms_type.slice(1)
+          : "",
         connected: !!credentials.pms_type,
-        lastSync: credentials.pms_last_sync || ""
+        lastSync: credentials.pms_last_sync || "",
       });
-      
     } catch (error) {
       console.error("Error fetching PMS credentials:", error);
       // Don't show error toast for credentials, just log it
@@ -173,10 +177,10 @@ const Settings = ({ onBack }: { onBack: () => void }) => {
 
   const handleProfileSave = async () => {
     if (!user?.id) return;
-    
+
     try {
       setIsSaving(true);
-      
+
       const response = await authenticatedFetch("/api/user/profile", {
         method: "PUT",
         body: JSON.stringify({
@@ -191,13 +195,14 @@ const Settings = ({ onBack }: { onBack: () => void }) => {
       }
 
       toast.success("Profile information has been saved successfully!");
-      
+
       // Refresh profile data
       await fetchUserProfile();
-      
     } catch (error) {
       console.error("Error saving profile:", error);
-      toast.error(error instanceof Error ? error.message : "Failed to save profile");
+      toast.error(
+        error instanceof Error ? error.message : "Failed to save profile",
+      );
     } finally {
       setIsSaving(false);
     }
@@ -211,24 +216,30 @@ const Settings = ({ onBack }: { onBack: () => void }) => {
 
     // Validate API key format based on PMS type
     if (pmsConnection.software === "Nookal") {
-      const nookalPattern = /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/;
+      const nookalPattern =
+        /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/;
       if (!nookalPattern.test(pmsConnection.apiKey)) {
-        toast.error("Invalid Nookal API key format. Expected format: xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx");
+        toast.error(
+          "Invalid Nookal API key format. Expected format: xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx",
+        );
         return;
       }
     }
 
     try {
       setIsConnecting(true);
-      
+
       // Test the connection first
-      const testResponse = await authenticatedFetch("/api/pms/test-connection", {
-        method: "POST",
-        body: JSON.stringify({
-          pmsType: pmsConnection.software.toLowerCase(),
-          apiKey: pmsConnection.apiKey,
-        }),
-      });
+      const testResponse = await authenticatedFetch(
+        "/api/pms/test-connection",
+        {
+          method: "POST",
+          body: JSON.stringify({
+            pmsType: pmsConnection.software.toLowerCase(),
+            apiKey: pmsConnection.apiKey,
+          }),
+        },
+      );
 
       if (!testResponse.ok) {
         const errorData = await testResponse.json();
@@ -236,13 +247,16 @@ const Settings = ({ onBack }: { onBack: () => void }) => {
       }
 
       // If connection test passes, save to database
-      const saveResponse = await authenticatedFetch("/api/user/pms-connection", {
-        method: "POST",
-        body: JSON.stringify({
-          pms_type: pmsConnection.software.toLowerCase(), // Convert to lowercase for database
-          api_key: pmsConnection.apiKey,
-        }),
-      });
+      const saveResponse = await authenticatedFetch(
+        "/api/user/pms-connection",
+        {
+          method: "POST",
+          body: JSON.stringify({
+            pms_type: pmsConnection.software.toLowerCase(), // Convert to lowercase for database
+            api_key: pmsConnection.apiKey,
+          }),
+        },
+      );
 
       if (!saveResponse.ok) {
         const errorData = await saveResponse.json();
@@ -258,9 +272,9 @@ const Settings = ({ onBack }: { onBack: () => void }) => {
       };
 
       setPmsConnection(updatedConnection);
-      
+
       // Update profile state
-      setProfile(prev => ({
+      setProfile((prev) => ({
         ...prev,
         pms_type: pmsConnection.software,
         pms_connected: true,
@@ -271,10 +285,11 @@ const Settings = ({ onBack }: { onBack: () => void }) => {
       await fetchUserProfile();
 
       toast.success(`Successfully connected to ${pmsConnection.software}.`);
-      
     } catch (error) {
       console.error("Error connecting PMS:", error);
-      toast.error(error instanceof Error ? error.message : "Failed to connect to PMS");
+      toast.error(
+        error instanceof Error ? error.message : "Failed to connect to PMS",
+      );
     } finally {
       setIsConnecting(false);
     }
@@ -300,9 +315,9 @@ const Settings = ({ onBack }: { onBack: () => void }) => {
       };
 
       setPmsConnection(updatedConnection);
-      
+
       // Update profile state
-      setProfile(prev => ({
+      setProfile((prev) => ({
         ...prev,
         pms_type: "",
         pms_connected: false,
@@ -313,10 +328,11 @@ const Settings = ({ onBack }: { onBack: () => void }) => {
       await fetchUserProfile();
 
       toast.success("Your practice management software has been disconnected.");
-      
     } catch (error) {
       console.error("Error disconnecting PMS:", error);
-      toast.error(error instanceof Error ? error.message : "Failed to disconnect PMS");
+      toast.error(
+        error instanceof Error ? error.message : "Failed to disconnect PMS",
+      );
     }
   };
 
@@ -334,7 +350,7 @@ const Settings = ({ onBack }: { onBack: () => void }) => {
       const contentType = res.headers.get("content-type") || "";
       if (!contentType.includes("application/json")) {
         throw new Error(
-          `Expected JSON, got ${contentType}. Possible HTML error page.`
+          `Expected JSON, got ${contentType}. Possible HTML error page.`,
         );
       }
 
@@ -446,8 +462,8 @@ const Settings = ({ onBack }: { onBack: () => void }) => {
                 </p>
               </div>
 
-              <Button 
-                onClick={handleProfileSave} 
+              <Button
+                onClick={handleProfileSave}
                 className="w-full"
                 disabled={isSaving}
               >
@@ -521,7 +537,11 @@ const Settings = ({ onBack }: { onBack: () => void }) => {
                 </label>
                 <Input
                   type="password"
-                  placeholder={pmsConnection.connected ? "API key is encrypted and stored securely" : "Enter your API key"}
+                  placeholder={
+                    pmsConnection.connected
+                      ? "API key is encrypted and stored securely"
+                      : "Enter your API key"
+                  }
                   value={pmsConnection.apiKey}
                   onChange={(e) =>
                     setPmsConnection((prev) => ({
@@ -554,10 +574,14 @@ const Settings = ({ onBack }: { onBack: () => void }) => {
                   Disconnect
                 </Button>
               ) : (
-                <Button 
-                  onClick={handlePMSConnect} 
+                <Button
+                  onClick={handlePMSConnect}
                   className="w-full"
-                  disabled={isConnecting || !pmsConnection.software || !pmsConnection.apiKey}
+                  disabled={
+                    isConnecting ||
+                    !pmsConnection.software ||
+                    !pmsConnection.apiKey
+                  }
                 >
                   {isConnecting ? (
                     <Loader2 className="h-4 w-4 mr-2 animate-spin" />
