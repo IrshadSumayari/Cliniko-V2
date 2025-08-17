@@ -13,7 +13,7 @@ export async function POST(request: NextRequest) {
     if (!pmsType || !apiKey) {
       return NextResponse.json(
         { error: "Missing required fields" },
-        { status: 400 },
+        { status: 400 }
       );
     }
 
@@ -26,14 +26,14 @@ export async function POST(request: NextRequest) {
       console.error("Missing or invalid authorization header");
       return NextResponse.json(
         { error: "Authentication required. Please provide a valid token." },
-        { status: 401 },
+        { status: 401 }
       );
     }
 
     const token = authHeader.replace("Bearer ", "");
     console.log(
       "Token extracted:",
-      token ? `${token.substring(0, 20)}...` : "missing",
+      token ? `${token.substring(0, 20)}...` : "missing"
     );
 
     // Use createAdminClient for token-based authentication (NO COOKIES)
@@ -54,7 +54,7 @@ export async function POST(request: NextRequest) {
         {
           error: "Authentication failed. Please provide a valid token.",
         },
-        { status: 401 },
+        { status: 401 }
       );
     }
 
@@ -65,7 +65,7 @@ export async function POST(request: NextRequest) {
     console.log("User Email:", user.email);
     console.log(
       "API Key format:",
-      apiKey ? `${apiKey.substring(0, 10)}...` : "missing",
+      apiKey ? `${apiKey.substring(0, 10)}...` : "missing"
     );
 
     console.log("Ensuring user record exists...");
@@ -96,7 +96,7 @@ export async function POST(request: NextRequest) {
         console.error("Error creating user record:", createUserError);
         return NextResponse.json(
           { error: "Failed to create user record" },
-          { status: 500 },
+          { status: 500 }
         );
       }
       console.log("User record created successfully:", newUser);
@@ -112,7 +112,7 @@ export async function POST(request: NextRequest) {
         {
           error: `Invalid API key format for ${pmsType}. Please check your API key.`,
         },
-        { status: 400 },
+        { status: 400 }
       );
     }
 
@@ -133,7 +133,7 @@ export async function POST(request: NextRequest) {
               : "Unknown error"
           }`,
         },
-        { status: 400 },
+        { status: 400 }
       );
     }
 
@@ -145,7 +145,7 @@ export async function POST(request: NextRequest) {
           {
             error: `Failed to connect to ${pmsType}. Please verify your API key is correct.`,
           },
-          { status: 400 },
+          { status: 400 }
         );
       }
       console.log("Connection test successful!");
@@ -159,7 +159,7 @@ export async function POST(request: NextRequest) {
         {
           error: `Connection to ${pmsType} failed: ${errorMessage}`,
         },
-        { status: 400 },
+        { status: 400 }
       );
     }
 
@@ -184,7 +184,7 @@ export async function POST(request: NextRequest) {
       console.error("❌ Error storing credentials:", credentialsError);
       return NextResponse.json(
         { error: "Failed to store credentials in database" },
-        { status: 500 },
+        { status: 500 }
       );
     }
 
@@ -197,7 +197,7 @@ export async function POST(request: NextRequest) {
       if (processedTypes.length > 0) {
         await storeAppointmentTypes(userRecordData.id, pmsType, processedTypes);
         console.log(
-          `✅ Stored ${processedTypes.length} appointment types successfully!`,
+          `✅ Stored ${processedTypes.length} appointment types successfully!`
         );
       } else {
         console.log("⚠️ No EPC/WC appointment types found");
@@ -213,13 +213,13 @@ export async function POST(request: NextRequest) {
       adminSupabase,
       userRecordData.id,
       pmsClient,
-      pmsType,
+      pmsType
     );
 
     const appointmentTypesCount = await getAppointmentTypesCount(
       adminSupabase,
       userRecordData.id,
-      pmsType,
+      pmsType
     );
 
     // Don't automatically update onboarding status - let user decide when to complete onboarding
@@ -253,7 +253,7 @@ export async function POST(request: NextRequest) {
           error instanceof Error ? error.message : "Unknown error"
         }`,
       },
-      { status: 500 },
+      { status: 500 }
     );
   }
 }
@@ -261,7 +261,7 @@ export async function POST(request: NextRequest) {
 async function getAppointmentTypesCount(
   supabase: any,
   userId: string,
-  pmsType: string,
+  pmsType: string
 ): Promise<number> {
   try {
     const { count, error } = await supabase
@@ -286,7 +286,7 @@ async function performInitialSync(
   supabase: any,
   userId: string,
   pmsClient: any,
-  pmsType: string,
+  pmsType: string
 ) {
   const issues: string[] = [];
   let wcPatients = 0;
@@ -314,28 +314,27 @@ async function performInitialSync(
       userAppointmentTypes?.map((t: any) => t.appointment_id) || [];
     console.log(
       `[SERVER] Found ${appointmentTypeIds.length} stored appointment types:`,
-      appointmentTypeIds,
+      appointmentTypeIds
     );
 
     let patients: any[] = [];
     let allAppointments: any[] = [];
 
-    if (pmsType === "cliniko") {
-      // For Cliniko, use the new efficient method
+    if (pmsType === "cliniko" || pmsType === "nookal") {
       const result = await pmsClient.getPatientsWithAppointments(
         undefined,
-        appointmentTypeIds,
+        appointmentTypeIds
       );
       patients = result.patients;
       allAppointments = result.appointments;
       console.log(
-        `[SERVER] ✅ API call completed: ${patients.length} patients and ${allAppointments.length} appointments from Cliniko`,
+        `[SERVER] ✅ API call completed: ${patients.length} patients and ${allAppointments.length} appointments from ${pmsType}`
       );
     } else {
-      // For other PMS system
+      // For other PMS systems
       patients = await pmsClient.getPatients(undefined, appointmentTypeIds);
       console.log(
-        `[SERVER] Fetched ${patients.length} patients from ${pmsType}`,
+        `[SERVER] Fetched ${patients.length} patients from ${pmsType}`
       );
     }
 
@@ -345,7 +344,7 @@ async function performInitialSync(
     const patientsToInsert = patients
       .filter(
         (patient) =>
-          patient.patientType === "EPC" || patient.patientType === "WC",
+          patient.patientType === "EPC" || patient.patientType === "WC"
       )
       .map((patient) => ({
         user_id: userId,
@@ -366,7 +365,7 @@ async function performInitialSync(
     if (patientsToInsert.length > 0) {
       try {
         console.log(
-          `[SERVER] Bulk inserting ${patientsToInsert.length} patients...`,
+          `[SERVER] Bulk inserting ${patientsToInsert.length} patients...`
         );
         const { data: insertedPatients, error: bulkPatientError } =
           await supabase
@@ -380,22 +379,22 @@ async function performInitialSync(
         if (bulkPatientError) {
           console.error(
             "[SERVER] Bulk patient insert error:",
-            bulkPatientError,
+            bulkPatientError
           );
           issues.push("Failed to bulk insert patients");
         } else {
           console.log(
             `[SERVER] ✅ Successfully bulk inserted ${
               insertedPatients?.length || 0
-            } patients`,
+            } patients`
           );
 
           // Count EPC vs WC patients
           epcPatients = patientsToInsert.filter(
-            (p) => p.patient_type === "EPC",
+            (p) => p.patient_type === "EPC"
           ).length;
           wcPatients = patientsToInsert.filter(
-            (p) => p.patient_type === "WC",
+            (p) => p.patient_type === "WC"
           ).length;
         }
       } catch (error) {
@@ -405,15 +404,17 @@ async function performInitialSync(
     }
 
     console.log(
-      `[SERVER] Patient processing complete. EPC: ${epcPatients}, WC: ${wcPatients}`,
+      `[SERVER] Patient processing complete. EPC: ${epcPatients}, WC: ${wcPatients}`
     );
 
     // Now process ALL appointments that meet the 3 conditions (outside patient loop)
     let appointmentsToProcess: any[] = [];
 
-    if (pmsType === "cliniko") {
-      // Use all appointments from the Cliniko API call
+    if (pmsType === "cliniko" || pmsType === "nookal") {
       appointmentsToProcess = allAppointments;
+      console.log(
+        `[SERVER] Using ${appointmentsToProcess.length} appointments from efficient ${pmsType} API call`
+      );
     } else {
       // For other PMS systems, fetch appointments for each patient
       console.log("[SERVER] Fetching appointments for EPC/WC patients...");
@@ -421,16 +422,16 @@ async function performInitialSync(
         if (patient.patientType === "EPC" || patient.patientType === "WC") {
           try {
             const patientAppointments = await pmsClient.getPatientAppointments(
-              patient.id,
+              patient.id
             );
             appointmentsToProcess.push(...patientAppointments);
           } catch (error) {
             console.error(
               `[SERVER] Error fetching appointments for patient ${patient.id}:`,
-              error,
+              error
             );
             issues.push(
-              `Failed to fetch appointments for patient: ${patient.firstName} ${patient.lastName}`,
+              `Failed to fetch appointments for patient: ${patient.firstName} ${patient.lastName}`
             );
           }
         }
@@ -438,7 +439,7 @@ async function performInitialSync(
     }
 
     console.log(
-      `[SERVER] Found ${appointmentsToProcess.length} total appointments to process`,
+      `[SERVER] Found ${appointmentsToProcess.length} total appointments to process`
     );
 
     // Removed maxAppointments check
@@ -454,16 +455,16 @@ async function performInitialSync(
           apt.did_not_arrive === false && // did_not_arrive = false
           appointmentDate <= today // appointment_date <= today
         );
-      },
+      }
     );
 
     console.log(
-      `[SERVER] Found ${validCompletedAppointments.length} valid appointments after filtering`,
+      `[SERVER] Found ${validCompletedAppointments.length} valid appointments after filtering`
     );
 
     // OPTIMIZATION: Get all patient IDs in one query to avoid individual lookups
     console.log(
-      "[SERVER] Fetching patient mappings for bulk appointment insert...",
+      "[SERVER] Fetching patient mappings for bulk appointment insert..."
     );
     const { data: patientMappings, error: mappingError } = await supabase
       .from("patients")
@@ -476,7 +477,7 @@ async function performInitialSync(
       issues.push("Failed to fetch patient mappings");
     } else {
       console.log(
-        `[SERVER] Found ${patientMappings?.length || 0} patient mappings`,
+        `[SERVER] Found ${patientMappings?.length || 0} patient mappings`
       );
     }
 
@@ -530,62 +531,66 @@ async function performInitialSync(
       .filter(Boolean); // Remove null entries
 
     console.log(
-      `[SERVER] Prepared ${appointmentsToInsert.length} appointments for bulk insert`,
+      `[SERVER] Prepared ${appointmentsToInsert.length} appointments for bulk insert`
     );
 
-    // BULK INSERT: Insert all appointments at once
+    // BULK UPSERT: Insert or update all appointments at once to prevent duplicates
     if (appointmentsToInsert.length > 0) {
       try {
         console.log(
-          `[SERVER] Bulk inserting ${appointmentsToInsert.length} appointments...`,
+          `[SERVER] Bulk upserting ${appointmentsToInsert.length} appointments...`
         );
 
         // Use larger batch size for better performance
         const BATCH_SIZE = 200;
         const totalBatches = Math.ceil(
-          appointmentsToInsert.length / BATCH_SIZE,
+          appointmentsToInsert.length / BATCH_SIZE
         );
 
         for (let batchIndex = 0; batchIndex < totalBatches; batchIndex++) {
           const startIndex = batchIndex * BATCH_SIZE;
           const endIndex = Math.min(
             startIndex + BATCH_SIZE,
-            appointmentsToInsert.length,
+            appointmentsToInsert.length
           );
           const batch = appointmentsToInsert.slice(startIndex, endIndex);
 
           console.log(
             `[SERVER] Processing batch ${batchIndex + 1}/${totalBatches} (${
               batch.length
-            } appointments)`,
+            } appointments)`
           );
 
+          // Use upsert with conflict resolution to prevent duplicates
           const { error: batchError } = await supabase
             .from("appointments")
-            .insert(batch);
+            .upsert(batch, {
+              onConflict: "user_id,pms_appointment_id,pms_type",
+              ignoreDuplicates: false,
+            });
 
           if (batchError) {
             console.error(
-              `[SERVER] Batch ${batchIndex + 1} insert error:`,
-              batchError,
+              `[SERVER] Batch ${batchIndex + 1} upsert error:`,
+              batchError
             );
-            issues.push(`Failed to insert batch ${batchIndex + 1}`);
+            issues.push(`Failed to upsert batch ${batchIndex + 1}`);
           } else {
             totalAppointments += batch.length;
             console.log(
               `[SERVER] ✅ Batch ${batchIndex + 1} completed: ${
                 batch.length
-              } appointments inserted`,
+              } appointments upserted`
             );
           }
         }
 
         console.log(
-          `[SERVER] ✅ All appointments bulk inserted successfully: ${totalAppointments} total`,
+          `[SERVER] ✅ All appointments bulk upserted successfully: ${totalAppointments} total`
         );
       } catch (error) {
-        console.error("[SERVER] Exception in bulk appointment insert:", error);
-        issues.push("Exception in bulk appointment insert");
+        console.error("[SERVER] Exception in bulk appointment upsert:", error);
+        issues.push("Exception in bulk appointment upsert");
       }
     }
 
@@ -593,7 +598,7 @@ async function performInitialSync(
     const totalSyncedRecords = wcPatients + epcPatients + totalAppointments;
     console.log(`[SERVER] 🎯 SYNC COMPLETED SUCCESSFULLY!`);
     console.log(
-      `[SERVER] 📊 Final Results: ${wcPatients} WC patients + ${epcPatients} EPC patients + ${totalAppointments} appointments = ${totalSyncedRecords} total records`,
+      `[SERVER] 📊 Final Results: ${wcPatients} WC patients + ${epcPatients} EPC patients + ${totalAppointments} appointments = ${totalSyncedRecords} total records`
     );
 
     return {

@@ -8,11 +8,11 @@ export const config = {
   // },
   //Local DB
   supabase: {
-    url: "https://iyielcnhqudbzuisswwl.supabase.co",
+    url: "https://ddsbasqzslznczvqwjph.supabase.co",
     anonKey:
-      "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Iml5aWVsY25ocXVkYnp1aXNzd3dsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTUxNjU0NTEsImV4cCI6MjA3MDc0MTQ1MX0.Yy5C6dp_Z3Z1L-siOIJOG5Fgy8ZdDmUU8xYya-GKzm0",
+      "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRkc2Jhc3F6c2x6bmN6dnF3anBoIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTU0MjcxMTQsImV4cCI6MjA3MTAwMzExNH0.XaVYKxo7_IAJvfU6psA9cGTuK_XtilV-aB7DDQVQGy8",
     serviceRoleKey:
-      "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Iml5aWVsY25ocXVkYnp1aXNzd3dsIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc1NTE2NTQ1MSwiZXhwIjoyMDcwNzQxNDUxfQ.Xgptm46wf_r6PN301PSIMaKvg9Vkhb8bxelJgVJkPd8",
+      "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRkc2Jhc3F6c2x6bmN6dnF3anBoIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc1NTQyNzExNCwiZXhwIjoyMDcxMDAzMTE0fQ.FyF2hv3XAaIU6syZ_FxIRrH1LlpPLPvCtl3N_Uc0ENY",
   },
   encryption: {
     secret: "83a22bb4478e7b82a17e27e7ec59c664453ecd630d3cb890cb7e79679b1c5749",

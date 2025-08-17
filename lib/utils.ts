@@ -11,7 +11,7 @@ export function cn(...inputs: ClassValue[]) {
  */
 export async function authenticatedFetch(
   url: string,
-  options: RequestInit = {},
+  options: RequestInit = {}
 ): Promise<Response> {
   try {
     // Get access token from localStorage
@@ -20,7 +20,7 @@ export async function authenticatedFetch(
     try {
       // Check for Supabase auth token
       const supabaseToken = localStorage.getItem(
-        "sb-iyielcnhqudbzuisswwl-auth-token",
+        "sb-ddsbasqzslznczvqwjph-auth-token"
       );
       if (supabaseToken) {
         const parsed = JSON.parse(supabaseToken);
@@ -60,10 +60,11 @@ export async function authenticatedFetch(
       console.error(
         "API request failed:",
         response.status,
-        response.statusText,
+        response.statusText
       );
+      console.log(response);
       throw new Error(
-        `API request failed: ${response.status} ${response.statusText}`,
+        `API request failed: ${response.status} ${response.statusText}`
       );
     }
 
