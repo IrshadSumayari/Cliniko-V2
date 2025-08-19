@@ -4,7 +4,7 @@ import { HalaxyAPI } from "./halaxy-api";
 import { NookalAPI } from "./nookal-api";
 
 export class PMSFactory {
-  static createClient(pmsType: PMSType, apiKey: string): PMSApiInterface {
+  static createClient(pmsType: PMSType, apiKey: string, options?: any): PMSApiInterface {
     const credentials: PMSApiCredentials = { apiKey };
 
     switch (pmsType) {
@@ -13,7 +13,9 @@ export class PMSFactory {
       case "halaxy":
         return new HalaxyAPI(credentials);
       case "nookal":
-        return new NookalAPI(credentials);
+        return new NookalAPI(credentials, {
+          fetchPatientDetails: options?.fetchPatientDetails ?? false
+        });
       default:
         throw new Error(`Unsupported PMS type: ${pmsType}`);
     }

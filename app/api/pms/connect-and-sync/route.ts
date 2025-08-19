@@ -601,6 +601,48 @@ async function performInitialSync(
       `[SERVER] 📊 Final Results: ${wcPatients} WC patients + ${epcPatients} EPC patients + ${totalAppointments} appointments = ${totalSyncedRecords} total records`
     );
 
+    // Create sync log entry for progress tracking
+    try {
+      console.log("[SERVER] Creating sync log entry for progress tracking...");
+      
+      let syncProgress = null;
+      if (pmsType === "nookal") {
+        // For Nookal, create batch sync progress
+        const totalPatients = wcPatients + epcPatients;
+        syncProgress = {
+          lastSyncedPatientId: totalPatients > 0 ? totalPatients : 0, // Mark as completed initial sync
+          totalPatients: totalPatients,
+          patientsProcessed: totalPatients,
+          hasMorePatients: false, // Initial sync is complete
+          lastBatchSync: new Date().toISOString(),
+          batchSize: totalPatients,
+          patientsInThisBatch: totalPatients,
+          appointmentsInThisBatch: totalAppointments,
+          syncType: "initial"
+        };
+      }
+
+      await supabase.from("sync_logs").insert({
+        user_id: userId,
+        pms_type: pmsType,
+        sync_type: "initial",
+        status: "completed",
+        patients_processed: wcPatients + epcPatients,
+        patients_added: wcPatients + epcPatients,
+        patients_synced: wcPatients + epcPatients,
+        appointments_synced: totalAppointments,
+        started_at: new Date().toISOString(),
+        completed_at: new Date().toISOString(),
+        sync_progress: syncProgress,
+        error_details: issues.length > 0 ? { issues } : null
+      });
+
+      console.log("[SERVER] ✅ Sync log created successfully");
+    } catch (logError) {
+      console.error("[SERVER] Warning: Failed to create sync log:", logError);
+      // Don't fail the sync if logging fails
+    }
+
     return {
       wcPatients,
       epcPatients,

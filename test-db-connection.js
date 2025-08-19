@@ -10,8 +10,8 @@ async function testDatabaseConnection() {
 
     // Check environment variables
     const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-    const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-    const encryptionSecret = process.env.ENCRYPTION_SECRET;
+    const supabaseServiceKey = process.env.NEXT_PUBLIC_SUPABASE_SERVICE_ROLE_KEY;
+    const encryptionSecret = process.env.NEXT_PUBLIC_ENCRYPTION_SECRET;
 
     console.log("Environment variables:");
     console.log(

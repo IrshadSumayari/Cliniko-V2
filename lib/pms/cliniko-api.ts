@@ -26,7 +26,7 @@ export class ClinikoAPI implements PMSApiInterface {
 
   private verifyZoneConsistency() {
     console.log(
-      `🔍 Zone consistency check: API Key zone: ${this.region} Base URL: ${this.baseUrl}`,
+      `🔍 Zone consistency check: API Key zone: ${this.region} Base URL: ${this.baseUrl}`
     );
   }
 
@@ -68,12 +68,12 @@ export class ClinikoAPI implements PMSApiInterface {
       const errorText = await response.text();
       console.error(
         `❌ Cliniko API error: ${response.status} ${response.statusText}`,
-        errorText,
+        errorText
       );
       console.error(`   Failed URL: ${urlString}`);
       console.error(`   Zone: ${this.region}`);
       throw new Error(
-        `Cliniko API error: ${response.status} ${response.statusText}`,
+        `Cliniko API error: ${response.status} ${response.statusText}`
       );
     }
 
@@ -93,7 +93,7 @@ export class ClinikoAPI implements PMSApiInterface {
     }
     if (responseData.appointment_types) {
       console.log(
-        `   Appointment types count: ${responseData.appointment_types.length}`,
+        `   Appointment types count: ${responseData.appointment_types.length}`
       );
     }
 
@@ -109,14 +109,14 @@ export class ClinikoAPI implements PMSApiInterface {
         "   API Key format:",
         this.credentials.apiKey
           ? `${this.credentials.apiKey.substring(0, 10)}...`
-          : "missing",
+          : "missing"
       );
 
       // Add timeout to prevent hanging
       const timeoutPromise = new Promise((_, reject) => {
         setTimeout(
           () => reject(new Error("Connection test timeout after 10 seconds")),
-          10000,
+          10000
         );
       });
 
@@ -127,7 +127,7 @@ export class ClinikoAPI implements PMSApiInterface {
       const response = await Promise.race([connectionPromise, timeoutPromise]);
       console.log(
         "✅ Connection test successful - found businesses:",
-        response.businesses?.length || 0,
+        response.businesses?.length || 0
       );
       return true;
     } catch (error) {
@@ -135,17 +135,17 @@ export class ClinikoAPI implements PMSApiInterface {
       if (error instanceof Error) {
         if (error.message.includes("timeout")) {
           throw new Error(
-            "Connection test timed out - please check your internet connection",
+            "Connection test timed out - please check your internet connection"
           );
         } else if (error.message.includes("401")) {
           throw new Error(
-            "Invalid API key - please check your Cliniko API key is correct",
+            "Invalid API key - please check your Cliniko API key is correct"
           );
         } else if (error.message.includes("403")) {
           throw new Error("API key does not have sufficient permissions");
         } else if (error.message.includes("404")) {
           throw new Error(
-            "Cliniko API endpoint not found - please check your region",
+            "Cliniko API endpoint not found - please check your region"
           );
         } else {
           throw new Error(`Cliniko API error: ${error.message}`);
@@ -157,21 +157,21 @@ export class ClinikoAPI implements PMSApiInterface {
 
   async getPatients(
     lastModified?: string,
-    appointmentTypeIds?: string[],
+    appointmentTypeIds?: string[]
   ): Promise<PMSPatient[]> {
     try {
       console.log(
-        "🔍 Fetching patients from Cliniko with appointment type filtering...",
+        "🔍 Fetching patients from Cliniko with appointment type filtering..."
       );
       console.log("   Last modified:", lastModified || "not specified");
       console.log(
         "   Appointment type IDs:",
-        appointmentTypeIds || "not specified",
+        appointmentTypeIds || "not specified"
       );
 
       if (!appointmentTypeIds || appointmentTypeIds.length === 0) {
         console.log(
-          "⚠️ No appointment type IDs provided, cannot filter bookings",
+          "⚠️ No appointment type IDs provided, cannot filter bookings"
         );
         return [];
       }
@@ -180,7 +180,7 @@ export class ClinikoAPI implements PMSApiInterface {
       // Format: q[]=appointment_type_id:=ID1,ID2,ID3 (this is the exact format that works in Postman!)
       const appointmentTypeFilter = appointmentTypeIds.join(",");
       console.log(
-        `🔍 Filtering bookings by appointment types: ${appointmentTypeFilter}`,
+        `🔍 Filtering bookings by appointment types: ${appointmentTypeFilter}`
       );
 
       const params: Record<string, string> = {
@@ -198,7 +198,7 @@ export class ClinikoAPI implements PMSApiInterface {
 
       console.log(`🚀 Starting parallel fetch for unlimited records...`);
       console.log(
-        `⚡ Using ${MAX_PARALLEL_PAGES} parallel pages for optimal performance`,
+        `⚡ Using ${MAX_PARALLEL_PAGES} parallel pages for optimal performance`
       );
 
       let currentPage = 1;
@@ -211,7 +211,7 @@ export class ClinikoAPI implements PMSApiInterface {
         console.log(
           `🔄 Fetching pages ${currentPage} to ${
             currentPage + pagesToFetch - 1
-          } in parallel...`,
+          } in parallel...`
         );
         console.log(`📊 Current total: ${allBookings.length} records`);
 
@@ -226,7 +226,7 @@ export class ClinikoAPI implements PMSApiInterface {
             }).catch((error) => {
               console.error(`❌ Failed to fetch page ${pageNumber}:`, error);
               return { bookings: [] }; // Return empty on failure, don't break the entire process
-            }),
+            })
           );
         }
 
@@ -242,7 +242,7 @@ export class ClinikoAPI implements PMSApiInterface {
           const bookings = response.bookings || [];
 
           console.log(
-            `📋 Page ${pageNumber}: Found ${bookings.length} bookings`,
+            `📋 Page ${pageNumber}: Found ${bookings.length} bookings`
           );
 
           // Filter bookings by the 3 conditions you specified
@@ -263,7 +263,7 @@ export class ClinikoAPI implements PMSApiInterface {
           });
 
           console.log(
-            `✅ Page ${pageNumber}: ${validBookings.length}/${bookings.length} valid bookings`,
+            `✅ Page ${pageNumber}: ${validBookings.length}/${bookings.length} valid bookings`
           );
 
           // Add all valid bookings (no limit)
@@ -272,7 +272,7 @@ export class ClinikoAPI implements PMSApiInterface {
         }
 
         console.log(
-          `📈 Batch completed: Added ${batchTotalBookings} valid bookings`,
+          `📈 Batch completed: Added ${batchTotalBookings} valid bookings`
         );
         console.log(`📊 Running total: ${allBookings.length} records`);
 
@@ -291,31 +291,31 @@ export class ClinikoAPI implements PMSApiInterface {
         // Safety check to prevent infinite loops
         if (currentPage > 50) {
           console.log(
-            `⚠️ Reached maximum page limit (50), stopping parallel fetch`,
+            `⚠️ Reached maximum page limit (50), stopping parallel fetch`
           );
           break;
         }
 
         // Small delay between batches to be respectful to the API
         console.log(
-          `⏳ Waiting ${DELAY_BETWEEN_BATCHES}ms before next parallel batch...`,
+          `⏳ Waiting ${DELAY_BETWEEN_BATCHES}ms before next parallel batch...`
         );
         await new Promise((resolve) =>
-          setTimeout(resolve, DELAY_BETWEEN_BATCHES),
+          setTimeout(resolve, DELAY_BETWEEN_BATCHES)
         );
       }
 
       console.log(
-        `✅ Total synced records: ${allBookings.length} valid bookings from ${totalPagesFetched} pages`,
+        `✅ Total synced records: ${allBookings.length} valid bookings from ${totalPagesFetched} pages`
       );
       console.log(
-        `🚀 Parallel fetch completed in ${totalPagesFetched} pages with ${MAX_PARALLEL_PAGES} parallel calls per batch`,
+        `🚀 Parallel fetch completed in ${totalPagesFetched} pages with ${MAX_PARALLEL_PAGES} parallel calls per batch`
       );
 
       // Process valid bookings to extract patients
       const patients = await this.processBookingsForPatients(allBookings);
       console.log(
-        `✅ Processed ${allBookings.length} valid bookings, found ${patients.length} EPC/WC patients`,
+        `✅ Processed ${allBookings.length} valid bookings, found ${patients.length} EPC/WC patients`
       );
 
       return patients;
@@ -326,12 +326,12 @@ export class ClinikoAPI implements PMSApiInterface {
   }
 
   private async processBookingsForPatients(
-    bookings: any[],
+    bookings: any[]
   ): Promise<PMSPatient[]> {
     const patientMap = new Map<string, PMSPatient>();
 
     console.log(
-      `🔍 Processing ${bookings} ${patientMap}bookings for patients...`,
+      `🔍 Processing ${bookings} ${patientMap}bookings for patients...`
     );
 
     for (const booking of bookings) {
@@ -343,7 +343,7 @@ export class ClinikoAPI implements PMSApiInterface {
       const patientId = booking.patient.links.self.split("/").pop();
       if (!patientId || patientMap.has(patientId)) {
         console.log(
-          `⚠️ Skipping patient ${patientId} - already processed or invalid`,
+          `⚠️ Skipping patient ${patientId} - already processed or invalid`
         );
         continue;
       }
@@ -354,13 +354,13 @@ export class ClinikoAPI implements PMSApiInterface {
         .pop();
       if (!appointmentTypeId) {
         console.log(
-          `⚠️ Skipping booking ${booking.id} - no appointment type ID`,
+          `⚠️ Skipping booking ${booking.id} - no appointment type ID`
         );
         continue;
       }
 
       console.log(
-        `🔍 Processing patient ${patientId} with appointment type ${appointmentTypeId}`,
+        `🔍 Processing patient ${patientId} with appointment type ${appointmentTypeId}`
       );
 
       const patientData = await this.getPatientDetails(patientId);
@@ -371,28 +371,28 @@ export class ClinikoAPI implements PMSApiInterface {
 
       // Get appointment type details to check if it's EPC/WC
       const appointmentType = await this.getAppointmentTypeDetails(
-        booking.appointment_type.links.self,
+        booking.appointment_type.links.self
       );
       if (!appointmentType) {
         console.log(
-          `⚠️ Could not fetch appointment type details for ${appointmentTypeId}`,
+          `⚠️ Could not fetch appointment type details for ${appointmentTypeId}`
         );
         continue;
       }
 
       console.log(
-        `📋 Appointment type: ${appointmentType.name} (ID: ${appointmentTypeId})`,
+        `📋 Appointment type: ${appointmentType.name} (ID: ${appointmentTypeId})`
       );
 
       const patientType = this.determinePatientTypeFromBooking(
         booking,
-        appointmentType,
+        appointmentType
       );
       console.log(`🏷️ Determined patient type: ${patientType}`);
 
       if (patientType) {
         console.log(
-          `✅ Adding ${patientType} patient: ${patientData.first_name} ${patientData.last_name}`,
+          `✅ Adding ${patientType} patient: ${patientData.first_name} ${patientData.last_name}`
         );
 
         patientMap.set(patientId, {
@@ -417,14 +417,14 @@ export class ClinikoAPI implements PMSApiInterface {
         });
       } else {
         console.log(
-          `❌ Patient ${patientId} does not have EPC/WC appointment type`,
+          `❌ Patient ${patientId} does not have EPC/WC appointment type`
         );
       }
     }
 
     const result = Array.from(patientMap.values());
     console.log(
-      `✅ Processed ${bookings.length} bookings, found ${result.length} EPC/WC patients`,
+      `✅ Processed ${bookings.length} bookings, found ${result.length} EPC/WC patients`
     );
     return result;
   }
@@ -440,12 +440,12 @@ export class ClinikoAPI implements PMSApiInterface {
   }
 
   private async getAppointmentTypeDetails(
-    appointmentTypeUrl: string,
+    appointmentTypeUrl: string
   ): Promise<any> {
     try {
       const appointmentTypeId = appointmentTypeUrl.split("/").pop();
       const response = await this.makeRequest(
-        `/appointment_types/${appointmentTypeId}`,
+        `/appointment_types/${appointmentTypeId}`
       );
       return response;
     } catch (error) {
@@ -456,13 +456,13 @@ export class ClinikoAPI implements PMSApiInterface {
 
   private determinePatientTypeFromBooking(
     booking: any,
-    appointmentType: any,
+    appointmentType: any
   ): "EPC" | "WC" | null {
     const appointmentTypeName = appointmentType?.name?.toLowerCase() || "";
     const notes = booking.notes?.toLowerCase() || "";
 
     console.log(
-      `🔍 Checking appointment type: "${appointmentTypeName}" and notes: "${notes}"`,
+      `🔍 Checking appointment type: "${appointmentTypeName}" and notes: "${notes}"`
     );
 
     if (
@@ -470,11 +470,10 @@ export class ClinikoAPI implements PMSApiInterface {
       appointmentTypeName.includes("enhanced primary care") ||
       appointmentTypeName.includes("medicare") ||
       notes.includes("epc") ||
-      notes.includes("enhanced primary care") ||
-      notes.includes("medicare")
+      notes.includes("enhanced primary care")
     ) {
       console.log(
-        `✅ Matched EPC criteria for appointment type: "${appointmentTypeName}"`,
+        `✅ Matched EPC criteria for appointment type: "${appointmentTypeName}"`
       );
       return "EPC";
     }
@@ -489,20 +488,20 @@ export class ClinikoAPI implements PMSApiInterface {
       notes.includes("work injury")
     ) {
       console.log(
-        `✅ Matched WC criteria for appointment type: "${appointmentTypeName}"`,
+        `✅ Matched WC criteria for appointment type: "${appointmentTypeName}"`
       );
       return "WC";
     }
 
     console.log(
-      `❌ No EPC/WC match found for appointment type: "${appointmentTypeName}"`,
+      `❌ No EPC/WC match found for appointment type: "${appointmentTypeName}"`
     );
     return null;
   }
 
   async getAppointments(
     patientIds: string[],
-    lastModified?: string,
+    lastModified?: string
   ): Promise<PMSAppointment[]> {
     try {
       const params: Record<string, string> = {
@@ -529,7 +528,7 @@ export class ClinikoAPI implements PMSApiInterface {
             !booking.unavailable_block_type &&
             !booking.cancelled_at &&
             !booking.did_not_arrive &&
-            new Date(booking.ends_at) < new Date(),
+            new Date(booking.ends_at) < new Date()
         );
 
         const appointments = completedBookings
@@ -579,7 +578,7 @@ export class ClinikoAPI implements PMSApiInterface {
     if (Math.random() < 0.1) {
       // Log only ~10% of successful mappings
       console.log(
-        `🔍 Mapping booking ${booking.id} for patient ${patientId}, type: ${appointmentTypeId}`,
+        `🔍 Mapping booking ${booking.id} for patient ${patientId}, type: ${appointmentTypeId}`
       );
     }
 
@@ -592,7 +591,7 @@ export class ClinikoAPI implements PMSApiInterface {
       physioName: booking.patient_name,
       durationMinutes: this.calculateDuration(
         booking.starts_at,
-        booking.ends_at,
+        booking.ends_at
       ),
       notes: booking.notes,
       lastModified: booking.updated_at,
@@ -614,7 +613,7 @@ export class ClinikoAPI implements PMSApiInterface {
     try {
       const bookings = await this.getPatientBookings(patientId);
       console.log(
-        `🔍 Found ${bookings.length} bookings for patient ${patientId}`,
+        `🔍 Found ${bookings.length} bookings for patient ${patientId}`
       );
 
       const appointments: PMSAppointment[] = [];
@@ -628,13 +627,13 @@ export class ClinikoAPI implements PMSApiInterface {
       }
 
       console.log(
-        `✅ Successfully mapped ${appointments.length} appointments from ${bookings.length} bookings for patient ${patientId}`,
+        `✅ Successfully mapped ${appointments.length} appointments from ${bookings.length} bookings for patient ${patientId}`
       );
       return appointments;
     } catch (error) {
       console.error(
         `❌ Error in getPatientAppointments for patient ${patientId}:`,
-        error,
+        error
       );
       return [];
     }
@@ -651,14 +650,14 @@ export class ClinikoAPI implements PMSApiInterface {
 
       const bookings = response.bookings || [];
       console.log(
-        `📋 Found ${bookings.length} bookings for patient ${patientId}`,
+        `📋 Found ${bookings.length} bookings for patient ${patientId}`
       );
 
       // Log the first booking structure for debugging
       if (bookings.length > 0) {
         console.log(
           `🔍 First booking structure:`,
-          JSON.stringify(bookings[0], null, 2),
+          JSON.stringify(bookings[0], null, 2)
         );
       }
 
@@ -670,7 +669,7 @@ export class ClinikoAPI implements PMSApiInterface {
   }
 
   private mapBookingStatus(
-    status: string,
+    status: string
   ): "completed" | "cancelled" | "dna" | "scheduled" {
     const statusLower = status?.toLowerCase() || "";
 
@@ -713,18 +712,16 @@ export class ClinikoAPI implements PMSApiInterface {
         const appointmentTypes = response.appointment_types || [];
 
         console.log(
-          `📋 Found ${appointmentTypes.length} appointment types on page ${page}`,
+          `📋 Found ${appointmentTypes.length} appointment types on page ${page}`
         );
         allAppointmentTypes.push(...appointmentTypes);
 
         hasMore = response.links?.next !== undefined;
         page++;
-
-        if (page > 20) break; // Safety limit
       }
 
       console.log(
-        `✅ Total appointment types fetched: ${allAppointmentTypes.length}`,
+        `✅ Total appointment types fetched: ${allAppointmentTypes.length}`
       );
       return allAppointmentTypes;
     } catch (error) {
@@ -772,40 +769,40 @@ export class ClinikoAPI implements PMSApiInterface {
 
       if (code) {
         processedTypes.push({
-          appointment_id: appointmentType.id, // Fixed: was using duration_in_minutes instead of id
+          appointment_id: appointmentType.id,
           appointment_name: appointmentType.name,
           code: code,
         });
 
         console.log(
-          `📝 Processed appointment type: ${appointmentType.name} (ID: ${appointmentType.id}) -> ${code}`,
+          `📝 Processed appointment type: ${appointmentType.name} (ID: ${appointmentType.id}) -> ${code}`
         );
       }
     }
 
     console.log(
-      `✅ Filtered ${processedTypes.length} EPC/WC appointment types from ${appointmentTypes.length} total`,
+      `✅ Filtered ${processedTypes.length} EPC/WC appointment types from ${appointmentTypes.length} total`
     );
     return processedTypes;
   }
 
   async getPatientsWithAppointments(
     lastModified?: string,
-    appointmentTypeIds?: string[],
+    appointmentTypeIds?: string[]
   ): Promise<{ patients: PMSPatient[]; appointments: PMSAppointment[] }> {
     try {
       console.log(
-        "🔍 Fetching patients and appointments from Cliniko with appointment type filtering...",
+        "🔍 Fetching patients and appointments from Cliniko with appointment type filtering..."
       );
       console.log("   Last modified:", lastModified || "not specified");
       console.log(
         "   Appointment type IDs:",
-        appointmentTypeIds || "not specified",
+        appointmentTypeIds || "not specified"
       );
 
       if (!appointmentTypeIds || appointmentTypeIds.length === 0) {
         console.log(
-          "⚠️ No appointment type IDs provided, cannot filter bookings",
+          "⚠️ No appointment type IDs provided, cannot filter bookings"
         );
         return { patients: [], appointments: [] };
       }
@@ -814,7 +811,7 @@ export class ClinikoAPI implements PMSApiInterface {
       // Format: q[]=appointment_type_id:=ID1,ID2,ID3 (this is the exact format that works in Postman!)
       const appointmentTypeFilter = appointmentTypeIds.join(",");
       console.log(
-        `🔍 Filtering bookings by appointment types: ${appointmentTypeFilter}`,
+        `🔍 Filtering bookings by appointment types: ${appointmentTypeFilter}`
       );
 
       const params: Record<string, string> = {
@@ -832,7 +829,7 @@ export class ClinikoAPI implements PMSApiInterface {
 
       console.log(`🚀 Starting parallel fetch for unlimited records...`);
       console.log(
-        `⚡ Using ${MAX_PARALLEL_PAGES} parallel pages for optimal performance`,
+        `⚡ Using ${MAX_PARALLEL_PAGES} parallel pages for optimal performance`
       );
 
       let currentPage = 1;
@@ -845,7 +842,7 @@ export class ClinikoAPI implements PMSApiInterface {
         console.log(
           `🔄 Fetching pages ${currentPage} to ${
             currentPage + pagesToFetch - 1
-          } in parallel...`,
+          } in parallel...`
         );
         console.log(`📊 Current total: ${allBookings.length} records`);
 
@@ -860,7 +857,7 @@ export class ClinikoAPI implements PMSApiInterface {
             }).catch((error) => {
               console.error(`❌ Failed to fetch page ${pageNumber}:`, error);
               return { bookings: [] }; // Return empty on failure, don't break the entire process
-            }),
+            })
           );
         }
 
@@ -876,7 +873,7 @@ export class ClinikoAPI implements PMSApiInterface {
           const bookings = response.bookings || [];
 
           console.log(
-            `📋 Page ${pageNumber}: Found ${bookings.length} bookings`,
+            `📋 Page ${pageNumber}: Found ${bookings.length} bookings`
           );
 
           // Filter bookings by the 3 conditions you specified
@@ -897,7 +894,7 @@ export class ClinikoAPI implements PMSApiInterface {
           });
 
           console.log(
-            `✅ Page ${pageNumber}: ${validBookings.length}/${bookings.length} valid bookings`,
+            `✅ Page ${pageNumber}: ${validBookings.length}/${bookings.length} valid bookings`
           );
 
           // Add all valid bookings (no limit)
@@ -906,7 +903,7 @@ export class ClinikoAPI implements PMSApiInterface {
         }
 
         console.log(
-          `📈 Batch completed: Added ${batchTotalBookings} valid bookings`,
+          `📈 Batch completed: Added ${batchTotalBookings} valid bookings`
         );
         console.log(`📊 Running total: ${allBookings.length} records`);
 
@@ -925,54 +922,54 @@ export class ClinikoAPI implements PMSApiInterface {
         // Safety check to prevent infinite loops
         if (currentPage > 50) {
           console.log(
-            `⚠️ Reached maximum page limit (50), stopping parallel fetch`,
+            `⚠️ Reached maximum page limit (50), stopping parallel fetch`
           );
           break;
         }
 
         // Small delay between batches to be respectful to the API
         console.log(
-          `⏳ Waiting ${DELAY_BETWEEN_BATCHES}ms before next parallel batch...`,
+          `⏳ Waiting ${DELAY_BETWEEN_BATCHES}ms before next parallel batch...`
         );
         await new Promise((resolve) =>
-          setTimeout(resolve, DELAY_BETWEEN_BATCHES),
+          setTimeout(resolve, DELAY_BETWEEN_BATCHES)
         );
       }
 
       console.log(
-        `✅ Total synced records: ${allBookings.length} valid bookings from ${totalPagesFetched} pages`,
+        `✅ Total synced records: ${allBookings.length} valid bookings from ${totalPagesFetched} pages`
       );
       console.log(
-        `🚀 Parallel fetch completed in ${totalPagesFetched} pages with ${MAX_PARALLEL_PAGES} parallel calls per batch`,
+        `🚀 Parallel fetch completed in ${totalPagesFetched} pages with ${MAX_PARALLEL_PAGES} parallel calls per batch`
       );
 
       // Process valid bookings to extract patients
       const patients = await this.processBookingsForPatients(allBookings);
       console.log(
-        `✅ Processed ${allBookings.length} valid bookings, found ${patients.length} EPC/WC patients`,
+        `✅ Processed ${allBookings.length} valid bookings, found ${patients.length} EPC/WC patients`
       );
 
       // Convert valid bookings to appointments
       const appointments = allBookings
         .map((booking: any) => this.mapBookingToAppointment(booking))
         .filter(
-          (appointment): appointment is PMSAppointment => appointment !== null,
+          (appointment): appointment is PMSAppointment => appointment !== null
         );
       const skippedBookings = allBookings.length - appointments.length;
       if (skippedBookings > 0) {
         console.log(
-          `⚠️ Skipped ${skippedBookings} bookings due to incomplete data (missing patient info)`,
+          `⚠️ Skipped ${skippedBookings} bookings due to incomplete data (missing patient info)`
         );
       }
       console.log(
-        `✅ Converted ${allBookings.length} valid bookings to ${appointments.length} valid appointments`,
+        `✅ Converted ${allBookings.length} valid bookings to ${appointments.length} valid appointments`
       );
 
       return { patients, appointments };
     } catch (error) {
       console.error(
         "❌ Error fetching patients and appointments from Cliniko:",
-        error,
+        error
       );
       throw error;
     }

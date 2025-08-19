@@ -3,8 +3,18 @@ import crypto from "crypto";
 import { config } from "@/lib/config";
 
 export function createAdminClient() {
-  const supabaseUrl = config.supabase.url;
-  const supabaseServiceKey = config.supabase.serviceRoleKey;
+  // Use environment variables if available, otherwise fall back to config
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || config.supabase.url;
+  const supabaseServiceKey = process.env.NEXT_PUBLIC_SUPABASE_SERVICE_ROLE_KEY || config.supabase.serviceRoleKey;
+
+  console.log("[SERVER-ADMIN] Creating admin client with:", {
+    url: supabaseUrl ? `${supabaseUrl.substring(0, 30)}...` : 'undefined',
+    hasServiceKey: !!supabaseServiceKey
+  });
+
+  if (!supabaseUrl || !supabaseServiceKey) {
+    throw new Error("Missing Supabase configuration. Please check your environment variables.");
+  }
 
   return createClient(supabaseUrl, supabaseServiceKey, {
     auth: {
@@ -16,7 +26,7 @@ export function createAdminClient() {
 
 function encryptApiKey(apiKey: string): string {
   const algorithm = "aes-256-ctr";
-  const secretKey = config.encryption.secret;
+  const secretKey = process.env.NEXT_PUBLIC_ENCRYPTION_SECRET || config.encryption.secret;
 
   // Create a hash of the secret key to ensure it's 32 bytes
   const key = crypto.createHash("sha256").update(secretKey).digest();
@@ -29,9 +39,9 @@ function encryptApiKey(apiKey: string): string {
   return `${iv.toString("hex")}:${encrypted}`;
 }
 
-function decryptApiKey(encryptedData: string): string {
+export function decryptApiKey(encryptedData: string): string {
   const algorithm = "aes-256-ctr";
-  const secretKey = config.encryption.secret;
+  const secretKey = process.env.NEXT_PUBLIC_ENCRYPTION_SECRET || config.encryption.secret;
 
   // Create a hash of the secret key to ensure it's 32 bytes
   const key = crypto.createHash("sha256").update(secretKey).digest();
