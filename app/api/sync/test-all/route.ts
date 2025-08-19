@@ -1,22 +1,22 @@
-import { type NextRequest, NextResponse } from "next/server";
-import { createAdminClient } from "@/lib/supabase/server-admin";
-import { PMSApiFactory } from "@/lib/pms/factory";
-import { getDecryptedApiKey } from "@/lib/supabase/server-admin";
-import type { PMSType } from "@/lib/pms/types";
+import { type NextRequest, NextResponse } from 'next/server';
+import { createAdminClient } from '@/lib/supabase/server-admin';
+import { PMSApiFactory } from '@/lib/pms/factory';
+import { getDecryptedApiKey } from '@/lib/supabase/server-admin';
+import type { PMSType } from '@/lib/pms/types';
 
 export async function POST(request: NextRequest) {
   try {
     const { userId } = await request.json();
 
     if (!userId) {
-      return NextResponse.json({ error: "Missing userId" }, { status: 400 });
+      return NextResponse.json({ error: 'Missing userId' }, { status: 400 });
     }
 
     const supabase = createAdminClient();
     const results: Record<string, any> = {};
 
     // Test all configured PMS integrations
-    const pmsTypes: PMSType[] = ["cliniko", "halaxy", "nookal"];
+    const pmsTypes: PMSType[] = ['cliniko', 'halaxy', 'nookal'];
 
     for (const pmsType of pmsTypes) {
       try {
@@ -26,7 +26,7 @@ export async function POST(request: NextRequest) {
         if (!credentials) {
           results[pmsType] = {
             success: false,
-            error: "No API credentials configured",
+            error: 'No API credentials configured',
             tests: {
               auth: false,
               connection: false,
@@ -65,7 +65,7 @@ export async function POST(request: NextRequest) {
 
             // Test 3: EPC/WC filtering
             const epcWcPatients = patients.filter(
-              (p) => p.patientType === "EPC" || p.patientType === "WC",
+              (p) => p.patientType === 'EPC' || p.patientType === 'WC'
             );
             testResults.filtering = epcWcPatients.length >= 0; // Even 0 is valid
           } catch (error) {
@@ -76,28 +76,24 @@ export async function POST(request: NextRequest) {
         results[pmsType] = {
           success: Object.values(testResults).every(Boolean),
           tests: testResults,
-          patientCount: testResults.data
-            ? Math.floor(Math.random() * 100) + 10
-            : 0,
+          patientCount: testResults.data ? Math.floor(Math.random() * 100) + 10 : 0,
         };
 
         // Update test status in database
         await supabase
-          .from("pms_api_keys")
+          .from('pms_api_keys')
           .update({
             last_tested_at: new Date().toISOString(),
-            test_status: results[pmsType].success ? "success" : "failed",
-            test_error_message: results[pmsType].success
-              ? null
-              : "One or more tests failed",
+            test_status: results[pmsType].success ? 'success' : 'failed',
+            test_error_message: results[pmsType].success ? null : 'One or more tests failed',
           })
-          .eq("user_id", userId)
-          .eq("pms_type", pmsType);
+          .eq('user_id', userId)
+          .eq('pms_type', pmsType);
       } catch (error) {
         console.error(`Error testing ${pmsType}:`, error);
         results[pmsType] = {
           success: false,
-          error: error instanceof Error ? error.message : "Unknown error",
+          error: error instanceof Error ? error.message : 'Unknown error',
           tests: {
             auth: false,
             connection: false,
@@ -119,10 +115,7 @@ export async function POST(request: NextRequest) {
       },
     });
   } catch (error) {
-    console.error("Test all integrations error:", error);
-    return NextResponse.json(
-      { error: "Internal server error" },
-      { status: 500 },
-    );
+    console.error('Test all integrations error:', error);
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
 }

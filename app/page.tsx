@@ -1,26 +1,24 @@
-"use client";
+'use client';
 
-import { useAuth } from "@/contexts/auth-context";
-import LandingPage from "@/components/landing-page";
-import OnboardingFlow from "@/components/onboarding-flow";
-import Dashboard from "@/components/dashboard";
-import Settings from "@/components/settings";
-import { useState, useMemo, useEffect } from "react";
+import { useAuth } from '@/contexts/auth-context';
+import LandingPage from '@/components/landing-page';
+import OnboardingFlow from '@/components/onboarding-flow';
+import Dashboard from '@/components/dashboard';
+import Settings from '@/components/settings';
+import { useState, useMemo, useEffect } from 'react';
 
 /**
  * A wrapper for the main application view after a user is authenticated and onboarded.
  * It handles navigation between the dashboard, settings, and onboarding.
  */
 function AuthenticatedApp() {
-  const [view, setView] = useState<"dashboard" | "settings" | "onboarding">(
-    "dashboard",
-  );
+  const [view, setView] = useState<'dashboard' | 'settings' | 'onboarding'>('dashboard');
 
-  if (view === "settings") {
-    return <Settings onBack={() => setView("dashboard")} />;
+  if (view === 'settings') {
+    return <Settings onBack={() => setView('dashboard')} />;
   }
 
-  if (view === "onboarding") {
+  if (view === 'onboarding') {
     return <OnboardingFlow />;
   }
 
@@ -49,5 +47,5 @@ export default function HomePage() {
     return <AuthenticatedApp />;
   }, [user, loading]);
 
-  return <div key={`${user?.id || "no-user"}-${loading}`}>{content}</div>;
+  return <div key={`${user?.id || 'no-user'}-${loading}`}>{content}</div>;
 }

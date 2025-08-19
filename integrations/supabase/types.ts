@@ -1,10 +1,4 @@
-export type Json =
-  | string
-  | number
-  | boolean
-  | null
-  | { [key: string]: Json | undefined }
-  | Json[];
+export type Json = string | number | boolean | null | { [key: string]: Json | undefined } | Json[];
 
 export type Database = {
   public: {
@@ -84,11 +78,11 @@ export type Database = {
         };
         Relationships: [
           {
-            foreignKeyName: "pms_api_keys_user_id_fkey";
-            columns: ["user_id"];
+            foreignKeyName: 'pms_api_keys_user_id_fkey';
+            columns: ['user_id'];
             isOneToOne: false;
-            referencedRelation: "users";
-            referencedColumns: ["id"];
+            referencedRelation: 'users';
+            referencedColumns: ['id'];
           },
         ];
       };
@@ -140,11 +134,11 @@ export type Database = {
         };
         Relationships: [
           {
-            foreignKeyName: "patients_user_id_fkey";
-            columns: ["user_id"];
+            foreignKeyName: 'patients_user_id_fkey';
+            columns: ['user_id'];
             isOneToOne: false;
-            referencedRelation: "users";
-            referencedColumns: ["id"];
+            referencedRelation: 'users';
+            referencedColumns: ['id'];
           },
         ];
       };
@@ -196,18 +190,18 @@ export type Database = {
         };
         Relationships: [
           {
-            foreignKeyName: "appointments_user_id_fkey";
-            columns: ["user_id"];
+            foreignKeyName: 'appointments_user_id_fkey';
+            columns: ['user_id'];
             isOneToOne: false;
-            referencedRelation: "users";
-            referencedColumns: ["id"];
+            referencedRelation: 'users';
+            referencedColumns: ['id'];
           },
           {
-            foreignKeyName: "appointments_patient_id_fkey";
-            columns: ["patient_id"];
+            foreignKeyName: 'appointments_patient_id_fkey';
+            columns: ['patient_id'];
             isOneToOne: false;
-            referencedRelation: "patients";
-            referencedColumns: ["id"];
+            referencedRelation: 'patients';
+            referencedColumns: ['id'];
           },
         ];
       };
@@ -244,11 +238,11 @@ export type Database = {
         };
         Relationships: [
           {
-            foreignKeyName: "appointment_types_user_id_fkey";
-            columns: ["user_id"];
+            foreignKeyName: 'appointment_types_user_id_fkey';
+            columns: ['user_id'];
             isOneToOne: false;
-            referencedRelation: "users";
-            referencedColumns: ["id"];
+            referencedRelation: 'users';
+            referencedColumns: ['id'];
           },
         ];
       };
@@ -297,11 +291,11 @@ export type Database = {
         };
         Relationships: [
           {
-            foreignKeyName: "sync_logs_user_id_fkey";
-            columns: ["user_id"];
+            foreignKeyName: 'sync_logs_user_id_fkey';
+            columns: ['user_id'];
             isOneToOne: false;
-            referencedRelation: "users";
-            referencedColumns: ["id"];
+            referencedRelation: 'users';
+            referencedColumns: ['id'];
           },
         ];
       };
@@ -338,18 +332,18 @@ export type Database = {
         };
         Relationships: [
           {
-            foreignKeyName: "sync_errors_user_id_fkey";
-            columns: ["user_id"];
+            foreignKeyName: 'sync_errors_user_id_fkey';
+            columns: ['user_id'];
             isOneToOne: false;
-            referencedRelation: "users";
-            referencedColumns: ["id"];
+            referencedRelation: 'users';
+            referencedColumns: ['id'];
           },
           {
-            foreignKeyName: "sync_errors_sync_log_id_fkey";
-            columns: ["sync_log_id"];
+            foreignKeyName: 'sync_errors_sync_log_id_fkey';
+            columns: ['sync_log_id'];
             isOneToOne: false;
-            referencedRelation: "sync_logs";
-            referencedColumns: ["id"];
+            referencedRelation: 'sync_logs';
+            referencedColumns: ['id'];
           },
         ];
       };
@@ -389,11 +383,11 @@ export type Database = {
         };
         Relationships: [
           {
-            foreignKeyName: "sync_controls_user_id_fkey";
-            columns: ["user_id"];
+            foreignKeyName: 'sync_controls_user_id_fkey';
+            columns: ['user_id'];
             isOneToOne: false;
-            referencedRelation: "users";
-            referencedColumns: ["id"];
+            referencedRelation: 'users';
+            referencedColumns: ['id'];
           },
         ];
       };

@@ -1,10 +1,10 @@
-"use client";
+'use client';
 
-import { createContext, useContext, useEffect, useState } from "react";
-import { User } from "@supabase/supabase-js";
-import { supabase } from "@/integrations/supabase/client";
-import { useRouter } from "next/navigation";
-import { config } from "@/lib/config";
+import { createContext, useContext, useEffect, useState } from 'react';
+import { User } from '@supabase/supabase-js';
+import { supabase } from '@/integrations/supabase/client';
+import { useRouter } from 'next/navigation';
+import { config } from '@/lib/config';
 
 interface AuthUser extends User {
   isOnboarded?: boolean;
@@ -43,35 +43,33 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const fetchUserData = async (authUser: User): Promise<AuthUser> => {
     try {
-      console.log("Fetching user data for:", authUser.id);
+      console.log('Fetching user data for:', authUser.id);
       const { data: userData, error } = await supabase
-        .from("users")
-        .select("is_onboarded")
-        .eq("auth_user_id", authUser.id)
+        .from('users')
+        .select('is_onboarded')
+        .eq('auth_user_id', authUser.id)
         .single();
 
       if (error) {
-        console.error("Error fetching user data:", error);
+        console.error('Error fetching user data:', error);
         // If user doesn't exist in database, default to not onboarded
         // Don't sign them out - they are still authenticated
-        if (error.code === "PGRST116") {
-          console.log(
-            "User not found in database, defaulting to not onboarded"
-          );
+        if (error.code === 'PGRST116') {
+          console.log('User not found in database, defaulting to not onboarded');
           return { ...authUser, isOnboarded: false };
         }
         // For other errors, also default to not onboarded but keep them authenticated
-        console.log("Database error, defaulting to not onboarded");
+        console.log('Database error, defaulting to not onboarded');
         return { ...authUser, isOnboarded: false };
       }
 
-      console.log("User data fetched successfully:", userData);
+      console.log('User data fetched successfully:', userData);
       return {
         ...authUser,
         isOnboarded: userData?.is_onboarded || false,
       };
     } catch (error) {
-      console.error("Error fetching user data:", error);
+      console.error('Error fetching user data:', error);
       return { ...authUser, isOnboarded: false };
     }
   };
@@ -87,7 +85,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       const updatedUser = await fetchUserData(user);
       setUser(updatedUser);
     } catch (error) {
-      console.error("Error refreshing user data:", error);
+      console.error('Error refreshing user data:', error);
     } finally {
       setIsLoading(false);
     }
@@ -95,17 +93,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const getAccessToken = (): string | null => {
     try {
-      const supabaseToken = localStorage.getItem(
-        "sb-ddsbasqzslznczvqwjph-auth-token"
-      );
+      const supabaseToken = localStorage.getItem('sb-ddsbasqzslznczvqwjph-auth-token');
       if (supabaseToken) {
         const parsed = JSON.parse(supabaseToken);
         return parsed.access_token || null;
       }
 
-      return localStorage.getItem("supabase.auth.token");
+      return localStorage.getItem('supabase.auth.token');
     } catch (error) {
-      console.warn("Error getting access token:", error);
+      console.warn('Error getting access token:', error);
       return null;
     }
   };
@@ -123,13 +119,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       } = await supabase.auth.getUser(token);
 
       if (error || !user) {
-        console.warn("Token validation failed:", error);
+        console.warn('Token validation failed:', error);
         return null;
       }
 
       return user;
     } catch (error) {
-      console.error("Error validating token:", error);
+      console.error('Error validating token:', error);
       return null;
     }
   };
@@ -140,21 +136,21 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     const initializeAuth = async () => {
       try {
-        console.log("Initializing token-based auth...");
+        console.log('Initializing token-based auth...');
         const authUser = await validateTokenAndGetUser();
 
         if (authUser && mounted) {
-          console.log("Valid token found, fetching user data...");
+          console.log('Valid token found, fetching user data...');
           const userWithData = await fetchUserData(authUser);
           if (mounted) {
             setUser(userWithData);
           }
         } else if (mounted) {
-          console.log("No valid token found");
+          console.log('No valid token found');
           setUser(null);
         }
       } catch (error) {
-        console.error("Error initializing auth:", error);
+        console.error('Error initializing auth:', error);
         if (mounted) {
           setUser(null);
         }
@@ -178,23 +174,23 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       if (!mounted) return;
 
       try {
-        if (event === "SIGNED_IN" && session?.user) {
+        if (event === 'SIGNED_IN' && session?.user) {
           const userWithData = await fetchUserData(session.user);
           if (mounted) {
             setUser(userWithData);
           }
-        } else if (event === "SIGNED_OUT") {
+        } else if (event === 'SIGNED_OUT') {
           if (mounted) {
             setUser(null);
           }
-        } else if (event === "TOKEN_REFRESHED" && session?.user) {
+        } else if (event === 'TOKEN_REFRESHED' && session?.user) {
           const userWithData = await fetchUserData(session.user);
           if (mounted) {
             setUser(userWithData);
           }
         }
       } catch (error) {
-        console.error("Error handling auth state change:", error);
+        console.error('Error handling auth state change:', error);
         if (session?.user && mounted) {
           setUser({ ...session.user, isOnboarded: false });
         } else if (mounted) {
@@ -221,31 +217,24 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     };
   }, []);
 
-  const updateUserOnboardingStatus = async (
-    isOnboarded: boolean
-  ): Promise<boolean> => {
+  const updateUserOnboardingStatus = async (isOnboarded: boolean): Promise<boolean> => {
     if (!user) {
-      console.error("No user found to update onboarding status");
+      console.error('No user found to update onboarding status');
       return false;
     }
 
     setIsLoading(true);
     try {
-      console.log(
-        "Updating onboarding status to:",
-        isOnboarded,
-        "for user:",
-        user.id
-      );
+      console.log('Updating onboarding status to:', isOnboarded, 'for user:', user.id);
 
       const { data, error } = await supabase
-        .from("users")
+        .from('users')
         .update({ is_onboarded: isOnboarded })
-        .eq("auth_user_id", user.id)
-        .select("is_onboarded");
+        .eq('auth_user_id', user.id)
+        .select('is_onboarded');
 
       if (error) {
-        console.error("Error updating onboarding status:", error);
+        console.error('Error updating onboarding status:', error);
         return false;
       }
 
@@ -254,7 +243,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
       return true;
     } catch (error) {
-      console.error("Error updating onboarding status:", error);
+      console.error('Error updating onboarding status:', error);
       return false;
     } finally {
       setIsLoading(false);
@@ -262,49 +251,47 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   const getErrorMessage = (error: any): string => {
-    if (!error) return "An unknown error occurred";
+    if (!error) return 'An unknown error occurred';
 
     // Handle Supabase auth errors
     switch (error.message) {
-      case "Invalid login credentials":
-        return "Invalid email or password. Please check your credentials and try again.";
-      case "Email not confirmed":
-        return "Please check your email and click the confirmation link before signing in.";
-      case "User not found":
-        return "No account found with this email address. Please sign up first.";
-      case "Invalid email":
-        return "Please enter a valid email address.";
-      case "Password should be at least 6 characters":
-        return "Password must be at least 6 characters long.";
-      case "User already registered":
-        return "An account with this email already exists. Please sign in instead.";
-      case "Signup requires a valid password":
-        return "Please enter a valid password.";
-      case "Only an email address is required to sign up":
-        return "Please enter a valid email address.";
-      case "Email rate limit exceeded":
-        return "Too many requests. Please wait a moment before trying again.";
-      case "User already registered":
-        return "An account with this email already exists. Please sign in instead.";
-      case "A user with this email address has already been registered":
-        return "An account with this email already exists. Please sign in instead.";
+      case 'Invalid login credentials':
+        return 'Invalid email or password. Please check your credentials and try again.';
+      case 'Email not confirmed':
+        return 'Please check your email and click the confirmation link before signing in.';
+      case 'User not found':
+        return 'No account found with this email address. Please sign up first.';
+      case 'Invalid email':
+        return 'Please enter a valid email address.';
+      case 'Password should be at least 6 characters':
+        return 'Password must be at least 6 characters long.';
+      case 'User already registered':
+        return 'An account with this email already exists. Please sign in instead.';
+      case 'Signup requires a valid password':
+        return 'Please enter a valid password.';
+      case 'Only an email address is required to sign up':
+        return 'Please enter a valid email address.';
+      case 'Email rate limit exceeded':
+        return 'Too many requests. Please wait a moment before trying again.';
+      case 'User already registered':
+        return 'An account with this email already exists. Please sign in instead.';
+      case 'A user with this email address has already been registered':
+        return 'An account with this email already exists. Please sign in instead.';
       default:
         // Handle other common error patterns
-        if (error.message?.includes("password")) {
-          return "Password is incorrect. Please try again.";
+        if (error.message?.includes('password')) {
+          return 'Password is incorrect. Please try again.';
         }
-        if (error.message?.includes("email")) {
-          return "There was an issue with the email address provided.";
+        if (error.message?.includes('email')) {
+          return 'There was an issue with the email address provided.';
         }
-        if (error.message?.includes("network")) {
-          return "Network error. Please check your connection and try again.";
+        if (error.message?.includes('network')) {
+          return 'Network error. Please check your connection and try again.';
         }
-        if (error.message?.includes("already been registered")) {
-          return "An account with this email already exists. Please sign in instead.";
+        if (error.message?.includes('already been registered')) {
+          return 'An account with this email already exists. Please sign in instead.';
         }
-        return (
-          error.message || "An unexpected error occurred. Please try again."
-        );
+        return error.message || 'An unexpected error occurred. Please try again.';
     }
   };
 
@@ -340,10 +327,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
-  const signIn = async (
-    email: string,
-    password: string
-  ): Promise<AuthResult> => {
+  const signIn = async (email: string, password: string): Promise<AuthResult> => {
     setIsLoading(true);
     try {
       const { error } = await supabase.auth.signInWithPassword({
@@ -364,7 +348,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setIsLoading(true);
     try {
       const { error } = await supabase.auth.signInWithOAuth({
-        provider: "google",
+        provider: 'google',
         options: {
           redirectTo: `${config.app.url}/auth/callback`,
         },
@@ -384,9 +368,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       await supabase.auth.signOut();
       setUser(null);
       // Don't set loading to true during signout to prevent infinite loops
-      router.push("/");
+      router.push('/');
     } catch (error) {
-      console.error("Error signing out:", error);
+      console.error('Error signing out:', error);
     }
   };
 
@@ -412,7 +396,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 export function useAuth() {
   const context = useContext(AuthContext);
   if (!context) {
-    throw new Error("useAuth must be used within an AuthProvider");
+    throw new Error('useAuth must be used within an AuthProvider');
   }
   return context;
 }

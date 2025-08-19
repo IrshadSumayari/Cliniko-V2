@@ -1,10 +1,10 @@
-"use client";
+'use client';
 
-import { useState } from "react";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Card } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
+import { useState } from 'react';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Card } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
 import {
   ArrowRight,
   ArrowLeft,
@@ -13,14 +13,14 @@ import {
   CheckCircle,
   Settings,
   ExternalLink,
-} from "lucide-react";
-import { useAuth } from "@/contexts/auth-context";
-import { toast } from "sonner";
-import { supabase } from "@/integrations/supabase/client";
-import { authenticatedFetch } from "@/lib/utils";
-import { useRouter } from "next/navigation";
+} from 'lucide-react';
+import { useAuth } from '@/contexts/auth-context';
+import { toast } from 'sonner';
+import { supabase } from '@/integrations/supabase/client';
+import { authenticatedFetch } from '@/lib/utils';
+import { useRouter } from 'next/navigation';
 
-type OnboardingStep = "pms" | "api" | "syncing" | "sync-results";
+type OnboardingStep = 'pms' | 'api' | 'syncing' | 'sync-results';
 
 interface SyncResults {
   wcPatients: number;
@@ -32,17 +32,17 @@ interface SyncResults {
 export default function OnboardingFlow() {
   const { updateUserOnboardingStatus, isLoading, user } = useAuth();
   const router = useRouter();
-  const [currentStep, setCurrentStep] = useState<OnboardingStep>("pms");
+  const [currentStep, setCurrentStep] = useState<OnboardingStep>('pms');
   const [isProcessing, setIsProcessing] = useState(false);
   const [isCompleting, setIsCompleting] = useState(false);
   const [syncProgress, setSyncProgress] = useState({
     progress: 0,
-    message: "",
-    currentStage: "",
+    message: '',
+    currentStage: '',
   });
   const [formData, setFormData] = useState({
-    selectedPMS: "",
-    apiKey: "",
+    selectedPMS: '',
+    apiKey: '',
   });
   const [syncResults, setSyncResults] = useState<SyncResults>({
     wcPatients: 0,
@@ -58,24 +58,24 @@ export default function OnboardingFlow() {
   const resetSyncProgress = () => {
     setSyncProgress({
       progress: 0,
-      message: "",
-      currentStage: "",
+      message: '',
+      currentStage: '',
     });
   };
 
   const handleConnectAndSync = async () => {
     if (!formData.apiKey.trim()) {
-      toast.error("Please enter your API key");
+      toast.error('Please enter your API key');
       return;
     }
 
     // Validate API key format based on PMS type
-    if (formData.selectedPMS === "Nookal") {
+    if (formData.selectedPMS === 'Nookal') {
       const nookalPattern =
         /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/;
       if (!nookalPattern.test(formData.apiKey)) {
         toast.error(
-          "Invalid Nookal API key format. Expected format: xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx",
+          'Invalid Nookal API key format. Expected format: xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx'
         );
         return;
       }
@@ -83,20 +83,20 @@ export default function OnboardingFlow() {
 
     // Remove session check - we're using token-based auth now
     setIsProcessing(true);
-    setCurrentStep("syncing");
+    setCurrentStep('syncing');
     resetSyncProgress();
 
     try {
       // Start with 0% progress
       setSyncProgress({
         progress: 0,
-        message: "Initializing connection...",
-        currentStage: "initializing",
+        message: 'Initializing connection...',
+        currentStage: 'initializing',
       });
 
       // Make the API call immediately at 0%
-      const apiCallPromise = authenticatedFetch("/api/pms/connect-and-sync", {
-        method: "POST",
+      const apiCallPromise = authenticatedFetch('/api/pms/connect-and-sync', {
+        method: 'POST',
         body: JSON.stringify({
           pmsType: formData.selectedPMS.toLowerCase(),
           apiKey: formData.apiKey,
@@ -106,24 +106,24 @@ export default function OnboardingFlow() {
       // Start progress simulation
       setSyncProgress({
         progress: 10,
-        message: "Connecting to PMS...",
-        currentStage: "connecting",
+        message: 'Connecting to PMS...',
+        currentStage: 'connecting',
       });
 
       await new Promise((resolve) => setTimeout(resolve, 1000));
 
       setSyncProgress({
         progress: 25,
-        message: "Fetching appointment types...",
-        currentStage: "appointment-types",
+        message: 'Fetching appointment types...',
+        currentStage: 'appointment-types',
       });
 
       await new Promise((resolve) => setTimeout(resolve, 1000));
 
       setSyncProgress({
         progress: 30,
-        message: "Fetching patients...",
-        currentStage: "patients",
+        message: 'Fetching patients...',
+        currentStage: 'patients',
       });
 
       for (let progress = 31; progress <= 90; progress++) {
@@ -133,11 +133,11 @@ export default function OnboardingFlow() {
             new Promise((resolve) => setTimeout(resolve, 1200)),
           ]);
 
-          if (result && typeof result === "object" && "ok" in result) {
+          if (result && typeof result === 'object' && 'ok' in result) {
             setSyncProgress({
               progress: 100,
-              message: "Sync completed successfully!",
-              currentStage: "complete",
+              message: 'Sync completed successfully!',
+              currentStage: 'complete',
             });
 
             await new Promise((resolve) => setTimeout(resolve, 500));
@@ -148,12 +148,10 @@ export default function OnboardingFlow() {
 
             if (!response.ok) {
               if (response.status === 401) {
-                toast.error(
-                  "Authentication expired. Please refresh the page and try again.",
-                );
+                toast.error('Authentication expired. Please refresh the page and try again.');
                 return;
               }
-              throw new Error(responseData.error || "Failed to connect to PMS");
+              throw new Error(responseData.error || 'Failed to connect to PMS');
             }
 
             setSyncResults({
@@ -163,31 +161,27 @@ export default function OnboardingFlow() {
               issues: responseData.issues || [],
             });
 
-            toast.success("Successfully connected and synced data!");
-            setCurrentStep("sync-results");
+            toast.success('Successfully connected and synced data!');
+            setCurrentStep('sync-results');
             return;
           }
         } catch (error) {
-          if (error && typeof error === "object" && "message" in error) {
+          if (error && typeof error === 'object' && 'message' in error) {
             throw error;
           }
         }
 
         setSyncProgress({
           progress: progress,
-          message:
-            progress < 60
-              ? "Processing patient data..."
-              : "Processing appointment data...",
-          currentStage:
-            progress < 60 ? "patients-processing" : "appointments-processing",
+          message: progress < 60 ? 'Processing patient data...' : 'Processing appointment data...',
+          currentStage: progress < 60 ? 'patients-processing' : 'appointments-processing',
         });
       }
 
       setSyncProgress({
         progress: 90,
-        message: "Waiting for sync to complete...",
-        currentStage: "waiting",
+        message: 'Waiting for sync to complete...',
+        currentStage: 'waiting',
       });
 
       // Wait for the API call to complete
@@ -197,19 +191,17 @@ export default function OnboardingFlow() {
 
       if (!response.ok) {
         if (response.status === 401) {
-          toast.error(
-            "Authentication expired. Please refresh the page and try again.",
-          );
+          toast.error('Authentication expired. Please refresh the page and try again.');
           return;
         }
-        throw new Error(result.error || "Failed to connect to PMS");
+        throw new Error(result.error || 'Failed to connect to PMS');
       }
 
       // Success - complete the progress
       setSyncProgress({
         progress: 100,
-        message: "Sync completed successfully!",
-        currentStage: "complete",
+        message: 'Sync completed successfully!',
+        currentStage: 'complete',
       });
 
       await new Promise((resolve) => setTimeout(resolve, 1000));
@@ -221,17 +213,15 @@ export default function OnboardingFlow() {
         issues: result.issues || [],
       });
 
-      toast.success("Successfully connected and synced data!");
-      setCurrentStep("sync-results");
+      toast.success('Successfully connected and synced data!');
+      setCurrentStep('sync-results');
     } catch (error) {
-      console.error("Error during sync:", error);
-      toast.error(
-        error instanceof Error ? error.message : "Failed to sync data",
-      );
+      console.error('Error during sync:', error);
+      toast.error(error instanceof Error ? error.message : 'Failed to sync data');
 
       // Reset progress on error
       resetSyncProgress();
-      setCurrentStep("api");
+      setCurrentStep('api');
     } finally {
       setIsProcessing(false);
     }
@@ -244,17 +234,17 @@ export default function OnboardingFlow() {
     try {
       const success = await updateUserOnboardingStatus(true);
       if (success) {
-        toast.success("Setup complete! Welcome to your dashboard.");
+        toast.success('Setup complete! Welcome to your dashboard.');
         // Stay on the current screen instead of redirecting
         // setTimeout(() => {
         //   window.location.reload();
         // }, 1000);
       } else {
-        toast.error("Failed to complete setup. Please try again.");
+        toast.error('Failed to complete setup. Please try again.');
       }
     } catch (error) {
-      console.error("Error completing onboarding:", error);
-      toast.error("Failed to complete setup. Please try again.");
+      console.error('Error completing onboarding:', error);
+      toast.error('Failed to complete setup. Please try again.');
     } finally {
       setIsCompleting(false);
     }
@@ -265,7 +255,7 @@ export default function OnboardingFlow() {
 
     setIsCompleting(true);
     try {
-      toast.info("You can connect your PMS later in settings.");
+      toast.info('You can connect your PMS later in settings.');
       const success = await updateUserOnboardingStatus(false);
       if (success) {
         // Stay on the current screen instead of redirecting
@@ -273,24 +263,24 @@ export default function OnboardingFlow() {
         //   window.location.reload();
         // }, 1000);
       } else {
-        toast.error("Failed to update status. Please try again.");
+        toast.error('Failed to update status. Please try again.');
       }
     } catch (error) {
-      console.error("Error skipping onboarding:", error);
-      toast.error("Failed to update status. Please try again.");
+      console.error('Error skipping onboarding:', error);
+      toast.error('Failed to update status. Please try again.');
     } finally {
       setIsCompleting(false);
     }
   };
 
   const handleBack = () => {
-    const steps: OnboardingStep[] = ["pms", "api", "syncing", "sync-results"];
+    const steps: OnboardingStep[] = ['pms', 'api', 'syncing', 'sync-results'];
     const currentIndex = steps.indexOf(currentStep);
     if (currentIndex > 0) {
       setCurrentStep(steps[currentIndex - 1]);
 
       // Reset progress when going back to API step
-      if (steps[currentIndex - 1] === "api") {
+      if (steps[currentIndex - 1] === 'api') {
         resetSyncProgress();
       }
     }
@@ -299,62 +289,53 @@ export default function OnboardingFlow() {
   const getPMSInstructions = (pms: string) => {
     const instructions = {
       cliniko: [
-        "Log into your Cliniko account",
-        "Go to Settings → Developer → API Keys",
+        'Log into your Cliniko account',
+        'Go to Settings → Developer → API Keys',
         "Click 'Generate new API key'",
-        "Copy the key and paste it below",
+        'Copy the key and paste it below',
       ],
       halaxy: [
-        "Log into your Halaxy account",
-        "Go to Settings → Integrations → API Access",
-        "Generate a new API token",
-        "Copy the token and paste it below",
+        'Log into your Halaxy account',
+        'Go to Settings → Integrations → API Access',
+        'Generate a new API token',
+        'Copy the token and paste it below',
       ],
       nookal: [
-        "Log into your Nookal account",
-        "Go to Settings → API → Generate Key",
-        "Create a new API key",
-        "Copy the key and paste it below",
+        'Log into your Nookal account',
+        'Go to Settings → API → Generate Key',
+        'Create a new API key',
+        'Copy the key and paste it below',
       ],
     };
-    return (
-      instructions[pms.toLowerCase() as keyof typeof instructions] ||
-      instructions.cliniko
-    );
+    return instructions[pms.toLowerCase() as keyof typeof instructions] || instructions.cliniko;
   };
 
   const renderStep = () => {
     switch (currentStep) {
-      case "pms":
+      case 'pms':
         return (
           <div className="space-y-6 fade-in">
             <div className="text-center">
-              <h2 className="text-3xl font-bold mb-2">
-                Connect Your Practice Management Software
-              </h2>
-              <p className="text-muted-foreground">
-                Choose your current system
-              </p>
+              <h2 className="text-3xl font-bold mb-2">Connect Your Practice Management Software</h2>
+              <p className="text-muted-foreground">Choose your current system</p>
             </div>
 
             <div className="grid md:grid-cols-3 gap-6 max-w-2xl mx-auto">
               {[
-                { name: "Cliniko", letter: "C" },
-                { name: "Nookal", letter: "N" },
-                { name: "Halaxy", letter: "H" },
+                { name: 'Cliniko', letter: 'C' },
+                { name: 'Nookal', letter: 'N' },
+                { name: 'Halaxy', letter: 'H' },
               ].map((pms) => (
                 <Card
                   key={pms.name}
                   className={`p-8 text-center cursor-pointer transition-all hover:scale-105 ${
                     formData.selectedPMS === pms.name
-                      ? "ring-2 ring-primary border-primary bg-primary/5"
-                      : "hover:border-primary/50"
+                      ? 'ring-2 ring-primary border-primary bg-primary/5'
+                      : 'hover:border-primary/50'
                   }`}
                   onClick={() => handlePMSSelect(pms.name)}
                 >
-                  <div className="text-6xl font-bold mb-4 text-primary">
-                    {pms.letter}
-                  </div>
+                  <div className="text-6xl font-bold mb-4 text-primary">{pms.letter}</div>
                   <div className="font-semibold text-lg">{pms.name}</div>
                 </Card>
               ))}
@@ -369,7 +350,7 @@ export default function OnboardingFlow() {
               <Button
                 variant="default"
                 size="lg"
-                onClick={() => setCurrentStep("api")}
+                onClick={() => setCurrentStep('api')}
                 disabled={!formData.selectedPMS || isProcessing || isLoading}
                 className="min-w-[280px]"
               >
@@ -378,11 +359,7 @@ export default function OnboardingFlow() {
               </Button>
 
               <div className="pt-4">
-                <Button
-                  variant="outline"
-                  onClick={handleSkip}
-                  disabled={isProcessing || isLoading}
-                >
+                <Button variant="outline" onClick={handleSkip} disabled={isProcessing || isLoading}>
                   Back to Home
                 </Button>
               </div>
@@ -390,7 +367,7 @@ export default function OnboardingFlow() {
           </div>
         );
 
-      case "api":
+      case 'api':
         return (
           <div className="space-y-8 fade-in">
             <div className="text-center">
@@ -399,12 +376,9 @@ export default function OnboardingFlow() {
                 <div className="w-8 h-0.5 bg-primary"></div>
                 <div className="w-3 h-3 rounded-full bg-primary"></div>
               </div>
-              <h2 className="text-3xl font-bold mb-2">
-                Get Your {formData.selectedPMS} API Key
-              </h2>
+              <h2 className="text-3xl font-bold mb-2">Get Your {formData.selectedPMS} API Key</h2>
               <p className="text-muted-foreground">
-                Follow these step-by-step instructions to connect your practice
-                management system
+                Follow these step-by-step instructions to connect your practice management system
               </p>
             </div>
 
@@ -417,19 +391,17 @@ export default function OnboardingFlow() {
                 </div>
 
                 <div className="space-y-4">
-                  {getPMSInstructions(formData.selectedPMS).map(
-                    (instruction, index) => (
-                      <div key={index} className="flex gap-3">
-                        <Badge
-                          variant="outline"
-                          className="rounded-full w-6 h-6 flex items-center justify-center text-xs shrink-0"
-                        >
-                          {index + 1}
-                        </Badge>
-                        <p className="text-sm flex-1">{instruction}</p>
-                      </div>
-                    ),
-                  )}
+                  {getPMSInstructions(formData.selectedPMS).map((instruction, index) => (
+                    <div key={index} className="flex gap-3">
+                      <Badge
+                        variant="outline"
+                        className="rounded-full w-6 h-6 flex items-center justify-center text-xs shrink-0"
+                      >
+                        {index + 1}
+                      </Badge>
+                      <p className="text-sm flex-1">{instruction}</p>
+                    </div>
+                  ))}
                 </div>
 
                 <Button
@@ -439,7 +411,7 @@ export default function OnboardingFlow() {
                   onClick={() =>
                     window.open(
                       `https://${formData.selectedPMS.toLowerCase()}.com/docs/api`,
-                      "_blank",
+                      '_blank'
                     )
                   }
                 >
@@ -467,9 +439,7 @@ export default function OnboardingFlow() {
                     type="password"
                     placeholder={`Paste your ${formData.selectedPMS} API key here`}
                     value={formData.apiKey}
-                    onChange={(e) =>
-                      setFormData({ ...formData, apiKey: e.target.value })
-                    }
+                    onChange={(e) => setFormData({ ...formData, apiKey: e.target.value })}
                     className="font-mono text-sm"
                   />
 
@@ -479,17 +449,10 @@ export default function OnboardingFlow() {
                   </div>
 
                   <div className="bg-blue-50 dark:bg-blue-950/20 p-4 rounded-lg">
-                    <h4 className="font-medium text-sm mb-2">
-                      What happens next?
-                    </h4>
+                    <h4 className="font-medium text-sm mb-2">What happens next?</h4>
                     <ul className="text-xs text-muted-foreground space-y-1">
-                      <li>
-                        • We'll securely connect to your {formData.selectedPMS}{" "}
-                        account
-                      </li>
-                      <li>
-                        • Import your patient data and appointment history
-                      </li>
+                      <li>• We'll securely connect to your {formData.selectedPMS} account</li>
+                      <li>• Import your patient data and appointment history</li>
                       <li>• Set up your personalized dashboard</li>
                       <li>• You'll be ready to use the system immediately</li>
                     </ul>
@@ -505,7 +468,7 @@ export default function OnboardingFlow() {
                     {isProcessing ? (
                       <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                     ) : (
-                      "Connect & Sync Data"
+                      'Connect & Sync Data'
                     )}
                     {!isProcessing && <ArrowRight className="ml-2 h-4 w-4" />}
                   </Button>
@@ -514,26 +477,18 @@ export default function OnboardingFlow() {
             </div>
 
             <div className="flex justify-center gap-4">
-              <Button
-                variant="outline"
-                onClick={handleBack}
-                disabled={isProcessing}
-              >
+              <Button variant="outline" onClick={handleBack} disabled={isProcessing}>
                 <ArrowLeft className="mr-2 h-4 w-4" />
                 Back to PMS Selection
               </Button>
-              <Button
-                variant="outline"
-                onClick={handleSkip}
-                disabled={isProcessing}
-              >
+              <Button variant="outline" onClick={handleSkip} disabled={isProcessing}>
                 Back to Home
               </Button>
             </div>
           </div>
         );
 
-      case "syncing":
+      case 'syncing':
         return (
           <div className="space-y-8 fade-in text-center">
             <div className="text-center">
@@ -544,20 +499,16 @@ export default function OnboardingFlow() {
                 <div className="w-8 h-0.5 bg-primary"></div>
                 <div className="w-3 h-3 rounded-full bg-primary"></div>
               </div>
-              <h2 className="text-3xl font-bold mb-2">
-                Setting Up Your Dashboard
-              </h2>
+              <h2 className="text-3xl font-bold mb-2">Setting Up Your Dashboard</h2>
               <p className="text-muted-foreground mb-8">
-                We're connecting to your clinic's data and mapping your
-                patients, quotas and appointments...
+                We're connecting to your clinic's data and mapping your patients, quotas and
+                appointments...
               </p>
             </div>
 
             <div className="max-w-md mx-auto">
               <div className="text-center mb-4">
-                <span className="text-2xl font-bold text-primary">
-                  {syncProgress.progress}%
-                </span>
+                <span className="text-2xl font-bold text-primary">{syncProgress.progress}%</span>
               </div>
 
               <div className="w-full bg-muted rounded-full h-2 mb-6">
@@ -576,17 +527,13 @@ export default function OnboardingFlow() {
               </p>
             </div>
 
-            <Button
-              variant="outline"
-              onClick={handleSkip}
-              disabled={isProcessing}
-            >
+            <Button variant="outline" onClick={handleSkip} disabled={isProcessing}>
               Back to Home
             </Button>
           </div>
         );
 
-      case "sync-results":
+      case 'sync-results':
         return (
           <div className="space-y-8 fade-in">
             <div className="text-center">
@@ -603,25 +550,19 @@ export default function OnboardingFlow() {
                   <div className="text-4xl font-bold text-blue-600 mb-2">
                     {syncResults.wcPatients}
                   </div>
-                  <div className="text-sm text-muted-foreground">
-                    Workers Compensation Patients
-                  </div>
+                  <div className="text-sm text-muted-foreground">Workers Compensation Patients</div>
                 </Card>
                 <Card className="p-6 text-center">
                   <div className="text-4xl font-bold text-green-600 mb-2">
                     {syncResults.epcPatients}
                   </div>
-                  <div className="text-sm text-muted-foreground">
-                    EPC Patients
-                  </div>
+                  <div className="text-sm text-muted-foreground">EPC Patients</div>
                 </Card>
                 <Card className="p-6 text-center">
                   <div className="text-4xl font-bold text-purple-600 mb-2">
                     {syncResults.totalAppointments}
                   </div>
-                  <div className="text-sm text-muted-foreground">
-                    Total Appointments
-                  </div>
+                  <div className="text-sm text-muted-foreground">Total Appointments</div>
                 </Card>
               </div>
 
@@ -631,8 +572,8 @@ export default function OnboardingFlow() {
                   <h3 className="font-semibold">Configure Patient Tags</h3>
                 </div>
                 <p className="text-sm text-muted-foreground mb-6">
-                  Customize how patients are categorized in your dashboard.
-                  These tags help track quota usage.
+                  Customize how patients are categorized in your dashboard. These tags help track
+                  quota usage.
                 </p>
 
                 <div className="grid md:grid-cols-2 gap-6">
@@ -642,14 +583,11 @@ export default function OnboardingFlow() {
                     </label>
                     <Input defaultValue="Workers Comp" className="mb-2" />
                     <p className="text-xs text-muted-foreground">
-                      What do you call Workers Compensation patients in your
-                      system?
+                      What do you call Workers Compensation patients in your system?
                     </p>
                   </div>
                   <div>
-                    <label className="text-sm font-medium mb-2 block">
-                      EPC Tag
-                    </label>
+                    <label className="text-sm font-medium mb-2 block">EPC Tag</label>
                     <Input defaultValue="EPC Plan" className="mb-2" />
                     <p className="text-xs text-muted-foreground">
                       How do you identify EPC patients in your practice?
@@ -672,8 +610,8 @@ export default function OnboardingFlow() {
                     ))}
                   </ul>
                   <p className="text-xs text-orange-600 dark:text-orange-400 mt-3">
-                    These issues won't affect your dashboard functionality, but
-                    you may want to review them.
+                    These issues won't affect your dashboard functionality, but you may want to
+                    review them.
                   </p>
                 </Card>
               )}
@@ -681,7 +619,7 @@ export default function OnboardingFlow() {
               <div className="flex justify-center gap-4">
                 <Button
                   variant="outline"
-                  onClick={() => setCurrentStep("api")}
+                  onClick={() => setCurrentStep('api')}
                   disabled={isProcessing || isLoading || isCompleting}
                 >
                   Back to Sync
@@ -695,7 +633,7 @@ export default function OnboardingFlow() {
                   {isCompleting ? (
                     <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                   ) : (
-                    "Continue to Dashboard"
+                    'Continue to Dashboard'
                   )}
                   {!isCompleting && <ArrowRight className="ml-2 h-4 w-4" />}
                 </Button>

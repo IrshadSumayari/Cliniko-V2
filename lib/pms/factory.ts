@@ -1,20 +1,20 @@
-import type { PMSApiInterface, PMSApiCredentials, PMSType } from "./types";
-import { ClinikoAPI } from "./cliniko-api";
-import { HalaxyAPI } from "./halaxy-api";
-import { NookalAPI } from "./nookal-api";
+import type { PMSApiInterface, PMSApiCredentials, PMSType } from './types';
+import { ClinikoAPI } from './cliniko-api';
+import { HalaxyAPI } from './halaxy-api';
+import { NookalAPI } from './nookal-api';
 
 export class PMSFactory {
   static createClient(pmsType: PMSType, apiKey: string, options?: any): PMSApiInterface {
     const credentials: PMSApiCredentials = { apiKey };
 
     switch (pmsType) {
-      case "cliniko":
+      case 'cliniko':
         return new ClinikoAPI(credentials);
-      case "halaxy":
+      case 'halaxy':
         return new HalaxyAPI(credentials);
-      case "nookal":
+      case 'nookal':
         return new NookalAPI(credentials, {
-          fetchPatientDetails: options?.fetchPatientDetails ?? false
+          fetchPatientDetails: options?.fetchPatientDetails ?? false,
         });
       default:
         throw new Error(`Unsupported PMS type: ${pmsType}`);
@@ -22,15 +22,12 @@ export class PMSFactory {
   }
 
   static getSupportedPMSTypes(): PMSType[] {
-    return ["cliniko", "halaxy", "nookal"];
+    return ['cliniko', 'halaxy', 'nookal'];
   }
 
-  static validateCredentials(
-    pmsType: PMSType,
-    credentials: PMSApiCredentials,
-  ): boolean {
+  static validateCredentials(pmsType: PMSType, credentials: PMSApiCredentials): boolean {
     if (!credentials.apiKey) {
-      console.log("❌ No API key provided");
+      console.log('❌ No API key provided');
       return false;
     }
 
@@ -38,17 +35,13 @@ export class PMSFactory {
     console.log(`   API Key: ${credentials.apiKey.substring(0, 20)}...`);
 
     switch (pmsType) {
-      case "cliniko":
-        const parts = credentials.apiKey.split("-");
+      case 'cliniko':
+        const parts = credentials.apiKey.split('-');
         console.log(`   Split parts: ${parts.length}`);
-        console.log(
-          `   Parts: [${parts.map((p) => `"${p.substring(0, 10)}..."`).join(", ")}]`,
-        );
+        console.log(`   Parts: [${parts.map((p) => `"${p.substring(0, 10)}..."`).join(', ')}]`);
 
         if (parts.length < 2) {
-          console.log(
-            `   ❌ Invalid format: needs at least 2 parts separated by '-'`,
-          );
+          console.log(`   ❌ Invalid format: needs at least 2 parts separated by '-'`);
           return false;
         }
 
@@ -64,9 +57,9 @@ export class PMSFactory {
         console.log(`   ✅ Validation result: ${isValid}`);
         return isValid;
 
-      case "halaxy":
+      case 'halaxy':
         return credentials.apiKey.length > 0;
-      case "nookal":
+      case 'nookal':
         // Nookal API keys follow UUID v4 format: xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx
         const nookalPattern =
           /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/;

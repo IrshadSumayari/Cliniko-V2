@@ -1,17 +1,12 @@
-"use client";
+'use client';
 
-import { useState, useEffect } from "react";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Checkbox } from "@/components/ui/checkbox";
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipProvider,
-  TooltipTrigger,
-} from "@/components/ui/tooltip";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Badge } from "@/components/ui/badge";
+import { useState, useEffect } from 'react';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Checkbox } from '@/components/ui/checkbox';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Badge } from '@/components/ui/badge';
 import {
   Users,
   Bell,
@@ -39,13 +34,13 @@ import {
   TrendingUp,
   Plus,
   SlidersHorizontal,
-} from "lucide-react";
-import { useToast } from "@/hooks/use-toast";
-import { useAuth } from "@/contexts/auth-context";
-import { useRouter } from "next/navigation";
+} from 'lucide-react';
+import { useToast } from '@/hooks/use-toast';
+import { useAuth } from '@/contexts/auth-context';
+import { useRouter } from 'next/navigation';
 
 interface DashboardProps {
-  onNavigate?: (view: "settings" | "onboarding") => void;
+  onNavigate?: (view: 'settings' | 'onboarding') => void;
 }
 
 const Dashboard = ({ onNavigate }: DashboardProps) => {
@@ -53,93 +48,91 @@ const Dashboard = ({ onNavigate }: DashboardProps) => {
   const { user, signOut } = useAuth();
   const route = useRouter();
   const [isSync, setIsSync] = useState(false);
-  const [searchTerm, setSearchTerm] = useState("");
-  const [selectedFilter, setSelectedFilter] = useState("all");
-  const [selectedPhysio, setSelectedPhysio] = useState("all");
-  const [selectedLocation, setSelectedLocation] = useState("all");
-  const [activeTab, setActiveTab] = useState("all-patients");
+  const [searchTerm, setSearchTerm] = useState('');
+  const [selectedFilter, setSelectedFilter] = useState('all');
+  const [selectedPhysio, setSelectedPhysio] = useState('all');
+  const [selectedLocation, setSelectedLocation] = useState('all');
+  const [activeTab, setActiveTab] = useState('all-patients');
   const [showAlertSettings, setShowAlertSettings] = useState(false);
   const [selectedClients, setSelectedClients] = useState<number[]>([]);
   const [showApiHelp, setShowApiHelp] = useState(false);
-  const [showPendingReason, setShowPendingReason] = useState<number | null>(
-    null,
-  );
+  const [showPendingReason, setShowPendingReason] = useState<number | null>(null);
   const [showTutorial, setShowTutorial] = useState(false);
   const [clientsData, setClientsData] = useState([
     {
       id: 1,
-      name: "Sarah Mitchell",
-      program: "EPC",
+      name: 'Sarah Mitchell',
+      program: 'EPC',
       sessionsUsed: 3,
       totalSessions: 5,
       remainingSessions: 2,
-      nextAppointment: "2024-01-25",
-      physio: "Dr. Smith",
-      location: "Main Clinic",
-      status: "warning",
-      alert: "EPC referral expires in 3 days",
-      urgency: "high",
-      lastSync: "2 mins ago",
+      nextAppointment: '2024-01-25',
+      physio: 'Dr. Smith',
+      location: 'Main Clinic',
+      status: 'warning',
+      alert: 'EPC referral expires in 3 days',
+      urgency: 'high',
+      lastSync: '2 mins ago',
     },
     {
       id: 2,
-      name: "John Davidson",
+      name: 'John Davidson',
       program: "Workers' Compensation",
       sessionsUsed: 8,
       totalSessions: 12,
       remainingSessions: 4,
-      nextAppointment: "2024-01-26",
-      physio: "Dr. Jones",
-      location: "North Branch",
-      status: "good",
+      nextAppointment: '2024-01-26',
+      physio: 'Dr. Jones',
+      location: 'North Branch',
+      status: 'good',
       alert: null,
-      urgency: "low",
-      lastSync: "5 mins ago",
+      urgency: 'low',
+      lastSync: '5 mins ago',
     },
     {
       id: 3,
-      name: "Emma Wilson",
+      name: 'Emma Wilson',
       program: "Workers' Compensation",
       sessionsUsed: 1,
       totalSessions: 10,
       remainingSessions: 9,
-      nextAppointment: "2024-01-27",
-      physio: "Dr. Brown",
-      location: "South Clinic",
-      status: "pending",
-      alert: "Insurer approval pending",
-      urgency: "medium",
-      lastSync: "1 min ago",
+      nextAppointment: '2024-01-27',
+      physio: 'Dr. Brown',
+      location: 'South Clinic',
+      status: 'pending',
+      alert: 'Insurer approval pending',
+      urgency: 'medium',
+      lastSync: '1 min ago',
     },
     {
       id: 4,
-      name: "Michael Chen",
-      program: "EPC",
+      name: 'Michael Chen',
+      program: 'EPC',
       sessionsUsed: 4,
       totalSessions: 5,
       remainingSessions: 1,
-      nextAppointment: "2024-01-24",
-      physio: "Dr. Smith",
-      location: "Main Clinic",
-      status: "critical",
-      alert: "Final session - renewal needed immediately",
-      urgency: "critical",
-      lastSync: "3 mins ago",
+      nextAppointment: '2024-01-24',
+      physio: 'Dr. Smith',
+      location: 'Main Clinic',
+      status: 'critical',
+      alert: 'Final session - renewal needed immediately',
+      urgency: 'critical',
+      lastSync: '3 mins ago',
     },
     {
       id: 5,
-      name: "Lisa Taylor",
+      name: 'Lisa Taylor',
       program: "Workers' Compensation",
       sessionsUsed: 18,
       totalSessions: 20,
       remainingSessions: 2,
-      nextAppointment: "2024-01-28",
-      physio: "Dr. Jones",
-      location: "North Branch",
-      status: "warning",
-      alert: "Pre-approval for additional sessions required",
-      urgency: "medium",
-      lastSync: "4 mins ago",
+      nextAppointment: '2024-01-28',
+      physio: 'Dr. Jones',
+      location: 'North Branch',
+      status: 'warning',
+      alert: 'Pre-approval for additional sessions required',
+      urgency: 'medium',
+      lastSync: '4 mins ago',
     },
   ]);
 
@@ -147,28 +140,28 @@ const Dashboard = ({ onNavigate }: DashboardProps) => {
 
   const kpiData = [
     {
-      label: "Active Patients",
-      value: "142",
+      label: 'Active Patients',
+      value: '142',
       icon: Users,
-      color: "text-primary",
+      color: 'text-primary',
     },
     {
-      label: "Sessions Remaining (All)",
-      value: "1,234",
+      label: 'Sessions Remaining (All)',
+      value: '1,234',
       icon: Clock,
-      color: "text-primary",
+      color: 'text-primary',
     },
     {
-      label: "Patients Needing Action",
-      value: "8",
+      label: 'Patients Needing Action',
+      value: '8',
       icon: Bell,
-      color: "text-warning",
+      color: 'text-warning',
     },
     {
-      label: "Last Sync Status",
-      value: "2 min ago",
+      label: 'Last Sync Status',
+      value: '2 min ago',
       icon: CheckCircle,
-      color: "text-success",
+      color: 'text-success',
     },
   ];
   const handleSignOut = () => {
@@ -183,18 +176,18 @@ const Dashboard = ({ onNavigate }: DashboardProps) => {
     // Simulate progress animation
     setTimeout(() => {
       const syncTime = new Date().toLocaleString();
-      localStorage.setItem("last_sync", syncTime);
+      localStorage.setItem('last_sync', syncTime);
       setIsSync(false);
       toast({
-        title: "Sync Completed",
-        description: "Your client data has been updated successfully.",
+        title: 'Sync Completed',
+        description: 'Your client data has been updated successfully.',
       });
     }, 2000);
   };
 
   const handleSendReminder = (clientName: string) => {
     toast({
-      title: "Reminder Sent",
+      title: 'Reminder Sent',
       description: `Reminder sent to ${clientName}'s email`,
     });
   };
@@ -229,23 +222,18 @@ const Dashboard = ({ onNavigate }: DashboardProps) => {
 
   const handleUpdateQuota = (clientName: string) => {
     toast({
-      title: "Quota Updated",
+      title: 'Quota Updated',
       description: `${clientName}'s quota has been updated successfully`,
     });
   };
 
   const handleDischarge = (clientId: number, clientName: string) => {
-    const clientToArchive = clientsData.find(
-      (client) => client.id === clientId,
-    );
+    const clientToArchive = clientsData.find((client) => client.id === clientId);
     if (clientToArchive) {
-      setArchivedClients((prev) => [
-        ...prev,
-        { ...clientToArchive, status: "archived" },
-      ]);
+      setArchivedClients((prev) => [...prev, { ...clientToArchive, status: 'archived' }]);
       setClientsData((prev) => prev.filter((client) => client.id !== clientId));
       toast({
-        title: "Client Discharged",
+        title: 'Client Discharged',
         description: `${clientName} has been discharged and moved to archived`,
       });
     }
@@ -253,38 +241,34 @@ const Dashboard = ({ onNavigate }: DashboardProps) => {
 
   const handleMoveToPending = (clientId: number, clientName: string) => {
     setClientsData((prev) =>
-      prev.map((client) =>
-        client.id === clientId ? { ...client, status: "pending" } : client,
-      ),
+      prev.map((client) => (client.id === clientId ? { ...client, status: 'pending' } : client))
     );
     toast({
-      title: "Moved to Pending",
+      title: 'Moved to Pending',
       description: `${clientName} moved to pending - no immediate action required`,
     });
   };
 
   const handleMoveBackToActive = (clientId: number, clientName: string) => {
     setClientsData((prev) =>
-      prev.map((client) =>
-        client.id === clientId ? { ...client, status: "good" } : client,
-      ),
+      prev.map((client) => (client.id === clientId ? { ...client, status: 'good' } : client))
     );
     toast({
-      title: "Moved Back to Active",
+      title: 'Moved Back to Active',
       description: `${clientName} is now back in active status`,
     });
   };
 
   const getProgressBarColor = (status: string) => {
     switch (status) {
-      case "critical":
-        return "bg-destructive";
-      case "warning":
-        return "bg-warning";
-      case "pending":
-        return "bg-gradient-to-r from-blue-400 to-cyan-400";
+      case 'critical':
+        return 'bg-destructive';
+      case 'warning':
+        return 'bg-warning';
+      case 'pending':
+        return 'bg-gradient-to-r from-blue-400 to-cyan-400';
       default:
-        return "bg-primary";
+        return 'bg-primary';
     }
   };
 
@@ -294,28 +278,24 @@ const Dashboard = ({ onNavigate }: DashboardProps) => {
 
   const getProgramBadgeClass = (program: string) => {
     switch (program.toLowerCase()) {
-      case "epc":
-        return "program-badge-epc";
-      case "ctp":
-        return "program-badge-ctp";
+      case 'epc':
+        return 'program-badge-epc';
+      case 'ctp':
+        return 'program-badge-ctp';
       case "workers' compensation":
-        return "program-badge-workcover";
+        return 'program-badge-workcover';
       default:
-        return "program-badge-epc";
+        return 'program-badge-epc';
     }
   };
 
   const getUniquePhysios = () => {
-    const allPhysios = [...clientsData, ...archivedClients].map(
-      (client) => client.physio,
-    );
+    const allPhysios = [...clientsData, ...archivedClients].map((client) => client.physio);
     return [...new Set(allPhysios)];
   };
 
   const getUniqueLocations = () => {
-    const allLocations = [...clientsData, ...archivedClients].map(
-      (client) => client.location,
-    );
+    const allLocations = [...clientsData, ...archivedClients].map((client) => client.location);
     return [...new Set(allLocations)];
   };
 
@@ -323,21 +303,18 @@ const Dashboard = ({ onNavigate }: DashboardProps) => {
     let baseClients = [];
 
     switch (tabFilter) {
-      case "all-patients":
+      case 'all-patients':
         baseClients = clientsData;
         break;
-      case "action-needed":
+      case 'action-needed':
         baseClients = clientsData.filter(
-          (client) =>
-            client.status === "warning" || client.status === "critical",
+          (client) => client.status === 'warning' || client.status === 'critical'
         );
         break;
-      case "pending":
-        baseClients = clientsData.filter(
-          (client) => client.status === "pending",
-        );
+      case 'pending':
+        baseClients = clientsData.filter((client) => client.status === 'pending');
         break;
-      case "archived":
+      case 'archived':
         baseClients = archivedClients;
         break;
       default:
@@ -345,20 +322,13 @@ const Dashboard = ({ onNavigate }: DashboardProps) => {
     }
 
     return baseClients.filter((client) => {
-      const matchesSearch = client.name
-        .toLowerCase()
-        .includes(searchTerm.toLowerCase());
+      const matchesSearch = client.name.toLowerCase().includes(searchTerm.toLowerCase());
       const matchesProgram =
-        selectedFilter === "all" ||
-        client.program.toLowerCase() === selectedFilter.toLowerCase();
-      const matchesPhysio =
-        selectedPhysio === "all" || client.physio === selectedPhysio;
-      const matchesLocation =
-        selectedLocation === "all" || client.location === selectedLocation;
+        selectedFilter === 'all' || client.program.toLowerCase() === selectedFilter.toLowerCase();
+      const matchesPhysio = selectedPhysio === 'all' || client.physio === selectedPhysio;
+      const matchesLocation = selectedLocation === 'all' || client.location === selectedLocation;
 
-      return (
-        matchesSearch && matchesProgram && matchesPhysio && matchesLocation
-      );
+      return matchesSearch && matchesProgram && matchesPhysio && matchesLocation;
     });
   };
 
@@ -414,10 +384,7 @@ const Dashboard = ({ onNavigate }: DashboardProps) => {
           <div className="flex items-center justify-between p-4 bg-muted/30 rounded-xl border border-border/40">
             <div className="flex items-center gap-3">
               <Checkbox
-                checked={
-                  selectedClients.length === clients.length &&
-                  clients.length > 0
-                }
+                checked={selectedClients.length === clients.length && clients.length > 0}
                 onCheckedChange={(checked) => {
                   if (checked) {
                     setSelectedClients(clients.map((client) => client.id));
@@ -431,11 +398,8 @@ const Dashboard = ({ onNavigate }: DashboardProps) => {
               </span>
             </div>
             <div className="text-sm text-muted-foreground">
-              Showing {clients.length} of{" "}
-              {tabType === "archived"
-                ? archivedClients.length
-                : clientsData.length}{" "}
-              total
+              Showing {clients.length} of{' '}
+              {tabType === 'archived' ? archivedClients.length : clientsData.length} total
             </div>
           </div>
         )}
@@ -472,27 +436,21 @@ const Dashboard = ({ onNavigate }: DashboardProps) => {
                       </div>
                       <div
                         className={`absolute -bottom-1 -right-1 w-6 h-6 rounded-full border-2 border-background shadow-lg ${
-                          client.status === "critical"
-                            ? "bg-gradient-to-br from-red-500 to-red-600"
-                            : client.status === "warning"
-                              ? "bg-gradient-to-br from-amber-500 to-orange-500"
-                              : client.status === "pending"
-                                ? "bg-gradient-to-br from-blue-500 to-indigo-500"
-                                : "bg-gradient-to-br from-emerald-500 to-green-500"
+                          client.status === 'critical'
+                            ? 'bg-gradient-to-br from-red-500 to-red-600'
+                            : client.status === 'warning'
+                              ? 'bg-gradient-to-br from-amber-500 to-orange-500'
+                              : client.status === 'pending'
+                                ? 'bg-gradient-to-br from-blue-500 to-indigo-500'
+                                : 'bg-gradient-to-br from-emerald-500 to-green-500'
                         } flex items-center justify-center`}
                       >
-                        {client.status === "critical" && (
+                        {client.status === 'critical' && (
                           <AlertTriangle className="h-3 w-3 text-white" />
                         )}
-                        {client.status === "warning" && (
-                          <Clock className="h-3 w-3 text-white" />
-                        )}
-                        {client.status === "pending" && (
-                          <Timer className="h-3 w-3 text-white" />
-                        )}
-                        {client.status === "good" && (
-                          <CheckCircle className="h-3 w-3 text-white" />
-                        )}
+                        {client.status === 'warning' && <Clock className="h-3 w-3 text-white" />}
+                        {client.status === 'pending' && <Timer className="h-3 w-3 text-white" />}
+                        {client.status === 'good' && <CheckCircle className="h-3 w-3 text-white" />}
                       </div>
                     </div>
 
@@ -506,20 +464,20 @@ const Dashboard = ({ onNavigate }: DashboardProps) => {
                             <TooltipTrigger>
                               <div
                                 className={`p-1 rounded-full backdrop-blur-sm ${
-                                  client.urgency === "critical"
-                                    ? "bg-red-500/20 animate-pulse border border-red-500/30"
-                                    : client.urgency === "high"
-                                      ? "bg-amber-500/20 border border-amber-500/30"
-                                      : "bg-blue-500/20 border border-blue-500/30"
+                                  client.urgency === 'critical'
+                                    ? 'bg-red-500/20 animate-pulse border border-red-500/30'
+                                    : client.urgency === 'high'
+                                      ? 'bg-amber-500/20 border border-amber-500/30'
+                                      : 'bg-blue-500/20 border border-blue-500/30'
                                 } hover:scale-110 transition-transform duration-300`}
                               >
                                 <AlertTriangle
                                   className={`h-3 w-3 ${
-                                    client.urgency === "critical"
-                                      ? "text-red-600"
-                                      : client.urgency === "high"
-                                        ? "text-amber-600"
-                                        : "text-blue-600"
+                                    client.urgency === 'critical'
+                                      ? 'text-red-600'
+                                      : client.urgency === 'high'
+                                        ? 'text-amber-600'
+                                        : 'text-blue-600'
                                   }`}
                                 />
                               </div>
@@ -528,23 +486,19 @@ const Dashboard = ({ onNavigate }: DashboardProps) => {
                               side="top"
                               className="max-w-xs bg-gradient-to-r from-background to-accent/20 border border-border/50"
                             >
-                              <p className="font-medium text-xs">
-                                {client.alert}
-                              </p>
+                              <p className="font-medium text-xs">{client.alert}</p>
                             </TooltipContent>
                           </Tooltip>
                         )}
                       </div>
                       <div className="flex items-center gap-3">
-                        <p className="text-muted-foreground font-medium text-sm">
-                          {client.physio}
-                        </p>
+                        <p className="text-muted-foreground font-medium text-sm">{client.physio}</p>
                         <Badge
                           variant="outline"
                           className={`px-2 py-1 text-xs font-bold border ${
-                            client.program === "EPC"
-                              ? "bg-emerald-50 border-emerald-300 text-emerald-700 dark:bg-emerald-950/30 dark:border-emerald-700 dark:text-emerald-300"
-                              : "bg-blue-50 border-blue-300 text-blue-700 dark:bg-blue-950/30 dark:border-blue-700 dark:text-blue-300"
+                            client.program === 'EPC'
+                              ? 'bg-emerald-50 border-emerald-300 text-emerald-700 dark:bg-emerald-950/30 dark:border-emerald-700 dark:text-emerald-300'
+                              : 'bg-blue-50 border-blue-300 text-blue-700 dark:bg-blue-950/30 dark:border-blue-700 dark:text-blue-300'
                           }`}
                         >
                           {client.program}
@@ -558,9 +512,7 @@ const Dashboard = ({ onNavigate }: DashboardProps) => {
                 <div className="col-span-3">
                   <div className="space-y-2">
                     <div className="flex items-center justify-between">
-                      <span className="text-sm font-medium text-muted-foreground">
-                        Sessions
-                      </span>
+                      <span className="text-sm font-medium text-muted-foreground">Sessions</span>
                       <span className="text-lg font-bold text-foreground">
                         {client.sessionsUsed}/{client.totalSessions}
                       </span>
@@ -568,18 +520,18 @@ const Dashboard = ({ onNavigate }: DashboardProps) => {
                     <div className="relative w-full bg-gradient-to-r from-muted/50 to-muted/30 rounded-full h-3 overflow-hidden shadow-inner border border-border/30">
                       <div
                         className={`h-3 rounded-full transition-all duration-[2000ms] ease-out shadow-lg relative overflow-hidden ${
-                          client.status === "critical"
-                            ? "bg-gradient-to-r from-red-500 to-red-600"
-                            : client.status === "warning"
-                              ? "bg-gradient-to-r from-amber-500 to-orange-500"
-                              : client.status === "pending"
-                                ? "bg-gradient-to-r from-blue-500 to-indigo-500"
-                                : "bg-gradient-to-r from-emerald-500 to-green-500"
+                          client.status === 'critical'
+                            ? 'bg-gradient-to-r from-red-500 to-red-600'
+                            : client.status === 'warning'
+                              ? 'bg-gradient-to-r from-amber-500 to-orange-500'
+                              : client.status === 'pending'
+                                ? 'bg-gradient-to-r from-blue-500 to-indigo-500'
+                                : 'bg-gradient-to-r from-emerald-500 to-green-500'
                         }`}
                         style={{
                           width: `${getProgressPercentage(
                             client.sessionsUsed,
-                            client.totalSessions,
+                            client.totalSessions
                           )}%`,
                           animationDelay: `${index * 0.1}s`,
                         }}
@@ -592,14 +544,12 @@ const Dashboard = ({ onNavigate }: DashboardProps) => {
 
                 {/* Sessions Remaining */}
                 <div className="col-span-2 text-center">
-                  <p className="text-xs font-medium text-muted-foreground mb-2">
-                    Sessions Left
-                  </p>
+                  <p className="text-xs font-medium text-muted-foreground mb-2">Sessions Left</p>
                   <div
                     className={`inline-flex items-center justify-center w-16 h-16 rounded-2xl font-bold text-xl shadow-lg border-2 backdrop-blur-sm ${
                       client.remainingSessions <= 2
-                        ? "bg-gradient-to-br from-amber-100/80 to-orange-100/80 text-amber-700 border-amber-300/50 dark:from-amber-950/50 dark:to-orange-950/50 dark:text-amber-300 dark:border-amber-700/50"
-                        : "bg-gradient-to-br from-emerald-100/80 to-green-100/80 text-emerald-700 border-emerald-300/50 dark:from-emerald-950/50 dark:to-green-950/50 dark:text-emerald-300 dark:border-emerald-700/50"
+                        ? 'bg-gradient-to-br from-amber-100/80 to-orange-100/80 text-amber-700 border-amber-300/50 dark:from-amber-950/50 dark:to-orange-950/50 dark:text-amber-300 dark:border-amber-700/50'
+                        : 'bg-gradient-to-br from-emerald-100/80 to-green-100/80 text-emerald-700 border-emerald-300/50 dark:from-emerald-950/50 dark:to-green-950/50 dark:text-emerald-300 dark:border-emerald-700/50'
                     } hover:scale-105 transition-transform duration-300`}
                   >
                     {client.remainingSessions}
@@ -608,9 +558,7 @@ const Dashboard = ({ onNavigate }: DashboardProps) => {
 
                 {/* Next Appointment */}
                 <div className="col-span-2">
-                  <p className="text-xs font-medium text-muted-foreground mb-2">
-                    Next Visit
-                  </p>
+                  <p className="text-xs font-medium text-muted-foreground mb-2">Next Visit</p>
                   <div className="flex items-center gap-2 p-3 bg-gradient-to-r from-accent/40 to-secondary/30 rounded-xl border border-border/40 backdrop-blur-sm">
                     <Calendar className="h-4 w-4 text-primary flex-shrink-0" />
                     <span className="text-sm font-bold text-foreground">
@@ -621,14 +569,12 @@ const Dashboard = ({ onNavigate }: DashboardProps) => {
 
                 {/* 3-Button Actions */}
                 <div className="col-span-1 flex flex-col gap-2">
-                  {client.status === "pending" ? (
+                  {client.status === 'pending' ? (
                     <>
                       <Button
                         variant="outline"
                         size="sm"
-                        onClick={() =>
-                          handleMoveBackToActive(client.id, client.name)
-                        }
+                        onClick={() => handleMoveBackToActive(client.id, client.name)}
                         className="justify-center gap-2 h-8 px-3 bg-gradient-to-r from-emerald-50 to-green-50 border border-emerald-300 text-emerald-700 hover:from-emerald-100 hover:to-green-100 hover:border-emerald-400 text-xs font-medium dark:from-emerald-950/30 dark:to-green-950/30 dark:border-emerald-700 dark:text-emerald-300"
                       >
                         <RotateCcw className="h-3 w-3" />
@@ -667,9 +613,7 @@ const Dashboard = ({ onNavigate }: DashboardProps) => {
                       <Button
                         variant="outline"
                         size="sm"
-                        onClick={() =>
-                          handleMoveToPending(client.id, client.name)
-                        }
+                        onClick={() => handleMoveToPending(client.id, client.name)}
                         className="justify-center gap-2 h-8 px-3 bg-gradient-to-r from-amber-50 to-orange-50 border border-amber-300 text-amber-700 hover:from-amber-100 hover:to-orange-100 hover:border-amber-400 text-xs font-medium dark:from-amber-950/30 dark:to-orange-950/30 dark:border-amber-700 dark:text-amber-300"
                       >
                         <Timer className="h-3 w-3" />
@@ -699,12 +643,10 @@ const Dashboard = ({ onNavigate }: DashboardProps) => {
               <Users className="h-16 w-16 text-muted-foreground/60" />
             </div>
             <div className="space-y-2">
-              <h3 className="text-2xl font-semibold text-foreground">
-                No patients found
-              </h3>
+              <h3 className="text-2xl font-semibold text-foreground">No patients found</h3>
               <p className="text-muted-foreground text-lg max-w-md mx-auto">
-                {tabType === "archived"
-                  ? "No archived patients match your current filters."
+                {tabType === 'archived'
+                  ? 'No archived patients match your current filters.'
                   : "Try adjusting your search terms or filters to find the patients you're looking for."}
               </p>
             </div>
@@ -712,10 +654,10 @@ const Dashboard = ({ onNavigate }: DashboardProps) => {
               variant="outline"
               size="lg"
               onClick={() => {
-                setSearchTerm("");
-                setSelectedFilter("all");
-                setSelectedPhysio("all");
-                setSelectedLocation("all");
+                setSearchTerm('');
+                setSelectedFilter('all');
+                setSelectedPhysio('all');
+                setSelectedLocation('all');
               }}
               className="gap-2 mt-4"
             >
@@ -740,12 +682,8 @@ const Dashboard = ({ onNavigate }: DashboardProps) => {
                   <Activity className="h-6 w-6 text-primary" />
                 </div>
                 <div>
-                  <h1 className="text-2xl font-bold text-foreground tracking-tight">
-                    PhysioFlow
-                  </h1>
-                  <p className="text-muted-foreground text-sm">
-                    Welcome back, {user?.email}
-                  </p>
+                  <h1 className="text-2xl font-bold text-foreground tracking-tight">PhysioFlow</h1>
+                  <p className="text-muted-foreground text-sm">Welcome back, {user?.email}</p>
                 </div>
               </div>
 
@@ -757,15 +695,13 @@ const Dashboard = ({ onNavigate }: DashboardProps) => {
                   disabled={isSync}
                   className="gap-2 h-12 px-6 border-border/60 hover:border-primary/60 hover:bg-primary/5"
                 >
-                  <RefreshCw
-                    className={`h-5 w-5 ${isSync ? "animate-spin" : ""}`}
-                  />
-                  {isSync ? "Syncing..." : "Sync Data"}
+                  <RefreshCw className={`h-5 w-5 ${isSync ? 'animate-spin' : ''}`} />
+                  {isSync ? 'Syncing...' : 'Sync Data'}
                 </Button>
                 <Button
                   variant="outline"
                   size="lg"
-                  onClick={() => onNavigate?.("settings")}
+                  onClick={() => onNavigate?.('settings')}
                   className="gap-2 h-12 px-6 border-border/60 hover:border-secondary/60 hover:bg-secondary/5"
                 >
                   <Settings className="h-5 w-5" />
@@ -803,7 +739,7 @@ const Dashboard = ({ onNavigate }: DashboardProps) => {
               </div>
               <Button
                 className="bg-gradient-to-r from-warning to-warning/90 text-warning-foreground hover:scale-105 transition-transform"
-                onClick={() => onNavigate?.("settings")}
+                onClick={() => onNavigate?.('settings')}
               >
                 Upgrade Now
               </Button>
@@ -820,20 +756,13 @@ const Dashboard = ({ onNavigate }: DashboardProps) => {
               >
                 <div className="flex items-center justify-between mb-4">
                   <div className="p-3 bg-gradient-to-br from-accent to-secondary rounded-xl group-hover:scale-110 transition-transform duration-300">
-                    <kpi.icon
-                      className={`h-7 w-7 ${kpi.color}`}
-                      strokeWidth={1.8}
-                    />
+                    <kpi.icon className={`h-7 w-7 ${kpi.color}`} strokeWidth={1.8} />
                   </div>
                   <div className="w-3 h-3 bg-green-500 rounded-full"></div>
                 </div>
                 <div>
-                  <p className="text-sm font-medium text-muted-foreground mb-2">
-                    {kpi.label}
-                  </p>
-                  <p className="text-3xl font-bold text-foreground tracking-tight">
-                    {kpi.value}
-                  </p>
+                  <p className="text-sm font-medium text-muted-foreground mb-2">{kpi.label}</p>
+                  <p className="text-3xl font-bold text-foreground tracking-tight">{kpi.value}</p>
                 </div>
               </div>
             ))}
@@ -902,40 +831,28 @@ const Dashboard = ({ onNavigate }: DashboardProps) => {
                 <div className="flex items-center gap-6">
                   {/* Program Filter */}
                   <div className="flex items-center gap-3">
-                    <span className="text-sm font-medium text-muted-foreground">
-                      Program:
-                    </span>
+                    <span className="text-sm font-medium text-muted-foreground">Program:</span>
                     <div className="flex gap-2">
                       <Button
-                        variant={
-                          selectedFilter === "all" ? "default" : "outline"
-                        }
+                        variant={selectedFilter === 'all' ? 'default' : 'outline'}
                         size="sm"
-                        onClick={() => setSelectedFilter("all")}
+                        onClick={() => setSelectedFilter('all')}
                         className="h-10 px-4"
                       >
                         All
                       </Button>
                       <Button
-                        variant={
-                          selectedFilter === "epc" ? "default" : "outline"
-                        }
+                        variant={selectedFilter === 'epc' ? 'default' : 'outline'}
                         size="sm"
-                        onClick={() => setSelectedFilter("epc")}
+                        onClick={() => setSelectedFilter('epc')}
                         className="h-10 px-4"
                       >
                         EPC
                       </Button>
                       <Button
-                        variant={
-                          selectedFilter === "workers' compensation"
-                            ? "default"
-                            : "outline"
-                        }
+                        variant={selectedFilter === "workers' compensation" ? 'default' : 'outline'}
                         size="sm"
-                        onClick={() =>
-                          setSelectedFilter("workers' compensation")
-                        }
+                        onClick={() => setSelectedFilter("workers' compensation")}
                         className="h-10 px-4"
                       >
                         WC
@@ -947,16 +864,12 @@ const Dashboard = ({ onNavigate }: DashboardProps) => {
 
                   {/* Physio Filter */}
                   <div className="flex items-center gap-3">
-                    <span className="text-sm font-medium text-muted-foreground">
-                      Physio:
-                    </span>
+                    <span className="text-sm font-medium text-muted-foreground">Physio:</span>
                     <div className="flex gap-2">
                       <Button
-                        variant={
-                          selectedPhysio === "all" ? "default" : "outline"
-                        }
+                        variant={selectedPhysio === 'all' ? 'default' : 'outline'}
                         size="sm"
-                        onClick={() => setSelectedPhysio("all")}
+                        onClick={() => setSelectedPhysio('all')}
                         className="h-10 px-4"
                       >
                         All
@@ -964,9 +877,7 @@ const Dashboard = ({ onNavigate }: DashboardProps) => {
                       {getUniquePhysios().map((physio) => (
                         <Button
                           key={physio}
-                          variant={
-                            selectedPhysio === physio ? "default" : "outline"
-                          }
+                          variant={selectedPhysio === physio ? 'default' : 'outline'}
                           size="sm"
                           onClick={() => setSelectedPhysio(physio)}
                           className="h-10 px-4"
@@ -981,16 +892,12 @@ const Dashboard = ({ onNavigate }: DashboardProps) => {
 
                   {/* Location Filter */}
                   <div className="flex items-center gap-3">
-                    <span className="text-sm font-medium text-muted-foreground">
-                      Location:
-                    </span>
+                    <span className="text-sm font-medium text-muted-foreground">Location:</span>
                     <div className="flex gap-2">
                       <Button
-                        variant={
-                          selectedLocation === "all" ? "default" : "outline"
-                        }
+                        variant={selectedLocation === 'all' ? 'default' : 'outline'}
                         size="sm"
-                        onClick={() => setSelectedLocation("all")}
+                        onClick={() => setSelectedLocation('all')}
                         className="h-10 px-4"
                       >
                         All
@@ -998,11 +905,7 @@ const Dashboard = ({ onNavigate }: DashboardProps) => {
                       {getUniqueLocations().map((location) => (
                         <Button
                           key={location}
-                          variant={
-                            selectedLocation === location
-                              ? "default"
-                              : "outline"
-                          }
+                          variant={selectedLocation === location ? 'default' : 'outline'}
                           size="sm"
                           onClick={() => setSelectedLocation(location)}
                           className="h-10 px-4"
@@ -1018,11 +921,7 @@ const Dashboard = ({ onNavigate }: DashboardProps) => {
 
             {/* Modern Tabs Interface */}
             <div className="container mx-auto px-8 py-8">
-              <Tabs
-                value={activeTab}
-                onValueChange={setActiveTab}
-                className="w-full"
-              >
+              <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
                 <TabsList className="grid w-full grid-cols-4 mb-8 h-14 bg-muted/30 rounded-2xl p-2">
                   <TabsTrigger
                     value="all-patients"
@@ -1042,10 +941,8 @@ const Dashboard = ({ onNavigate }: DashboardProps) => {
                     Action Needed
                     <Badge variant="destructive" className="ml-2 animate-pulse">
                       {
-                        clientsData.filter(
-                          (c) =>
-                            c.status === "warning" || c.status === "critical",
-                        ).length
+                        clientsData.filter((c) => c.status === 'warning' || c.status === 'critical')
+                          .length
                       }
                     </Badge>
                   </TabsTrigger>
@@ -1055,11 +952,8 @@ const Dashboard = ({ onNavigate }: DashboardProps) => {
                   >
                     <Timer className="h-5 w-5 mr-2" />
                     Pending
-                    <Badge
-                      variant="outline"
-                      className="ml-2 border-blue-500 text-blue-600"
-                    >
-                      {clientsData.filter((c) => c.status === "pending").length}
+                    <Badge variant="outline" className="ml-2 border-blue-500 text-blue-600">
+                      {clientsData.filter((c) => c.status === 'pending').length}
                     </Badge>
                   </TabsTrigger>
                   <TabsTrigger
@@ -1076,19 +970,19 @@ const Dashboard = ({ onNavigate }: DashboardProps) => {
 
                 {/* Shared Content for All Tabs */}
                 <TabsContent value="all-patients" className="mt-0">
-                  {renderClientList("all-patients")}
+                  {renderClientList('all-patients')}
                 </TabsContent>
 
                 <TabsContent value="action-needed" className="mt-0">
-                  {renderClientList("action-needed")}
+                  {renderClientList('action-needed')}
                 </TabsContent>
 
                 <TabsContent value="pending" className="mt-0">
-                  {renderClientList("pending")}
+                  {renderClientList('pending')}
                 </TabsContent>
 
                 <TabsContent value="archived" className="mt-0">
-                  {renderClientList("archived")}
+                  {renderClientList('archived')}
                 </TabsContent>
               </Tabs>
             </div>

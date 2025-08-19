@@ -1,74 +1,67 @@
-"use client";
+'use client';
 
-import type React from "react";
-import { useState } from "react";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Card } from "@/components/ui/card";
-import { Separator } from "@/components/ui/separator";
-import {
-  LogIn,
-  Eye,
-  EyeOff,
-  ArrowLeft,
-  Loader2,
-  AlertCircle,
-} from "lucide-react";
-import { useAuth } from "@/contexts/auth-context";
-import { useRouter } from "next/navigation";
-import Link from "next/link";
-import { ThemeToggle } from "./theme-toggle";
+import type React from 'react';
+import { useState } from 'react';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Card } from '@/components/ui/card';
+import { Separator } from '@/components/ui/separator';
+import { LogIn, Eye, EyeOff, ArrowLeft, Loader2, AlertCircle } from 'lucide-react';
+import { useAuth } from '@/contexts/auth-context';
+import { useRouter } from 'next/navigation';
+import Link from 'next/link';
+import { ThemeToggle } from './theme-toggle';
 
 const LoginForm = () => {
   const [formData, setFormData] = useState({
-    email: "",
-    password: "",
+    email: '',
+    password: '',
   });
   const [showPassword, setShowPassword] = useState(false);
-  const [error, setError] = useState("");
+  const [error, setError] = useState('');
   const { signIn, signInWithGoogle, isLoading } = useAuth();
   const router = useRouter();
 
   const handleChange = (field: string, value: string) => {
     setFormData((prev) => ({ ...prev, [field]: value }));
     // Clear error when user starts typing
-    if (error) setError("");
+    if (error) setError('');
   };
 
   const handleGoogleSignIn = async () => {
-    setError("");
+    setError('');
     try {
       const result = await signInWithGoogle();
       if (result.success) {
         // Success will be handled by auth state change
       } else {
-        setError(result.error || "Failed to sign in with Google");
+        setError(result.error || 'Failed to sign in with Google');
       }
     } catch (error) {
-      console.error("Google sign in error:", error);
-      setError("Google sign-in failed");
+      console.error('Google sign in error:', error);
+      setError('Google sign-in failed');
     }
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setError("");
+    setError('');
 
     if (!formData.email || !formData.password) {
-      setError("Please fill in all fields");
+      setError('Please fill in all fields');
       return;
     }
 
     try {
       const result = await signIn(formData.email, formData.password);
       if (result.success) {
-        router.push("/");
+        router.push('/');
       } else {
-        setError(result.error || "Failed to sign in");
+        setError(result.error || 'Failed to sign in');
       }
     } catch (error) {
-      console.error("Sign in error:", error);
-      setError("An error occurred during sign in");
+      console.error('Sign in error:', error);
+      setError('An error occurred during sign in');
     }
   };
 
@@ -94,9 +87,7 @@ const LoginForm = () => {
             <LogIn className="h-6 w-6 text-primary" />
           </div>
           <h1 className="text-2xl font-bold mb-2">Welcome Back</h1>
-          <p className="text-muted-foreground">
-            Sign in to your clinic account
-          </p>
+          <p className="text-muted-foreground">Sign in to your clinic account</p>
         </div>
 
         {error && (
@@ -146,9 +137,7 @@ const LoginForm = () => {
         <div className="relative mb-6">
           <Separator />
           <div className="absolute inset-0 flex items-center justify-center">
-            <span className="bg-background px-2 text-xs text-muted-foreground">
-              or
-            </span>
+            <span className="bg-background px-2 text-xs text-muted-foreground">or</span>
           </div>
         </div>
 
@@ -158,17 +147,17 @@ const LoginForm = () => {
             type="email"
             placeholder="Email"
             value={formData.email}
-            onChange={(e) => handleChange("email", e.target.value)}
+            onChange={(e) => handleChange('email', e.target.value)}
             disabled={isLoading}
             required
           />
 
           <div className="relative">
             <Input
-              type={showPassword ? "text" : "password"}
+              type={showPassword ? 'text' : 'password'}
               placeholder="Password"
               value={formData.password}
-              onChange={(e) => handleChange("password", e.target.value)}
+              onChange={(e) => handleChange('password', e.target.value)}
               disabled={isLoading}
               required
             />
@@ -180,11 +169,7 @@ const LoginForm = () => {
               onClick={() => setShowPassword(!showPassword)}
               disabled={isLoading}
             >
-              {showPassword ? (
-                <EyeOff className="h-4 w-4" />
-              ) : (
-                <Eye className="h-4 w-4" />
-              )}
+              {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
             </Button>
           </div>
 
@@ -195,7 +180,7 @@ const LoginForm = () => {
                 Signing in...
               </>
             ) : (
-              "Sign In"
+              'Sign In'
             )}
           </Button>
         </form>
@@ -204,11 +189,11 @@ const LoginForm = () => {
 
         <div className="text-center">
           <p className="text-sm text-muted-foreground">
-            Don't have an account?{" "}
+            Don't have an account?{' '}
             <Link
               href="/signup"
               className={`text-primary hover:underline font-medium ${
-                isLoading ? "pointer-events-none opacity-50" : ""
+                isLoading ? 'pointer-events-none opacity-50' : ''
               }`}
             >
               Sign up

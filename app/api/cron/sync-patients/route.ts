@@ -1,36 +1,36 @@
-import { type NextRequest, NextResponse } from "next/server";
-import { PMSFactory } from "@/lib/pms/factory";
-import { config } from "@/lib/config";
-import { createAdminClient } from "@/lib/supabase/server-admin";
+import { type NextRequest, NextResponse } from 'next/server';
+import { PMSFactory } from '@/lib/pms/factory';
+import { config } from '@/lib/config';
+import { createAdminClient } from '@/lib/supabase/server-admin';
 
 export async function GET(request: NextRequest) {
   try {
-    const authHeader = request.headers.get("authorization");
+    const authHeader = request.headers.get('authorization');
     if (authHeader !== `Bearer ${config.cron.secret}`) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    console.log("=== Starting Scheduled Patient Sync ===");
+    console.log('=== Starting Scheduled Patient Sync ===');
 
     const supabase = createAdminClient();
 
     const { data: credentials, error: credentialsError } = await supabase
-      .from("pms_api_keys")
-      .select("*")
-      .eq("is_active", true);
+      .from('pms_api_keys')
+      .select('*')
+      .eq('is_active', true);
 
     if (credentialsError) {
-      console.error("Error fetching credentials:", credentialsError);
-      return NextResponse.json({ error: "Database error" }, { status: 500 });
+      console.error('Error fetching credentials:', credentialsError);
+      return NextResponse.json({ error: 'Database error' }, { status: 500 });
     }
 
     if (!credentials || credentials.length === 0) {
-      console.log("No active credentials found - returning early");
+      console.log('No active credentials found - returning early');
       return NextResponse.json({
         success: true,
         processedUsers: 0,
         results: [],
-        message: "No active credentials found in database",
+        message: 'No active credentials found in database',
       });
     }
 
@@ -38,29 +38,23 @@ export async function GET(request: NextRequest) {
 
     for (const credential of credentials || []) {
       try {
-        console.log(
-          `Syncing for user ${credential.user_id} (${credential.pms_type})`
-        );
+        console.log(`Syncing for user ${credential.user_id} (${credential.pms_type})`);
 
         // Decrypt the API key
-        const { decryptApiKey } = await import("@/lib/supabase/server-admin");
+        const { decryptApiKey } = await import('@/lib/supabase/server-admin');
         const decryptedApiKey = decryptApiKey(credential.api_key_encrypted);
 
         // For now, we'll use a default lastSyncAt since we don't have it in pms_api_keys
         const lastSyncAt = new Date(0); // Start from beginning
 
-        const pmsClient = PMSFactory.createClient(
-          credential.pms_type,
-          decryptedApiKey,
-          {
-            apiUrl: credential.api_url,
-            clinicId: credential.clinic_id,
-          }
-        );
+        const pmsClient = PMSFactory.createClient(credential.pms_type, decryptedApiKey, {
+          apiUrl: credential.api_url,
+          clinicId: credential.clinic_id,
+        });
 
         let result;
 
-        if (credential.pms_type === "nookal") {
+        if (credential.pms_type === 'nookal') {
           // Special handling for Nookal - batch processing
           result = await performNookalBatchSync(
             supabase,
@@ -85,11 +79,11 @@ export async function GET(request: NextRequest) {
           ...result,
         });
 
-        await supabase.from("sync_logs").insert({
+        await supabase.from('sync_logs').insert({
           user_id: credential.user_id,
           pms_type: credential.pms_type,
-          sync_type: result.syncType || "incremental",
-          status: result.success ? "completed" : "failed",
+          sync_type: result.syncType || 'incremental',
+          status: result.success ? 'completed' : 'failed',
           patients_synced: result.patientsUpdated || 0,
           appointments_synced: result.appointmentsUpdated || 0,
           started_at: new Date().toISOString(),
@@ -101,27 +95,26 @@ export async function GET(request: NextRequest) {
       } catch (error) {
         console.error(`Sync failed for user ${credential.user_id}:`, error);
 
-        await supabase.from("sync_logs").insert({
+        await supabase.from('sync_logs').insert({
           user_id: credential.user_id,
           pms_type: credential.pms_type,
-          sync_type: "incremental",
-          status: "failed",
+          sync_type: 'incremental',
+          status: 'failed',
           started_at: new Date().toISOString(),
           completed_at: new Date().toISOString(),
-          error_message:
-            error instanceof Error ? error.message : "Unknown error",
+          error_message: error instanceof Error ? error.message : 'Unknown error',
         });
 
         syncResults.push({
           userId: credential.user_id,
           pmsType: credential.pms_type,
           success: false,
-          error: error instanceof Error ? error.message : "Unknown error",
+          error: error instanceof Error ? error.message : 'Unknown error',
         });
       }
     }
 
-    console.log("=== Scheduled Sync Complete ===");
+    console.log('=== Scheduled Sync Complete ===');
     console.log(`Processed ${syncResults.length} users`);
 
     return NextResponse.json({
@@ -130,11 +123,8 @@ export async function GET(request: NextRequest) {
       results: syncResults,
     });
   } catch (error) {
-    console.error("Cron sync error:", error);
-    return NextResponse.json(
-      { error: "Internal server error" },
-      { status: 500 }
-    );
+    console.error('Cron sync error:', error);
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
 }
 
@@ -151,14 +141,12 @@ async function performIncrementalSync(
     const issues: string[] = [];
 
     const modifiedPatients = await pmsClient.getModifiedPatients(lastSyncAt);
-    console.log(
-      `Found ${modifiedPatients.length} modified patients for user ${userId}`
-    );
+    console.log(`Found ${modifiedPatients.length} modified patients for user ${userId}`);
 
     for (const patient of modifiedPatients) {
       // For Nookal, all patients are now fetched without EPC/WC filtering
 
-      let patientType = "EPC";
+      let patientType = 'EPC';
 
       // If the PMS client has specific logic for determining patient type, use it
       if (pmsClient.isEPCPatient && pmsClient.isWCPatient) {
@@ -166,14 +154,14 @@ async function performIncrementalSync(
         const isWC = pmsClient.isWCPatient(patient);
 
         if (isEPC) {
-          patientType = "EPC";
+          patientType = 'EPC';
         } else if (isWC) {
-          patientType = "WC";
+          patientType = 'WC';
         }
       }
 
       // For Nookal, we now process all patients regardless of type
-      const { error: patientError } = await supabase.from("patients").upsert({
+      const { error: patientError } = await supabase.from('patients').upsert({
         user_id: userId,
         pms_patient_id: patient.id,
         pms_type: pmsType,
@@ -190,45 +178,37 @@ async function performIncrementalSync(
         patientsUpdated++;
 
         try {
-          const appointments = await pmsClient.getPatientAppointments(
-            patient.id,
-            lastSyncAt
-          );
+          const appointments = await pmsClient.getPatientAppointments(patient.id, lastSyncAt);
           const completedAppointments = appointments.filter((apt: any) =>
             pmsClient.isCompletedAppointment(apt)
           );
 
           for (const appointment of completedAppointments) {
-            const { data: patientRow, error: patientLookupError } =
-              await supabase
-                .from("patients")
-                .select("id")
-                .eq("user_id", userId)
-                .eq("pms_type", pmsType)
-                .eq("pms_patient_id", patient.id)
-                .single();
+            const { data: patientRow, error: patientLookupError } = await supabase
+              .from('patients')
+              .select('id')
+              .eq('user_id', userId)
+              .eq('pms_type', pmsType)
+              .eq('pms_patient_id', patient.id)
+              .single();
 
             if (patientLookupError || !patientRow) {
-              issues.push(
-                `Could not resolve patient UUID for patient ${patient.id}`
-              );
+              issues.push(`Could not resolve patient UUID for patient ${patient.id}`);
               continue;
             }
 
-            const { error: appointmentError } = await supabase
-              .from("appointments")
-              .upsert({
-                user_id: userId,
-                patient_id: patientRow.id,
-                pms_appointment_id: appointment.id,
-                pms_type: pmsType,
-                appointment_date: appointment.appointment_start,
-                appointment_type: appointment.appointment_type?.name,
-                practitioner_name: appointment.practitioner?.name,
-                status: appointment.status,
-                duration_minutes: appointment.duration,
-                updated_at: new Date().toISOString(),
-              });
+            const { error: appointmentError } = await supabase.from('appointments').upsert({
+              user_id: userId,
+              patient_id: patientRow.id,
+              pms_appointment_id: appointment.id,
+              pms_type: pmsType,
+              appointment_date: appointment.appointment_start,
+              appointment_type: appointment.appointment_type?.name,
+              practitioner_name: appointment.practitioner?.name,
+              status: appointment.status,
+              duration_minutes: appointment.duration,
+              updated_at: new Date().toISOString(),
+            });
 
             if (!appointmentError) {
               appointmentsUpdated++;
@@ -252,10 +232,10 @@ async function performIncrementalSync(
       details: { issues: issues.length > 0 ? issues : undefined },
     };
   } catch (error) {
-    console.error("Incremental sync error:", error);
+    console.error('Incremental sync error:', error);
     return {
       success: false,
-      error: error instanceof Error ? error.message : "Unknown error",
+      error: error instanceof Error ? error.message : 'Unknown error',
     };
   }
 }
@@ -276,12 +256,12 @@ async function performNookalBatchSync(
 
     // Get the latest sync log to check progress
     const { data: latestSyncLog } = await supabase
-      .from("sync_logs")
-      .select("sync_progress, patients_processed")
-      .eq("user_id", userId)
-      .eq("pms_type", "nookal")
-      .eq("status", "completed")
-      .order("completed_at", { ascending: false })
+      .from('sync_logs')
+      .select('sync_progress, patients_processed')
+      .eq('user_id', userId)
+      .eq('pms_type', 'nookal')
+      .eq('status', 'completed')
+      .order('completed_at', { ascending: false })
       .limit(1)
       .single();
 
@@ -296,16 +276,14 @@ async function performNookalBatchSync(
 
     // If this is the first run, check if we already have patients in the database
     if (totalPatients === 0) {
-      console.log(
-        `[NOOKAL] First run - checking database for existing patients...`
-      );
+      console.log(`[NOOKAL] First run - checking database for existing patients...`);
 
       // Check how many patients we already have
       const { count: existingPatientsCount } = await supabase
-        .from("patients")
-        .select("*", { count: "exact", head: true })
-        .eq("user_id", userId)
-        .eq("pms_type", "nookal");
+        .from('patients')
+        .select('*', { count: 'exact', head: true })
+        .eq('user_id', userId)
+        .eq('pms_type', 'nookal');
 
       if (existingPatientsCount && existingPatientsCount > 0) {
         // Calculate which page we should start from based on existing patients
@@ -328,25 +306,20 @@ async function performNookalBatchSync(
     const patients = await pmsClient.getAllPatients(currentPage, 200);
 
     // DEBUG: Log the raw patients response
-    console.log(
-      `[NOOKAL] Raw patients response:`,
-      JSON.stringify(patients, null, 2)
-    );
+    console.log(`[NOOKAL] Raw patients response:`, JSON.stringify(patients, null, 2));
     console.log(`[NOOKAL] Patients type:`, typeof patients);
     console.log(`[NOOKAL] Patients is array:`, Array.isArray(patients));
     console.log(`[NOOKAL] Patients length:`, patients?.length || 0);
 
     if (!patients || patients.length === 0) {
-      console.log(
-        `[NOOKAL] No patients found on page ${currentPage} - sync complete`
-      );
+      console.log(`[NOOKAL] No patients found on page ${currentPage} - sync complete`);
       return {
         success: true,
-        syncType: "batch",
+        syncType: 'batch',
         patientsUpdated: 0,
         appointmentsUpdated: 0,
         details: {
-          message: "No more patients to sync",
+          message: 'No more patients to sync',
           sync_page: currentPage,
           totalPatients,
           patientsProcessed,
@@ -354,9 +327,7 @@ async function performNookalBatchSync(
       };
     }
 
-    console.log(
-      `[NOOKAL] Processing page ${currentPage}: ${patients.length} patients`
-    );
+    console.log(`[NOOKAL] Processing page ${currentPage}: ${patients.length} patients`);
 
     let patientsUpdated = 0;
     let appointmentsUpdated = 0;
@@ -366,10 +337,7 @@ async function performNookalBatchSync(
     for (const patient of patients) {
       try {
         // DEBUG: Log each patient structure
-        console.log(
-          `[NOOKAL] Processing patient:`,
-          JSON.stringify(patient, null, 2)
-        );
+        console.log(`[NOOKAL] Processing patient:`, JSON.stringify(patient, null, 2));
         console.log(`[NOOKAL] Patient ID:`, patient.id);
         console.log(`[NOOKAL] Patient firstName:`, patient.firstName);
         console.log(`[NOOKAL] Patient lastName:`, patient.lastName);
@@ -380,11 +348,7 @@ async function performNookalBatchSync(
 
         // Validate and clean date_of_birth - convert empty strings to null
         let dateOfBirth = patient.dateOfBirth;
-        if (
-          dateOfBirth === "" ||
-          dateOfBirth === null ||
-          dateOfBirth === undefined
-        ) {
+        if (dateOfBirth === '' || dateOfBirth === null || dateOfBirth === undefined) {
           dateOfBirth = null;
         } else {
           // Try to validate the date format
@@ -404,40 +368,34 @@ async function performNookalBatchSync(
           }
         }
 
-        const { error: patientError } = await supabase.from("patients").upsert(
+        const { error: patientError } = await supabase.from('patients').upsert(
           {
             user_id: userId,
             pms_patient_id: patient.id,
-            pms_type: "nookal",
+            pms_type: 'nookal',
             first_name: patient.firstName,
             last_name: patient.lastName,
             email: patient.email,
             phone: patient.phone,
             date_of_birth: dateOfBirth,
-            patient_type: "EPC", // Default to EPC for Nookal
+            patient_type: 'EPC', // Default to EPC for Nookal
             updated_at: new Date().toISOString(),
           },
           {
-            onConflict: "user_id,pms_patient_id,pms_type", // Use upsert to handle duplicates
+            onConflict: 'user_id,pms_patient_id,pms_type', // Use upsert to handle duplicates
           }
         );
 
         if (patientError) {
           console.error(`[NOOKAL] Patient insert error:`, patientError);
-          issues.push(
-            `Could not insert patient ${patient.id}: ${patientError.message}`
-          );
+          issues.push(`Could not insert patient ${patient.id}: ${patientError.message}`);
         } else {
-          console.log(
-            `[NOOKAL] ✅ Patient ${patient.id} inserted successfully`
-          );
+          console.log(`[NOOKAL] ✅ Patient ${patient.id} inserted successfully`);
           patientsUpdated++;
 
           // Fetch appointments for this patient
           try {
-            const appointments = await pmsClient.getPatientAppointments(
-              patient.id.toString()
-            );
+            const appointments = await pmsClient.getPatientAppointments(patient.id.toString());
 
             const completedAppointments = appointments.filter((apt: any) =>
               pmsClient.isCompletedAppointment(apt)
@@ -445,55 +403,41 @@ async function performNookalBatchSync(
 
             for (const appointment of completedAppointments) {
               // Resolve the patient's UUID from our patients table before inserting appointment
-              const { data: patientRow, error: patientLookupError } =
-                await supabase
-                  .from("patients")
-                  .select("id")
-                  .eq("user_id", userId)
-                  .eq("pms_type", "nookal")
-                  .eq("pms_patient_id", patient.id)
-                  .single();
+              const { data: patientRow, error: patientLookupError } = await supabase
+                .from('patients')
+                .select('id')
+                .eq('user_id', userId)
+                .eq('pms_type', 'nookal')
+                .eq('pms_patient_id', patient.id)
+                .single();
 
               if (patientLookupError || !patientRow) {
-                issues.push(
-                  `Could not resolve patient UUID for patient ${patient.id}`
-                );
+                issues.push(`Could not resolve patient UUID for patient ${patient.id}`);
                 continue;
               }
 
-              const { error: appointmentError } = await supabase
-                .from("appointments")
-                .upsert(
-                  {
-                    user_id: userId,
-                    patient_id: patientRow.id,
-                    pms_appointment_id: appointment.id,
-                    pms_type: "nookal",
-                    appointment_date:
-                      appointment.appointment_date || appointment.date,
-                    appointment_type:
-                      appointment.appointment_type?.name || appointment.type,
-                    practitioner_name:
-                      appointment.practitioner?.name || appointment.physioName,
-                    status: appointment.status,
-                    duration_minutes:
-                      appointment.duration || appointment.durationMinutes,
-                    updated_at: new Date().toISOString(),
-                  },
-                  {
-                    onConflict: "user_id,pms_appointment_id,pms_type", // Use upsert to handle duplicates
-                  }
-                );
+              const { error: appointmentError } = await supabase.from('appointments').upsert(
+                {
+                  user_id: userId,
+                  patient_id: patientRow.id,
+                  pms_appointment_id: appointment.id,
+                  pms_type: 'nookal',
+                  appointment_date: appointment.appointment_date || appointment.date,
+                  appointment_type: appointment.appointment_type?.name || appointment.type,
+                  practitioner_name: appointment.practitioner?.name || appointment.physioName,
+                  status: appointment.status,
+                  duration_minutes: appointment.duration || appointment.durationMinutes,
+                  updated_at: new Date().toISOString(),
+                },
+                {
+                  onConflict: 'user_id,pms_appointment_id,pms_type', // Use upsert to handle duplicates
+                }
+              );
 
               if (appointmentError) {
-                console.error(
-                  `[NOOKAL] Appointment insert error:`,
-                  appointmentError
-                );
+                console.error(`[NOOKAL] Appointment insert error:`, appointmentError);
               } else {
-                console.log(
-                  `[NOOKAL] ✅ Appointment ${appointment.id} inserted successfully`
-                );
+                console.log(`[NOOKAL] ✅ Appointment ${appointment.id} inserted successfully`);
                 appointmentsUpdated++;
               }
             }
@@ -502,16 +446,11 @@ async function performNookalBatchSync(
               `[NOOKAL] Error fetching appointments for patient ${patient.id}:`,
               appointmentError
             );
-            issues.push(
-              `Could not sync appointments for patient ${patient.id}`
-            );
+            issues.push(`Could not sync appointments for patient ${patient.id}`);
           }
         }
       } catch (error) {
-        console.error(
-          `[NOOKAL] Error processing patient ${patient.id}:`,
-          error
-        );
+        console.error(`[NOOKAL] Error processing patient ${patient.id}:`, error);
         issues.push(`Error processing patient ${patient.id}: ${error}`);
       }
     }
@@ -537,14 +476,12 @@ async function performNookalBatchSync(
     console.log(
       `[NOOKAL] Page ${currentPage} completed: ${patientsUpdated} patients, ${appointmentsUpdated} appointments`
     );
-    console.log(
-      `[NOOKAL] Progress: ${newPatientsProcessed}/${totalPatients} patients processed`
-    );
+    console.log(`[NOOKAL] Progress: ${newPatientsProcessed}/${totalPatients} patients processed`);
     console.log(`[NOOKAL] Next page to fetch: ${nextPage}`);
 
     return {
       success: true,
-      syncType: "batch",
+      syncType: 'batch',
       patientsUpdated,
       appointmentsUpdated,
       details: {
@@ -553,11 +490,11 @@ async function performNookalBatchSync(
       },
     };
   } catch (error) {
-    console.error("Nookal batch sync error:", error);
+    console.error('Nookal batch sync error:', error);
     return {
       success: false,
-      syncType: "batch",
-      error: error instanceof Error ? error.message : "Unknown error",
+      syncType: 'batch',
+      error: error instanceof Error ? error.message : 'Unknown error',
     };
   }
 }

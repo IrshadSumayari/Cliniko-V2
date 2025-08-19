@@ -1,5 +1,5 @@
-import Stripe from "stripe";
-import { config } from "@/lib/config";
+import Stripe from 'stripe';
+import { config } from '@/lib/config';
 
 export const stripe = new Stripe(config.stripe.secretKey, {
   typescript: true,
@@ -16,10 +16,7 @@ export async function createStripeCustomer(email: string, name: string) {
   });
 }
 
-export async function createSubscription(
-  customerId: string,
-  planId: keyof typeof STRIPE_PLANS,
-) {
+export async function createSubscription(customerId: string, planId: keyof typeof STRIPE_PLANS) {
   const plan = STRIPE_PLANS[planId];
 
   if (!plan) {
@@ -36,13 +33,13 @@ export async function createSubscription(
 
   if (prices.data.length === 0) {
     const price = await stripe.prices.create({
-      unit_amount: plan === "price_basic" ? 0 : 30,
-      currency: "aud",
+      unit_amount: plan === 'price_basic' ? 0 : 30,
+      currency: 'aud',
       recurring: {
-        interval: "month",
+        interval: 'month',
       },
       product_data: {
-        name: plan === "price_basic" ? "Basic" : "price_professional",
+        name: plan === 'price_basic' ? 'Basic' : 'price_professional',
       },
       lookup_key: planId,
     });
@@ -54,9 +51,9 @@ export async function createSubscription(
   return await stripe.subscriptions.create({
     customer: customerId,
     items: [{ price: priceId }],
-    payment_behavior: "default_incomplete",
-    payment_settings: { save_default_payment_method: "on_subscription" },
-    expand: ["latest_invoice.payment_intent"],
+    payment_behavior: 'default_incomplete',
+    payment_settings: { save_default_payment_method: 'on_subscription' },
+    expand: ['latest_invoice.payment_intent'],
   });
 }
 
@@ -64,7 +61,7 @@ export async function createCheckoutSession(
   customerId: string,
   planId: keyof typeof STRIPE_PLANS,
   successUrl: string,
-  cancelUrl: string,
+  cancelUrl: string
 ) {
   const plan = STRIPE_PLANS[planId];
 
@@ -82,18 +79,13 @@ export async function createCheckoutSession(
 
   if (prices.data.length === 0) {
     const price = await stripe.prices.create({
-      unit_amount:
-        plan === "price_basic"
-          ? 0
-          : plan === "price_professional"
-            ? 2900
-            : 7900,
-      currency: "aud",
+      unit_amount: plan === 'price_basic' ? 0 : plan === 'price_professional' ? 2900 : 7900,
+      currency: 'aud',
       recurring: {
-        interval: "month",
+        interval: 'month',
       },
       product_data: {
-        name: plan === "price_basic" ? "Basic" : "price_professional",
+        name: plan === 'price_basic' ? 'Basic' : 'price_professional',
       },
       lookup_key: planId,
     });
@@ -104,14 +96,14 @@ export async function createCheckoutSession(
 
   return await stripe.checkout.sessions.create({
     customer: customerId,
-    payment_method_types: ["card"],
+    payment_method_types: ['card'],
     line_items: [
       {
         price: priceId,
         quantity: 1,
       },
     ],
-    mode: "subscription",
+    mode: 'subscription',
     success_url: successUrl,
     cancel_url: cancelUrl,
     subscription_data: {
