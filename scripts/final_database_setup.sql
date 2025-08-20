@@ -58,6 +58,8 @@ CREATE TABLE IF NOT EXISTS users (
     subscription_status TEXT DEFAULT 'trial',
     trial_ends_at TIMESTAMP WITH TIME ZONE DEFAULT (NOW() + INTERVAL '7 days'),
     pms_type TEXT,
+    WC TEXT DEFAULT 'WC',
+    EPC TEXT DEFAULT 'EPC',
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
@@ -135,6 +137,7 @@ CREATE TABLE appointments (
     pms_appointment_id TEXT NOT NULL,
     pms_type TEXT NOT NULL,
     appointment_type TEXT, -- For Nookal: stores "WC" or "EPC" extracted from appointment name
+    appointment_type_id TEXT, -- NEW: Stores the appointmentTypeID from PMS
     status TEXT NOT NULL,
     appointment_date TIMESTAMP WITH TIME ZONE NOT NULL,
     practitioner_name TEXT,
