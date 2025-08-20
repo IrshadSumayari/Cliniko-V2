@@ -344,18 +344,12 @@ async function performInitialSync(supabase: any, userId: string, pmsClient: any,
           console.log(
             `[SERVER] ✅ Successfully bulk inserted ${insertedPatients?.length || 0} patients`
           );
-
-          // Count EPC vs WC patients
-          epcPatients = patientsToInsert.filter((p) => p.patient_type === 'EPC').length;
-          wcPatients = patientsToInsert.filter((p) => p.patient_type === 'WC').length;
         }
       } catch (error) {
         console.error('[SERVER] Exception in bulk patient insert:', error);
         issues.push('Exception in bulk patient insert');
       }
     }
-
-    console.log(`[SERVER] Patient processing complete. EPC: ${epcPatients}, WC: ${wcPatients}`);
 
     // Now process ALL appointments that meet the 3 conditions (outside patient loop)
     let appointmentsToProcess: any[] = [];
@@ -384,8 +378,6 @@ async function performInitialSync(supabase: any, userId: string, pmsClient: any,
     }
 
     console.log(`[SERVER] Found ${appointmentsToProcess.length} total appointments to process`);
-
-    // Removed maxAppointments check
 
     // Apply the 3 conditions to ALL appointments
     const validCompletedAppointments = appointmentsToProcess.filter((apt: any) => {
@@ -453,6 +445,7 @@ async function performInitialSync(supabase: any, userId: string, pmsClient: any,
           pms_type: pmsType,
           appointment_date: appointment.date || appointment.appointment_date,
           appointment_type: appointment.type || appointment.appointment_type || null,
+          appointment_type_id: appointment.appointment_type_id || null,
           status: appointment.status || 'unknown',
           practitioner_name: appointment.physioName || appointment.practitioner_name || null,
           notes: appointment.notes || null,
@@ -506,6 +499,101 @@ async function performInitialSync(supabase: any, userId: string, pmsClient: any,
       } catch (error) {
         console.error('[SERVER] Exception in bulk appointment upsert:', error);
         issues.push('Exception in bulk appointment upsert');
+      }
+    }
+
+    // Calculate WC and EPC counts based on appointment types from appointment-types table
+    console.log('[SERVER] Calculating WC and EPC counts based on appointment types...');
+
+    // Get user's custom tags - only proceed if they have set custom tags
+    const { data: userData, error: userError } = await supabase
+      .from('users')
+      .select('wc, epc')
+      .eq('id', userId)
+      .single();
+
+    if (userError) {
+      console.error('[SERVER] Error fetching user tags:', userError);
+      issues.push('Could not fetch user custom tags');
+      // Skip counting if we can't get user tags
+      wcPatients = 0;
+      epcPatients = 0;
+    } else if (!userData?.wc || !userData?.epc) {
+      console.log('[SERVER] User has not set custom tags yet, skipping appointment counting');
+      // Skip counting if user hasn't set custom tags
+      wcPatients = 0;
+      epcPatients = 0;
+    } else {
+      const wcTag = userData.wc;
+      const epcTag = userData.epc;
+
+      const { data: wcAppointmentTypes, error: wcTypesError } = await supabase
+        .from('appointment_types')
+        .select('appointment_id, appointment_name')
+        .eq('user_id', userId)
+        .eq('pms_type', pmsType)
+        .ilike('appointment_name', `%${wcTag}%`);
+
+      const { data: epcAppointmentTypes, error: epcTypesError } = await supabase
+        .from('appointment_types')
+        .select('appointment_id, appointment_name')
+        .eq('user_id', userId)
+        .eq('pms_type', pmsType)
+        .ilike('appointment_name', `%${epcTag}%`);
+
+      if (wcTypesError || epcTypesError) {
+        console.error('[SERVER] Error fetching appointment types:', {
+          wcTypesError,
+          epcTypesError,
+        });
+        issues.push('Could not fetch appointment types for counting');
+      } else {
+        console.log('WC appointment types found:', wcAppointmentTypes);
+        console.log('EPC appointment types found:', epcAppointmentTypes);
+        // Extract appointment type IDs
+        const wcTypeIds = wcAppointmentTypes?.map((type: any) => type.appointment_id) || [];
+        const epcTypeIds = epcAppointmentTypes?.map((type: any) => type.appointment_id) || [];
+
+        // Step 2: Filter appointments using those IDs to calculate unique patient counts
+        if (wcTypeIds.length > 0) {
+          const { data: wcAppointments, error: wcCountError } = await supabase
+            .from('appointments')
+            .select('patient_id')
+            .eq('user_id', userId)
+            .eq('pms_type', pmsType)
+            .in('appointment_type_id', wcTypeIds)
+            .not('patient_id', 'is', null);
+
+          if (wcCountError) {
+            console.error('[SERVER] Error counting WC appointments:', wcCountError);
+            issues.push('Could not count WC appointments');
+          } else {
+            // Count unique patients (not appointments)
+            const uniquePatientIds = new Set(wcAppointments?.map((apt: any) => apt.patient_id).filter(Boolean));
+            wcPatients = uniquePatientIds.size;
+            console.log(`[SERVER] WC: Found ${wcAppointments?.length || 0} appointments for ${wcPatients} unique patients`);
+          }
+        }
+
+        if (epcTypeIds.length > 0) {
+          const { data: epcAppointments, error: epcCountError } = await supabase
+            .from('appointments')
+            .select('patient_id')
+            .eq('user_id', userId)
+            .eq('pms_type', pmsType)
+            .in('appointment_type_id', epcTypeIds)
+            .not('patient_id', 'is', null);
+
+          if (epcCountError) {
+            console.error('[SERVER] Error counting EPC appointments:', epcCountError);
+            issues.push('Could not count EPC appointments');
+          } else {
+            // Count unique patients (not appointments)
+            const uniquePatientIds = new Set(epcAppointments?.map((apt: any) => apt.patient_id).filter(Boolean));
+            epcPatients = uniquePatientIds.size;
+            console.log(`[SERVER] EPC: Found ${epcAppointments?.length || 0} appointments for ${epcPatients} unique patients`);
+          }
+        }
       }
     }
 

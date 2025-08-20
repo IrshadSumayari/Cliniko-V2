@@ -10,8 +10,11 @@ export type Database = {
           email: string;
           full_name: string | null;
           is_onboarded: boolean;
-          subscription_status: string;
+          subscription_status: string | null;
           trial_ends_at: string | null;
+          pms_type: string | null;
+          WC: string | null;
+          EPC: string | null;
           created_at: string | null;
           updated_at: string | null;
         };
@@ -21,8 +24,11 @@ export type Database = {
           email: string;
           full_name?: string | null;
           is_onboarded?: boolean;
-          subscription_status?: string;
+          subscription_status?: string | null;
           trial_ends_at?: string | null;
+          pms_type?: string | null;
+          WC?: string | null;
+          EPC?: string | null;
           created_at?: string | null;
           updated_at?: string | null;
         };
@@ -31,9 +37,12 @@ export type Database = {
           auth_user_id?: string;
           email?: string;
           full_name?: string | null;
-          is_onboarded?: boolean;
-          subscription_status?: string;
+          is_onboarded?: boolean | null;
+          subscription_status?: string | null;
           trial_ends_at?: string | null;
+          pms_type?: string | null;
+          WC?: string | null;
+          EPC?: string | null;
           created_at?: string | null;
           updated_at?: string | null;
         };
@@ -150,6 +159,7 @@ export type Database = {
           pms_appointment_id: string;
           pms_type: string;
           appointment_type: string | null;
+          appointment_type_id: string | null;
           status: string;
           appointment_date: string;
           practitioner_name: string | null;
@@ -165,6 +175,7 @@ export type Database = {
           pms_appointment_id: string;
           pms_type: string;
           appointment_type?: string | null;
+          appointment_type_id?: string | null;
           status: string;
           appointment_date: string;
           practitioner_name?: string | null;
@@ -180,6 +191,7 @@ export type Database = {
           pms_appointment_id?: string;
           pms_type?: string;
           appointment_type?: string | null;
+          appointment_type_id?: string | null;
           status?: string;
           appointment_date?: string;
           practitioner_name?: string | null;
@@ -187,6 +199,7 @@ export type Database = {
           is_completed?: boolean;
           created_at?: string | null;
           updated_at?: string | null;
+          duration_minutes?: number | null;
         };
         Relationships: [
           {

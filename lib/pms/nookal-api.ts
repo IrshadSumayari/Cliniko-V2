@@ -7,7 +7,7 @@ export class NookalAPI implements PMSApiInterface {
   private requestQueue: Array<() => Promise<any>> = [];
   private isProcessingQueue = false;
   private lastRequestTime = 0;
-  private minRequestInterval = 2000; // Start with 2 seconds between requests (very conservative)
+  private minRequestInterval = 500; // Start with 100ms between requests (very conservative)
   private maxConcurrentRequests = 1; // Start with only 1 concurrent request
   private activeRequests = 0;
   private consecutiveSuccesses = 0;
@@ -976,13 +976,27 @@ export class NookalAPI implements PMSApiInterface {
       const id = appointmentType.ID || appointmentType.id;
 
       if (name && id) {
+        // Determine if this is WC or EPC based on the appointment name
+        let code = 'Other'; // Default for non-WC/EPC types
+
+        const nameLower = name.toLowerCase();
+        if (
+          nameLower.includes('wc') ||
+          nameLower.includes('workcover') ||
+          nameLower.includes('work cover')
+        ) {
+          code = 'WC';
+        } else if (nameLower.includes('epc') || nameLower.includes('enhanced primary care')) {
+          code = 'EPC';
+        }
+
         processedTypes.push({
           appointment_id: id.toString(),
           appointment_name: name,
-          code: 'EPC', // Default to EPC as per requirements
+          code: code,
         });
 
-        console.log(`📝 Processed appointment type: ${name} -> EPC`);
+        console.log(`📝 Processed appointment type: ${name} -> ${code}`);
       }
     }
 

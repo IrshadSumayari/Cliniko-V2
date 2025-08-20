@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card } from '@/components/ui/card';
@@ -20,21 +20,26 @@ import { supabase } from '@/integrations/supabase/client';
 import { authenticatedFetch } from '@/lib/utils';
 import { useRouter } from 'next/navigation';
 
-type OnboardingStep = 'pms' | 'api' | 'syncing' | 'sync-results';
+type OnboardingStep = 'pms' | 'api' | 'syncing' | 'sync-results' | 'tag-config' | 'tag-complete';
 
 interface SyncResults {
   wcPatients: number;
   epcPatients: number;
   totalAppointments: number;
   issues?: string[];
+  customTags?: {
+    wc: string;
+    epc: string;
+  };
 }
 
 export default function OnboardingFlow() {
-  const { updateUserOnboardingStatus, isLoading, user } = useAuth();
+  const { updateUserOnboardingStatus, isLoading, user, getAccessToken } = useAuth();
   const router = useRouter();
   const [currentStep, setCurrentStep] = useState<OnboardingStep>('pms');
   const [isProcessing, setIsProcessing] = useState(false);
   const [isCompleting, setIsCompleting] = useState(false);
+  const [isSavingTags, setIsSavingTags] = useState(false);
   const [syncProgress, setSyncProgress] = useState({
     progress: 0,
     message: '',
@@ -49,7 +54,32 @@ export default function OnboardingFlow() {
     epcPatients: 0,
     totalAppointments: 0,
     issues: [],
+    customTags: {
+      wc: 'WC',
+      epc: 'EPC',
+    },
   });
+
+  const [customTags, setCustomTags] = useState({
+    wc: 'WC',
+    epc: 'EPC',
+  });
+
+  useEffect(() => {
+    const fetchUserTags = async () => {
+      try {
+        const token = getAccessToken();
+
+        if (!token) return;
+
+        console.log('Using default WC/EPC tags for now');
+      } catch (error) {
+        console.error('Error in tag initialization:', error);
+      }
+    };
+
+    fetchUserTags();
+  }, [getAccessToken]);
 
   const handlePMSSelect = (pms: string) => {
     setFormData({ ...formData, selectedPMS: pms });
@@ -162,7 +192,7 @@ export default function OnboardingFlow() {
             });
 
             toast.success('Successfully connected and synced data!');
-            setCurrentStep('sync-results');
+            setCurrentStep('tag-config');
             return;
           }
         } catch (error) {
@@ -214,7 +244,7 @@ export default function OnboardingFlow() {
       });
 
       toast.success('Successfully connected and synced data!');
-      setCurrentStep('sync-results');
+      setCurrentStep('tag-config');
     } catch (error) {
       console.error('Error during sync:', error);
       toast.error(error instanceof Error ? error.message : 'Failed to sync data');
@@ -274,7 +304,7 @@ export default function OnboardingFlow() {
   };
 
   const handleBack = () => {
-    const steps: OnboardingStep[] = ['pms', 'api', 'syncing', 'sync-results'];
+    const steps: OnboardingStep[] = ['pms', 'api', 'syncing', 'tag-config', 'tag-complete'];
     const currentIndex = steps.indexOf(currentStep);
     if (currentIndex > 0) {
       setCurrentStep(steps[currentIndex - 1]);
@@ -310,6 +340,83 @@ export default function OnboardingFlow() {
     return instructions[pms.toLowerCase() as keyof typeof instructions] || instructions.cliniko;
   };
 
+  const handleSaveTags = async () => {
+    try {
+      setIsSavingTags(true);
+
+      // Get the access token from auth context
+      const token = getAccessToken();
+
+      if (!token) {
+        toast.error('Authentication token not found. Please try logging in again.');
+        return;
+      }
+
+      const response = await fetch('/api/user/update-tags', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          wcTag: customTags.wc,
+          epcTag: customTags.epc,
+        }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to update tags');
+      }
+
+      const result = await response.json();
+
+      // Update the sync results with new counts
+      setSyncResults((prev) => ({
+        ...prev,
+        wcPatients: result.newCounts.wcPatients,
+        epcPatients: result.newCounts.epcPatients,
+        totalAppointments: result.newCounts.totalAppointments,
+        customTags: {
+          wc: customTags.wc,
+          epc: customTags.epc,
+        },
+      }));
+
+      toast.success('Tags updated successfully!');
+      setCurrentStep('tag-complete');
+    } catch (error) {
+      console.error('Error saving tags:', error);
+      toast.error(error instanceof Error ? error.message : 'Failed to save tags');
+    } finally {
+      setIsSavingTags(false);
+    }
+  };
+  // const handleTest = async () => {
+  //   const { data: userData, error: userError } = await supabase
+  //     .from('users')
+  //     .select('wc, epc')
+  //     // .eq('id', '4b896674-fbb9-47b5-80d4-54061212ef8f')
+  //     .single();
+  //   console.log(userData, 'User Data for Testing');
+  //   const wcTag = 'W/C';
+  //   const epcTag = 'EPC';
+  //   const { data: wcAppointmentTypes, error: wcTypesError } = await supabase
+  //     .from('appointment_types')
+  //     .select('appointment_id, appointment_name')
+  //     .eq('user_id', '4b896674-fbb9-47b5-80d4-54061212ef8f')
+  //     .eq('pms_type', 'nookal')
+  //     .ilike('appointment_name', `%${wcTag}%`);
+
+  //   const { data: epcAppointmentTypes, error: epcTypesError } = await supabase
+  //     .from('appointment_types')
+  //     .select('appointment_id, appointment_name')
+  //     .eq('user_id', '4b896674-fbb9-47b5-80d4-54061212ef8f')
+  //     .eq('pms_type', 'nookal')
+  //     .ilike('appointment_name', `%${epcTag}%`);
+
+  //   console.log(epcAppointmentTypes, 'Crack', wcAppointmentTypes);
+  // };
   const renderStep = () => {
     switch (currentStep) {
       case 'pms':
@@ -362,6 +469,9 @@ export default function OnboardingFlow() {
                 <Button variant="outline" onClick={handleSkip} disabled={isProcessing || isLoading}>
                   Back to Home
                 </Button>
+                {/* <Button variant="outline" onClick={handleTest} disabled={isProcessing || isLoading}>
+                  Testing
+                </Button> */}
               </div>
             </div>
           </div>
@@ -533,12 +643,89 @@ export default function OnboardingFlow() {
           </div>
         );
 
-      case 'sync-results':
+      case 'tag-config':
         return (
           <div className="space-y-8 fade-in">
             <div className="text-center">
               <CheckCircle className="h-16 w-16 mx-auto mb-4 text-green-500" />
               <h2 className="text-3xl font-bold mb-2">Sync Complete!</h2>
+              <p className="text-muted-foreground">
+                Now let's configure how to categorize your patients
+              </p>
+            </div>
+
+            <div className="max-w-4xl mx-auto space-y-6">
+              <Card className="p-6">
+                <div className="flex items-center gap-2 mb-4">
+                  <Settings className="h-5 w-5 text-primary" />
+                  <h3 className="font-semibold">Configure Patient Tags</h3>
+                </div>
+                <p className="text-sm text-muted-foreground mb-6">
+                  Customize how patients are categorized in your dashboard. These tags help track
+                  quota usage.
+                </p>
+
+                <div className="grid md:grid-cols-2 gap-6 mb-6">
+                  <div>
+                    <label className="text-sm font-medium mb-2 block">
+                      Workers Compensation Tag
+                    </label>
+                    <Input
+                      value={customTags.wc}
+                      onChange={(e) => setCustomTags((prev) => ({ ...prev, wc: e.target.value }))}
+                      className="mb-2"
+                    />
+                    <p className="text-xs text-muted-foreground">
+                      What do you call Workers Compensation patients in your system?
+                    </p>
+                  </div>
+                  <div>
+                    <label className="text-sm font-medium mb-2 block">EPC Tag</label>
+                    <Input
+                      value={customTags.epc}
+                      onChange={(e) => setCustomTags((prev) => ({ ...prev, epc: e.target.value }))}
+                      className="mb-2"
+                    />
+                    <p className="text-xs text-muted-foreground">
+                      How do you identify EPC patients in your practice?
+                    </p>
+                  </div>
+                </div>
+
+                <div className="flex justify-end">
+                  <Button onClick={handleSaveTags} className="px-6" disabled={isSavingTags}>
+                    {isSavingTags ? (
+                      <>
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                        Saving...
+                      </>
+                    ) : (
+                      'Save Tags'
+                    )}
+                  </Button>
+                </div>
+              </Card>
+
+              <div className="flex justify-center">
+                <Button
+                  variant="outline"
+                  onClick={() => setCurrentStep('api')}
+                  disabled={isSavingTags}
+                >
+                  <ArrowLeft className="mr-2 h-4 w-4" />
+                  Back to Sync
+                </Button>
+              </div>
+            </div>
+          </div>
+        );
+
+      case 'tag-complete':
+        return (
+          <div className="space-y-8 fade-in">
+            <div className="text-center">
+              <CheckCircle className="h-16 w-16 mx-auto mb-4 text-green-500" />
+              <h2 className="text-3xl font-bold mb-2">Setup Complete!</h2>
               <p className="text-muted-foreground">
                 Here's what we found in your {formData.selectedPMS} data
               </p>
@@ -566,36 +753,6 @@ export default function OnboardingFlow() {
                 </Card>
               </div>
 
-              <Card className="p-6">
-                <div className="flex items-center gap-2 mb-4">
-                  <Settings className="h-5 w-5 text-primary" />
-                  <h3 className="font-semibold">Configure Patient Tags</h3>
-                </div>
-                <p className="text-sm text-muted-foreground mb-6">
-                  Customize how patients are categorized in your dashboard. These tags help track
-                  quota usage.
-                </p>
-
-                <div className="grid md:grid-cols-2 gap-6">
-                  <div>
-                    <label className="text-sm font-medium mb-2 block">
-                      Workers Compensation Tag
-                    </label>
-                    <Input defaultValue="Workers Comp" className="mb-2" />
-                    <p className="text-xs text-muted-foreground">
-                      What do you call Workers Compensation patients in your system?
-                    </p>
-                  </div>
-                  <div>
-                    <label className="text-sm font-medium mb-2 block">EPC Tag</label>
-                    <Input defaultValue="EPC Plan" className="mb-2" />
-                    <p className="text-xs text-muted-foreground">
-                      How do you identify EPC patients in your practice?
-                    </p>
-                  </div>
-                </div>
-              </Card>
-
               {syncResults.issues && syncResults.issues.length > 0 && (
                 <Card className="p-6 border-orange-200 bg-orange-50 dark:bg-orange-950/20">
                   <div className="flex items-center gap-2 mb-4">
@@ -616,14 +773,7 @@ export default function OnboardingFlow() {
                 </Card>
               )}
 
-              <div className="flex justify-center gap-4">
-                <Button
-                  variant="outline"
-                  onClick={() => setCurrentStep('api')}
-                  disabled={isProcessing || isLoading || isCompleting}
-                >
-                  Back to Sync
-                </Button>
+              <div className="flex justify-center">
                 <Button
                   variant="default"
                   size="lg"

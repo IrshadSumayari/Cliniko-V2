@@ -31,6 +31,7 @@ interface AuthContextType {
   updateUserOnboardingStatus: (isOnboarded: boolean) => Promise<boolean>;
   isLoading: boolean;
   refreshUserData: () => Promise<void>;
+  getAccessToken: () => string | null;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -386,6 +387,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         updateUserOnboardingStatus,
         isLoading,
         refreshUserData,
+        getAccessToken,
       }}
     >
       {children}

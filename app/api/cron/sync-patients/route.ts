@@ -424,6 +424,7 @@ async function performNookalBatchSync(
                   pms_type: 'nookal',
                   appointment_date: appointment.appointment_date || appointment.date,
                   appointment_type: appointment.appointment_type?.name || appointment.type,
+                  appointment_type_id: appointment.appointmentTypeID || null,
                   practitioner_name: appointment.practitioner?.name || appointment.physioName,
                   status: appointment.status,
                   duration_minutes: appointment.duration || appointment.durationMinutes,
