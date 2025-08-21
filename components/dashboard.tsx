@@ -179,8 +179,8 @@ const Dashboard = ({ onNavigate }: DashboardProps) => {
       localStorage.setItem('last_sync', syncTime);
       setIsSync(false);
       toast({
-        title: 'Sync Completed',
-        description: 'Your client data has been updated successfully.',
+        title: 'Sync Started Successfully',
+        description: 'Your client data is being updated in background.',
       });
     }, 2000);
   };
