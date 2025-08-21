@@ -1,13 +1,13 @@
-'use client';
+"use client"
 
-import { Button } from '@/components/ui/button';
-import { ArrowRight, Users, Bell, Clock } from 'lucide-react';
-import Header from './header';
+import { Button } from "@/components/ui/button"
+import { ArrowRight, Users, Bell, Clock } from "lucide-react"
+import Header from "./header"
 
 interface HeroSectionProps {
-  onGetStarted?: () => void;
-  onLogin?: () => void;
-  onSignup?: () => void;
+  onGetStarted?: () => void
+  onLogin?: () => void
+  onSignup?: () => void
 }
 
 const HeroSection = ({ onGetStarted, onLogin, onSignup }: HeroSectionProps) => {
@@ -23,14 +23,11 @@ const HeroSection = ({ onGetStarted, onLogin, onSignup }: HeroSectionProps) => {
           </h1>
 
           <p className="text-xl md:text-2xl text-muted-foreground mb-8 leading-relaxed">
-            Connect your clinic software in minutes and never lose session revenue or miss renewals
-            again.
+            Connect your clinic software in minutes and never lose session revenue or miss renewals again.
           </p>
 
           <div className="mb-6 p-4 bg-gradient-to-r from-primary/10 to-primary/5 border border-primary/20 rounded-xl">
-            <p className="text-lg font-medium text-primary">
-              🚀 NDIS tracking/reminders beta coming soon
-            </p>
+            <p className="text-lg font-medium text-primary">🚀 NDIS tracking/reminders beta coming soon</p>
           </div>
 
           <Button variant="default" size="lg" className="mb-4" onClick={onGetStarted}>
@@ -59,27 +56,24 @@ const HeroSection = ({ onGetStarted, onLogin, onSignup }: HeroSectionProps) => {
                   {/* Mock KPI Cards */}
                   <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                     {[
-                      { label: 'Active Clients', value: '142', icon: Users },
+                      { label: "Active Clients", value: "142", icon: Users },
                       {
-                        label: 'Sessions Remaining',
-                        value: '1,234',
+                        label: "Sessions Remaining",
+                        value: "1,234",
                         icon: Clock,
                       },
                       {
-                        label: 'Clients Needing Action',
-                        value: '8',
+                        label: "Clients Needing Action",
+                        value: "8",
                         icon: Bell,
                       },
                       {
-                        label: 'Last Sync',
-                        value: '2 min ago',
+                        label: "Last Sync",
+                        value: "2 min ago",
                         icon: ArrowRight,
                       },
                     ].map((stat, index) => (
-                      <div
-                        key={index}
-                        className="bg-card p-4 text-center rounded-lg border border-border"
-                      >
+                      <div key={index} className="bg-card p-4 text-center rounded-lg border border-border">
                         <stat.icon className="h-6 w-6 mx-auto mb-2 text-primary" />
                         <div className="text-2xl font-bold">{stat.value}</div>
                         <div className="text-sm text-muted-foreground">{stat.label}</div>
@@ -91,22 +85,22 @@ const HeroSection = ({ onGetStarted, onLogin, onSignup }: HeroSectionProps) => {
                   <div className="space-y-2">
                     {[
                       {
-                        name: 'Sarah M***',
-                        program: 'EPC',
-                        sessions: '3/5',
-                        status: 'good',
+                        name: "Sarah M***",
+                        program: "EPC",
+                        sessions: "3/5",
+                        status: "good",
                       },
                       {
-                        name: 'John D***',
-                        program: 'Workers Comp',
-                        sessions: '8/12',
-                        status: 'good',
+                        name: "John D***",
+                        program: "Workers Comp",
+                        sessions: "8/12",
+                        status: "good",
                       },
                       {
-                        name: 'Emma W***',
-                        program: 'Workers Comp',
-                        sessions: '1/10',
-                        status: 'warning',
+                        name: "Emma W***",
+                        program: "Workers Comp",
+                        sessions: "1/10",
+                        status: "warning",
                       },
                     ].map((patient, index) => (
                       <div
@@ -122,7 +116,7 @@ const HeroSection = ({ onGetStarted, onLogin, onSignup }: HeroSectionProps) => {
                         <div className="flex items-center gap-4">
                           <div className="text-sm">{patient.sessions}</div>
                           <div
-                            className={`w-2 h-2 rounded-full ${patient.status === 'warning' ? 'bg-warning' : 'bg-success'}`}
+                            className={`w-2 h-2 rounded-full ${patient.status === "warning" ? "bg-warning" : "bg-success"}`}
                           ></div>
                         </div>
                       </div>
@@ -139,25 +133,21 @@ const HeroSection = ({ onGetStarted, onLogin, onSignup }: HeroSectionProps) => {
           {[
             {
               icon: Users,
-              title: 'All clients, one view',
-              description: 'See all your Workers Compensation & EPC patients in a single dashboard',
+              title: "All clients, one view",
+              description: "See all your Workers Compensation & EPC patients in a single dashboard",
             },
             {
               icon: Bell,
-              title: 'Instant alerts before quota ends',
-              description: 'Never miss a renewal or lose revenue from expired sessions',
+              title: "Instant alerts before quota ends",
+              description: "Never miss a renewal or lose revenue from expired sessions",
             },
             {
               icon: Clock,
-              title: 'Set up in under 3 minutes',
-              description: 'Connect your practice management software with just your API key',
+              title: "Set up in under 3 minutes",
+              description: "Connect your practice management software with just your API key",
             },
           ].map((benefit, index) => (
-            <div
-              key={index}
-              className="text-center fade-in"
-              style={{ animationDelay: `${index * 0.2}s` }}
-            >
+            <div key={index} className="text-center fade-in" style={{ animationDelay: `${index * 0.2}s` }}>
               <benefit.icon className="h-12 w-12 mx-auto mb-4 text-primary" strokeWidth={1} />
               <h3 className="text-lg font-semibold mb-2">{benefit.title}</h3>
               <p className="text-muted-foreground leading-relaxed">{benefit.description}</p>
@@ -174,7 +164,7 @@ const HeroSection = ({ onGetStarted, onLogin, onSignup }: HeroSectionProps) => {
         </div>
       </div>
     </div>
-  );
-};
+  )
+}
 
-export default HeroSection;
+export default HeroSection

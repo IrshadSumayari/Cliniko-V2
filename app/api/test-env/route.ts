@@ -1,5 +1,5 @@
-import { NextResponse } from 'next/server';
-import { config } from '@/lib/config';
+import { NextResponse } from "next/server";
+import { config } from "@/lib/config";
 
 export async function GET() {
   const envVars = {

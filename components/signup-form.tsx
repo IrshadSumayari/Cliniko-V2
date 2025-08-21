@@ -1,56 +1,63 @@
-'use client';
+"use client";
 
-import type React from 'react';
-import { useState } from 'react';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Card } from '@/components/ui/card';
-import { Separator } from '@/components/ui/separator';
-import { UserPlus, Eye, EyeOff, ArrowLeft, Loader2, AlertCircle } from 'lucide-react';
-import { useAuth } from '@/contexts/auth-context';
-import { useRouter } from 'next/navigation';
-import Link from 'next/link';
-import { toast } from 'sonner';
+import type React from "react";
+import { useState } from "react";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Card } from "@/components/ui/card";
+import { Separator } from "@/components/ui/separator";
+import {
+  UserPlus,
+  Eye,
+  EyeOff,
+  ArrowLeft,
+  Loader2,
+  AlertCircle,
+} from "lucide-react";
+import { useAuth } from "@/contexts/auth-context";
+import { useRouter } from "next/navigation";
+import Link from "next/link";
+import { toast } from "sonner";
 
 const SignupForm = () => {
   const [formData, setFormData] = useState({
-    firstName: '',
-    lastName: '',
-    email: '',
-    clinicName: '',
-    password: '',
-    confirmPassword: '',
+    firstName: "",
+    lastName: "",
+    email: "",
+    clinicName: "",
+    password: "",
+    confirmPassword: "",
   });
   const [showPassword, setShowPassword] = useState(false);
   const [showManualForm, setShowManualForm] = useState(false);
-  const [error, setError] = useState('');
+  const [error, setError] = useState("");
   const { signUp, signInWithGoogle, isLoading } = useAuth();
   const router = useRouter();
 
   const handleChange = (field: string, value: string) => {
     setFormData((prev) => ({ ...prev, [field]: value }));
     // Clear error when user starts typing
-    if (error) setError('');
+    if (error) setError("");
   };
 
   const handleGoogleSignup = async () => {
-    setError('');
+    setError("");
     try {
       const result = await signInWithGoogle();
       if (result.success) {
-        toast.success('Redirecting to Google...');
+        toast.success("Redirecting to Google...");
       } else {
-        setError(result.error || 'Failed to initiate Google sign-in');
+        setError(result.error || "Failed to initiate Google sign-in");
       }
     } catch (error) {
-      console.error('Google signup error:', error);
-      setError('Google sign-in failed');
+      console.error("Google signup error:", error);
+      setError("Google sign-in failed");
     }
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setError('');
+    setError("");
 
     if (
       !formData.firstName ||
@@ -59,17 +66,17 @@ const SignupForm = () => {
       !formData.clinicName ||
       !formData.password
     ) {
-      setError('Please fill in all fields');
+      setError("Please fill in all fields");
       return;
     }
 
     if (formData.password !== formData.confirmPassword) {
-      setError('Passwords do not match');
+      setError("Passwords do not match");
       return;
     }
 
     if (formData.password.length < 6) {
-      setError('Password must be at least 6 characters');
+      setError("Password must be at least 6 characters");
       return;
     }
 
@@ -82,16 +89,16 @@ const SignupForm = () => {
         formData.clinicName
       );
       if (result.success) {
-        toast.success('Account created!', {
-          description: 'Welcome to MyPhysioFlow.',
+        toast.success("Account created!", {
+          description: "Welcome to MyPhysioFlow.",
         });
-        router.push('/');
+        router.push("/");
       } else {
-        setError(result.error || 'Failed to create account');
+        setError(result.error || "Failed to create account");
       }
     } catch (error) {
-      console.error('Signup error:', error);
-      setError('An error occurred during signup');
+      console.error("Signup error:", error);
+      setError("An error occurred during signup");
     }
   };
 
@@ -113,7 +120,9 @@ const SignupForm = () => {
             <UserPlus className="h-6 w-6 text-primary" />
           </div>
           <h1 className="text-2xl font-bold mb-2">Create Account</h1>
-          <p className="text-muted-foreground">Start tracking your patient sessions</p>
+          <p className="text-muted-foreground">
+            Start tracking your patient sessions
+          </p>
         </div>
 
         {error && (
@@ -163,7 +172,9 @@ const SignupForm = () => {
         <div className="relative mb-6">
           <Separator />
           <div className="absolute inset-0 flex items-center justify-center">
-            <span className="bg-background px-2 text-xs text-muted-foreground">or</span>
+            <span className="bg-background px-2 text-xs text-muted-foreground">
+              or
+            </span>
           </div>
         </div>
 
@@ -183,14 +194,14 @@ const SignupForm = () => {
               <Input
                 placeholder="First Name"
                 value={formData.firstName}
-                onChange={(e) => handleChange('firstName', e.target.value)}
+                onChange={(e) => handleChange("firstName", e.target.value)}
                 disabled={isLoading}
                 required
               />
               <Input
                 placeholder="Last Name"
                 value={formData.lastName}
-                onChange={(e) => handleChange('lastName', e.target.value)}
+                onChange={(e) => handleChange("lastName", e.target.value)}
                 disabled={isLoading}
                 required
               />
@@ -200,7 +211,7 @@ const SignupForm = () => {
               type="email"
               placeholder="Email"
               value={formData.email}
-              onChange={(e) => handleChange('email', e.target.value)}
+              onChange={(e) => handleChange("email", e.target.value)}
               disabled={isLoading}
               required
             />
@@ -208,17 +219,17 @@ const SignupForm = () => {
             <Input
               placeholder="Clinic Name"
               value={formData.clinicName}
-              onChange={(e) => handleChange('clinicName', e.target.value)}
+              onChange={(e) => handleChange("clinicName", e.target.value)}
               disabled={isLoading}
               required
             />
 
             <div className="relative">
               <Input
-                type={showPassword ? 'text' : 'password'}
+                type={showPassword ? "text" : "password"}
                 placeholder="Password"
                 value={formData.password}
-                onChange={(e) => handleChange('password', e.target.value)}
+                onChange={(e) => handleChange("password", e.target.value)}
                 disabled={isLoading}
                 required
                 minLength={6}
@@ -231,7 +242,11 @@ const SignupForm = () => {
                 onClick={() => setShowPassword(!showPassword)}
                 disabled={isLoading}
               >
-                {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                {showPassword ? (
+                  <EyeOff className="h-4 w-4" />
+                ) : (
+                  <Eye className="h-4 w-4" />
+                )}
               </Button>
             </div>
 
@@ -239,7 +254,7 @@ const SignupForm = () => {
               type="password"
               placeholder="Confirm Password"
               value={formData.confirmPassword}
-              onChange={(e) => handleChange('confirmPassword', e.target.value)}
+              onChange={(e) => handleChange("confirmPassword", e.target.value)}
               disabled={isLoading}
               required
               minLength={6}
@@ -252,7 +267,7 @@ const SignupForm = () => {
                   Creating Account...
                 </>
               ) : (
-                'Create Account'
+                "Create Account"
               )}
             </Button>
 
@@ -272,11 +287,11 @@ const SignupForm = () => {
 
         <div className="text-center">
           <p className="text-sm text-muted-foreground">
-            Already have an account?{' '}
+            Already have an account?{" "}
             <Link
               href="/login"
               className={`text-primary hover:underline font-medium ${
-                isLoading ? 'pointer-events-none opacity-50' : ''
+                isLoading ? "pointer-events-none opacity-50" : ""
               }`}
             >
               Sign in
