@@ -132,143 +132,12 @@ export class ClinikoAPI implements PMSApiInterface {
     }
   }
 
-  async getPatients(lastModified?: string, appointmentTypeIds?: string[]): Promise<PMSPatient[]> {
+  // Simple method to just fetch patients (if you only need patients)
+  async syncPatientsOnly(): Promise<PMSPatient[]> {
     try {
-      console.log('🔍 Fetching patients from Cliniko with appointment type filtering...');
-      console.log('   Last modified:', lastModified || 'not specified');
-      console.log('   Appointment type IDs:', appointmentTypeIds || 'not specified');
-
-      if (!appointmentTypeIds || appointmentTypeIds.length === 0) {
-        console.log('⚠️ No appointment type IDs provided, cannot filter bookings');
-        return [];
-      }
-
-      // Create the query parameter for appointment type filtering
-      // Format: q[]=appointment_type_id:=ID1,ID2,ID3 (this is the exact format that works in Postman!)
-      const appointmentTypeFilter = appointmentTypeIds.join(',');
-      console.log(`🔍 Filtering bookings by appointment types: ${appointmentTypeFilter}`);
-
-      const params: Record<string, string> = {
-        per_page: '100', // Keep at 100 as per API limit
-        'q[]': `appointment_type_id:=${appointmentTypeFilter}`, // Fixed: using the exact working Postman format
-      };
-
-      if (lastModified) {
-        params.updated_since = lastModified;
-      }
-
-      const allBookings: any[] = [];
-      const MAX_PARALLEL_PAGES = 5; // Don't overwhelm the API
-      const DELAY_BETWEEN_BATCHES = 100; // 100ms delay between parallel batches
-
-      console.log(`🚀 Starting parallel fetch for unlimited records...`);
-      console.log(`⚡ Using ${MAX_PARALLEL_PAGES} parallel pages for optimal performance`);
-
-      let currentPage = 1;
-      let totalPagesFetched = 0;
-
-      while (true) {
-        // Calculate how many pages we need to fetch in this batch
-        const pagesToFetch = MAX_PARALLEL_PAGES;
-
-        console.log(
-          `🔄 Fetching pages ${currentPage} to ${currentPage + pagesToFetch - 1} in parallel...`
-        );
-        console.log(`📊 Current total: ${allBookings.length} records`);
-
-        // Create array of page promises to fetch in parallel
-        const pagePromises = [];
-        for (let i = 0; i < pagesToFetch; i++) {
-          const pageNumber = currentPage + i;
-          pagePromises.push(
-            this.makeRequest('/bookings', {
-              ...params,
-              page: pageNumber.toString(),
-            }).catch((error) => {
-              console.error(`❌ Failed to fetch page ${pageNumber}:`, error);
-              return { bookings: [] }; // Return empty on failure, don't break the entire process
-            })
-          );
-        }
-
-        // Execute all pages in parallel (this is the key performance improvement!)
-        const responses = await Promise.all(pagePromises);
-        totalPagesFetched += pagesToFetch;
-
-        // Process all responses
-        let batchTotalBookings = 0;
-        for (let i = 0; i < responses.length; i++) {
-          const response = responses[i];
-          const pageNumber = currentPage + i;
-          const bookings = response.bookings || [];
-
-          console.log(`📋 Page ${pageNumber}: Found ${bookings.length} bookings`);
-
-          // Filter bookings by the 3 conditions you specified
-          const validBookings = bookings.filter((booking: any) => {
-            const today = new Date();
-            const createdDate = new Date(booking.created_at);
-
-            // Check the 3 conditions:
-            // 1. cancelled_at is null
-            // 2. did_not_arrive is false
-            // 3. created_date <= today
-            const isValid =
-              !booking.cancelled_at && // cancelled_at is null
-              !booking.did_not_arrive && // did_not_arrive is false
-              createdDate <= today; // created_date <= today
-
-            return isValid;
-          });
-
-          console.log(
-            `✅ Page ${pageNumber}: ${validBookings.length}/${bookings.length} valid bookings`
-          );
-
-          // Add all valid bookings (no limit)
-          allBookings.push(...validBookings);
-          batchTotalBookings += validBookings.length;
-        }
-
-        console.log(`📈 Batch completed: Added ${batchTotalBookings} valid bookings`);
-        console.log(`📊 Running total: ${allBookings.length} records`);
-
-        // Check if we should continue (look for more pages)
-        const lastResponse = responses[responses.length - 1];
-        const hasMore = lastResponse.links?.next !== undefined;
-
-        if (!hasMore) {
-          console.log(`📄 No more pages available, stopping parallel fetch`);
-          break;
-        }
-
-        // Move to next batch of pages
-        currentPage += pagesToFetch;
-
-        // Safety check to prevent infinite loops
-        if (currentPage > 50) {
-          console.log(`⚠️ Reached maximum page limit (50), stopping parallel fetch`);
-          break;
-        }
-
-        // Small delay between batches to be respectful to the API
-        console.log(`⏳ Waiting ${DELAY_BETWEEN_BATCHES}ms before next parallel batch...`);
-        await new Promise((resolve) => setTimeout(resolve, DELAY_BETWEEN_BATCHES));
-      }
-
-      console.log(
-        `✅ Total synced records: ${allBookings.length} valid bookings from ${totalPagesFetched} pages`
-      );
-      console.log(
-        `🚀 Parallel fetch completed in ${totalPagesFetched} pages with ${MAX_PARALLEL_PAGES} parallel calls per batch`
-      );
-
-      // Process valid bookings to extract patients
-      const patients = await this.processBookingsForPatients(allBookings);
-      console.log(
-        `✅ Processed ${allBookings.length} valid bookings, found ${patients.length} EPC/WC patients`
-      );
-
+      console.log('👥 Fetching patients only from Cliniko...');
+      const patients = await this.getFirst200Patients();
+      console.log(`✅ Patients fetched: ${patients.length} patients`);
       return patients;
     } catch (error) {
       console.error('❌ Error fetching patients from Cliniko:', error);
@@ -276,87 +145,237 @@ export class ClinikoAPI implements PMSApiInterface {
     }
   }
 
-  private async processBookingsForPatients(bookings: any[]): Promise<PMSPatient[]> {
-    const patientMap = new Map<string, PMSPatient>();
-
-    console.log(`🔍 Processing ${bookings} ${patientMap}bookings for patients...`);
-
-    for (const booking of bookings) {
-      if (!booking.patient?.links?.self) {
-        console.log(`⚠️ Skipping booking ${booking.id} - no patient links`);
-        continue;
-      }
-
-      const patientId = booking.patient.links.self.split('/').pop();
-      if (!patientId || patientMap.has(patientId)) {
-        console.log(`⚠️ Skipping patient ${patientId} - already processed or invalid`);
-        continue;
-      }
-
-      // Extract appointment type ID from the links.self URL
-      const appointmentTypeId = booking.appointment_type?.links?.self?.split('/').pop();
-      if (!appointmentTypeId) {
-        console.log(`⚠️ Skipping booking ${booking.id} - no appointment type ID`);
-        continue;
-      }
-
-      console.log(`🔍 Processing patient ${patientId} with appointment type ${appointmentTypeId}`);
-
-      const patientData = await this.getPatientDetails(patientId);
-      if (!patientData) {
-        console.log(`⚠️ Could not fetch patient details for ${patientId}`);
-        continue;
-      }
-
-      // Get appointment type details to check if it's EPC/WC
-      const appointmentType = await this.getAppointmentTypeDetails(
-        booking.appointment_type.links.self
+  // Complete sync method that fetches everything: appointment types, patients, AND appointments
+  async syncComplete(): Promise<{
+    appointmentTypes: any[];
+    patients: PMSPatient[];
+    appointments: PMSAppointment[];
+  }> {
+    try {
+      console.log(
+        '🚀 Starting complete Cliniko sync: Appointment Types + Patients + Appointments...'
       );
-      if (!appointmentType) {
-        console.log(`⚠️ Could not fetch appointment type details for ${appointmentTypeId}`);
-        continue;
-      }
 
-      console.log(`📋 Appointment type: ${appointmentType.name} (ID: ${appointmentTypeId})`);
+      // Step 1: Fetch all appointment types
+      console.log('📋 Step 1: Fetching appointment types...');
+      const appointmentTypes = await this.getAppointmentTypes();
+      console.log(`✅ Step 1 completed: Found ${appointmentTypes.length} appointment types`);
 
-      const patientType = this.determinePatientTypeFromBooking(booking, appointmentType);
-      console.log(`🏷️ Determined patient type: ${patientType}`);
+      // Step 2: Fetch first 200 patients
+      console.log('👥 Step 2: Fetching first 200 patients...');
+      const patients = await this.getFirst200Patients();
+      console.log(`✅ Step 2 completed: Found ${patients.length} patients`);
 
-      if (patientType) {
-        console.log(
-          `✅ Adding ${patientType} patient: ${patientData.first_name} ${patientData.last_name}`
-        );
+      // Step 3: Fetch all appointments for these patients
+      console.log('📅 Step 3: Fetching all appointments for patients...');
+      const patientIds = patients.map((p) => p.id.toString());
+      const appointments = await this.getAppointmentsForPatients(patientIds);
+      console.log(`✅ Step 3 completed: Found ${appointments.length} appointments`);
 
-        patientMap.set(patientId, {
-          id: patientId,
-          firstName: patientData.first_name || '',
-          lastName: patientData.last_name || '',
-          email: patientData.email,
-          phone: patientData.phone_number,
-          dateOfBirth: patientData.date_of_birth,
-          gender: patientData.gender,
-          address: {
-            line1: patientData.address_1,
-            line2: patientData.address_2,
-            suburb: patientData.city,
-            state: patientData.state,
-            postcode: patientData.post_code,
-            country: patientData.country,
-          },
-          patientType,
-          physioName: booking.patient_name,
-          lastModified: patientData.updated_at,
-        });
-      } else {
-        console.log(`❌ Patient ${patientId} does not have EPC/WC appointment type`);
-      }
+      console.log(
+        `🎯 Complete sync finished: ${appointmentTypes.length} appointment types + ${patients.length} patients + ${appointments.length} appointments`
+      );
+
+      return {
+        appointmentTypes,
+        patients,
+        appointments,
+      };
+    } catch (error) {
+      console.error('❌ Error in complete Cliniko sync:', error);
+      throw error;
     }
-
-    const result = Array.from(patientMap.values());
-    console.log(`✅ Processed ${bookings.length} bookings, found ${result.length} EPC/WC patients`);
-    return result;
   }
 
+  // Remove the syncCompleteWithCounts method - counts are calculated in the route file like Nookal
+
+  // New method to get first 200 patients directly from /patients endpoint (same as Nookal flow)
+  async getFirst200Patients(appointmentTypeIds?: string[]): Promise<PMSPatient[]> {
+    try {
+      console.log('🔍 Fetching first 200 patients directly from Cliniko /patients endpoint...');
+      console.log('   Appointment type IDs:', appointmentTypeIds || 'not specified');
+
+      const allPatients: PMSPatient[] = [];
+      const patientsPerPage = 100; // Cliniko supports 1-100 per page
+      const targetTotal = 200; // We want 200 patients total
+      let currentPage = 1;
+
+      console.log(`🚀 Starting to fetch patients in batches of ${patientsPerPage}...`);
+
+      while (allPatients.length < targetTotal) {
+        console.log(
+          `📄 Fetching page ${currentPage} (target: ${targetTotal} patients, current: ${allPatients.length})`
+        );
+
+        const params: Record<string, string> = {
+          per_page: patientsPerPage.toString(), // Use 100 per page (Cliniko's limit)
+          page: currentPage.toString(),
+        };
+
+        try {
+          // Call the /patients endpoint directly (not /bookings)
+          const response = await this.makeRequest('/patients', params);
+          const patients = response.patients || [];
+
+          if (patients.length === 0) {
+            console.log(`📄 Page ${currentPage}: No more patients found, stopping`);
+            break;
+          }
+
+          console.log(`📋 Page ${currentPage}: Found ${patients.length} patients`);
+
+          // Process each patient and add to our collection
+          for (const patient of patients) {
+            if (allPatients.length >= targetTotal) {
+              console.log(`🎯 Reached target of ${targetTotal} patients`);
+              break;
+            }
+
+            // Map Cliniko patient data to our standard format
+            const mappedPatient: PMSPatient = {
+              id: patient.id,
+              firstName: patient.first_name || '',
+              lastName: patient.last_name || '',
+              email: patient.email,
+              phone: patient.phone_number,
+              dateOfBirth: patient.date_of_birth,
+              gender: patient.gender,
+              address: {
+                line1: patient.address_1,
+                line2: patient.address_2,
+                suburb: patient.city,
+                state: patient.state,
+                postcode: patient.post_code,
+                country: patient.country,
+              },
+              patientType: 'EPC', // Default to EPC as per your requirement
+              physioName: `${patient.first_name || ''} ${patient.last_name || ''}`.trim(),
+              lastModified: patient.updated_at,
+            };
+
+            allPatients.push(mappedPatient);
+          }
+
+          console.log(
+            `✅ Page ${currentPage}: Added ${patients.length} patients, total now: ${allPatients.length}`
+          );
+
+          // Check if there are more pages
+          const hasMore = response.links?.next !== undefined;
+          if (!hasMore) {
+            console.log(`📄 No more pages available, stopping`);
+            break;
+          }
+
+          currentPage++;
+
+          // Safety check to prevent infinite loops
+          if (currentPage > 50) {
+            console.log(`⚠️ Reached maximum page limit (50), stopping`);
+            break;
+          }
+        } catch (error) {
+          console.error(`❌ Error fetching page ${currentPage}:`, error);
+          break;
+        }
+      }
+
+      console.log(`✅ Total patients fetched: ${allPatients.length} from ${currentPage - 1} pages`);
+      return allPatients;
+    } catch (error) {
+      console.error('❌ Error fetching first 200 patients from Cliniko:', error);
+      throw error;
+    }
+  }
+
+  // Remove the old methods that are no longer needed with the new Nookal-style flow:
+  // - processBookingsForPatients (no longer needed - we fetch patients directly)
+  // - determinePatientTypeFromBooking (no longer needed - we fetch patients directly)
+  // - getAppointmentsForPatients (will implement later when we discuss booking flow)
+
+  // Modified method to match Nookal flow - get patients and appointments together
+  async getPatientsWithAppointments(
+    lastModified?: string,
+    appointmentTypeIds?: string[] // Optional: filter patients by appointment types (not used in new flow)
+  ): Promise<{ patients: PMSPatient[]; appointments: PMSAppointment[] }> {
+    try {
+      console.log('🔍 Fetching patients and appointments from Cliniko (same as Nookal flow)...');
+      console.log('   Last modified:', lastModified || 'not specified');
+      console.log(
+        '   Appointment type IDs:',
+        appointmentTypeIds || 'not specified (not used in new flow)'
+      );
+
+      // Step 1: Get first 200 patients directly from /patients endpoint
+      const patients = await this.getFirst200Patients(appointmentTypeIds);
+      console.log(`✅ Step 1 completed: Found ${patients.length} patients`);
+
+      if (patients.length === 0) {
+        console.log('⚠️ No patients found, returning empty result');
+        return { patients: [], appointments: [] };
+      }
+
+      // Step 2: Get all appointments for these 200 patients
+      const patientIds = patients.map((p) => p.id.toString());
+      const appointments = await this.getAppointmentsForPatients(patientIds, lastModified);
+      console.log(`✅ Step 2 completed: Found ${appointments.length} appointments`);
+
+      console.log(
+        `🎯 Nookal-style sync complete: ${patients.length} patients + ${appointments.length} appointments`
+      );
+      return { patients, appointments };
+    } catch (error) {
+      console.error('❌ Error in Nookal-style sync from Cliniko:', error);
+      throw error;
+    }
+  }
+
+  // Legacy method - now calls the new Nookal-style method
+  async getPatients(lastModified?: string, appointmentTypeIds?: string[]): Promise<PMSPatient[]> {
+    try {
+      console.log('🔍 Fetching patients from Cliniko (legacy method - now uses Nookal flow)...');
+
+      // For Cliniko, we now use the Nookal-style flow that directly fetches from /patients endpoint
+      // We get the first 200 patients in batches of 100 (appointment type IDs not used in new flow)
+      const { patients } = await this.getPatientsWithAppointments(lastModified, appointmentTypeIds);
+      return patients;
+    } catch (error) {
+      console.error('❌ Error fetching patients from Cliniko:', error);
+      throw error;
+    }
+  }
+
+  // Legacy method - now calls the new Nookal-style method
+  async getAppointments(patientIds: string[], lastModified?: string): Promise<PMSAppointment[]> {
+    try {
+      console.log(
+        '🔍 Fetching appointments from Cliniko (legacy method - now uses Nookal flow)...'
+      );
+
+      // Use the new method to get appointments for specific patients
+      const appointments = await this.getAppointmentsForPatients(patientIds, lastModified);
+      return appointments;
+    } catch (error) {
+      console.error('❌ Error fetching appointments from Cliniko:', error);
+      throw error;
+    }
+  }
+
+  // Legacy method - now calls the new Nookal-style method
+  async getPatientAppointments(patientId: string): Promise<PMSAppointment[]> {
+    try {
+      console.log(`🔍 Fetching appointments for patient ${patientId} from Cliniko...`);
+
+      // Use the new method to get appointments for a single patient
+      const appointments = await this.getAppointmentsForPatients([patientId]);
+      return appointments;
+    } catch (error) {
+      console.error(`❌ Error fetching appointments for patient ${patientId} from Cliniko:`, error);
+      return [];
+    }
+  }
+
+  // Keep existing helper methods
   private async getPatientDetails(patientId: string): Promise<any> {
     try {
       const response = await this.makeRequest(`/patients/${patientId}`);
@@ -378,92 +397,8 @@ export class ClinikoAPI implements PMSApiInterface {
     }
   }
 
-  private determinePatientTypeFromBooking(booking: any, appointmentType: any): 'EPC' | 'WC' | null {
-    const appointmentTypeName = appointmentType?.name?.toLowerCase() || '';
-    const notes = booking.notes?.toLowerCase() || '';
-
-    console.log(`🔍 Checking appointment type: "${appointmentTypeName}" and notes: "${notes}"`);
-
-    if (
-      appointmentTypeName.includes('epc') ||
-      appointmentTypeName.includes('enhanced primary care') ||
-      appointmentTypeName.includes('medicare') ||
-      notes.includes('epc') ||
-      notes.includes('enhanced primary care')
-    ) {
-      console.log(`✅ Matched EPC criteria for appointment type: "${appointmentTypeName}"`);
-      return 'EPC';
-    }
-
-    if (
-      appointmentTypeName.includes('workers comp') ||
-      appointmentTypeName.includes('workcover') ||
-      appointmentTypeName.includes('wc') ||
-      appointmentTypeName.includes('work injury') ||
-      notes.includes('workers comp') ||
-      notes.includes('workcover') ||
-      notes.includes('work injury')
-    ) {
-      console.log(`✅ Matched WC criteria for appointment type: "${appointmentTypeName}"`);
-      return 'WC';
-    }
-
-    console.log(`❌ No EPC/WC match found for appointment type: "${appointmentTypeName}"`);
-    return null;
-  }
-
-  async getAppointments(patientIds: string[], lastModified?: string): Promise<PMSAppointment[]> {
-    try {
-      const params: Record<string, string> = {
-        per_page: '50',
-      };
-
-      if (lastModified) {
-        params.updated_since = lastModified;
-      }
-
-      const allAppointments: PMSAppointment[] = [];
-      let page = 1;
-      let hasMore = true;
-
-      while (hasMore) {
-        params.page = page.toString();
-        const response = await this.makeRequest('/bookings', params);
-
-        const bookings = response.bookings || [];
-        const completedBookings = bookings.filter(
-          (booking: any) =>
-            booking.patient &&
-            booking.appointment_type &&
-            !booking.unavailable_block_type &&
-            !booking.cancelled_at &&
-            !booking.did_not_arrive &&
-            new Date(booking.ends_at) < new Date()
-        );
-
-        const appointments = completedBookings
-          .filter((booking: any) => {
-            const patientId = booking.patient.links.self.split('/').pop();
-            return patientIds.includes(patientId);
-          })
-          .map((booking: any) => this.mapBookingToAppointment(booking));
-
-        allAppointments.push(...appointments);
-
-        hasMore = response.links?.next !== undefined;
-        page++;
-
-        if (page > 100) break;
-      }
-
-      return allAppointments;
-    } catch (error) {
-      console.error('Error fetching Cliniko appointments:', error);
-      throw error;
-    }
-  }
-
   private mapBookingToAppointment(booking: any): PMSAppointment | null {
+    console.log(booking.appointment_type?.links?.self?.split('/').pop(), 'bookings ID');
     if (!booking) {
       return null;
     }
@@ -493,7 +428,7 @@ export class ClinikoAPI implements PMSApiInterface {
 
     return {
       id: parseInt(booking.id),
-      patientId: parseInt(patientId),
+      patientId: patientId,
       date: booking.starts_at,
       type: appointmentTypeId,
       status: 'completed',
@@ -505,7 +440,7 @@ export class ClinikoAPI implements PMSApiInterface {
       cancelled_at: booking.cancelled_at,
       did_not_arrive: booking.did_not_arrive,
       appointment_date: booking.starts_at,
-      appointment_type_id: parseInt(appointmentTypeId),
+      appointment_type_id: appointmentTypeId,
     };
   }
 
@@ -513,79 +448,6 @@ export class ClinikoAPI implements PMSApiInterface {
     const start = new Date(startTime);
     const end = new Date(endTime);
     return Math.round((end.getTime() - start.getTime()) / (1000 * 60));
-  }
-
-  async getPatientAppointments(patientId: string): Promise<PMSAppointment[]> {
-    try {
-      const bookings = await this.getPatientBookings(patientId);
-      console.log(`🔍 Found ${bookings.length} bookings for patient ${patientId}`);
-
-      const appointments: PMSAppointment[] = [];
-
-      for (const booking of bookings) {
-        const appointment = this.mapBookingToAppointment(booking);
-        if (appointment) {
-          appointments.push(appointment);
-        }
-        // Skip null appointments silently - no need to log every single one
-      }
-
-      console.log(
-        `✅ Successfully mapped ${appointments.length} appointments from ${bookings.length} bookings for patient ${patientId}`
-      );
-      return appointments;
-    } catch (error) {
-      console.error(`❌ Error in getPatientAppointments for patient ${patientId}:`, error);
-      return [];
-    }
-  }
-
-  private async getPatientBookings(patientId: string): Promise<any[]> {
-    try {
-      console.log(`🔍 Fetching bookings for patient ${patientId}...`);
-
-      const response = await this.makeRequest('/bookings', {
-        patient_id: patientId,
-        per_page: '50',
-      });
-
-      const bookings = response.bookings || [];
-      console.log(`📋 Found ${bookings.length} bookings for patient ${patientId}`);
-
-      // Log the first booking structure for debugging
-      if (bookings.length > 0) {
-        console.log(`🔍 First booking structure:`, JSON.stringify(bookings[0], null, 2));
-      }
-
-      return bookings;
-    } catch (error) {
-      console.error(`Error fetching bookings for patient ${patientId}:`, error);
-      return [];
-    }
-  }
-
-  private mapBookingStatus(status: string): 'completed' | 'cancelled' | 'dna' | 'scheduled' {
-    const statusLower = status?.toLowerCase() || '';
-
-    if (
-      statusLower.includes('completed') ||
-      statusLower.includes('arrived') ||
-      statusLower.includes('confirmed')
-    ) {
-      return 'completed';
-    }
-    if (statusLower.includes('cancelled') || statusLower.includes('deleted')) {
-      return 'cancelled';
-    }
-    if (
-      statusLower.includes('dna') ||
-      statusLower.includes('did not attend') ||
-      statusLower.includes('no show')
-    ) {
-      return 'dna';
-    }
-
-    return 'scheduled';
   }
 
   async getAppointmentTypes(): Promise<any[]> {
@@ -620,29 +482,7 @@ export class ClinikoAPI implements PMSApiInterface {
     }
   }
 
-  private extractCodeFromName(name: string): string | null {
-    const nameLower = name.toLowerCase();
-
-    if (
-      nameLower.includes('epc') ||
-      nameLower.includes('enhanced primary care') ||
-      nameLower.includes('medicare')
-    ) {
-      return 'EPC';
-    }
-
-    if (
-      nameLower.includes('wc') ||
-      nameLower.includes('workers comp') ||
-      nameLower.includes('workcover') ||
-      nameLower.includes('work injury')
-    ) {
-      return 'WC';
-    }
-
-    return null;
-  }
-
+  // Modified to process all appointment types with WC/EPC categorization like Nookal
   processAppointmentTypes(appointmentTypes: any[]): Array<{
     appointment_id: string;
     appointment_name: string;
@@ -655,186 +495,153 @@ export class ClinikoAPI implements PMSApiInterface {
     }> = [];
 
     for (const appointmentType of appointmentTypes) {
-      const code = this.extractCodeFromName(appointmentType.name);
+      const name = appointmentType.name;
+      const id = appointmentType.id;
 
-      if (code) {
+      if (name && id) {
+        // Determine if this is WC or EPC based on the appointment name (like Nookal)
+        let code = 'Other'; // Default for non-WC/EPC types
+
+        const nameLower = name.toLowerCase();
+        if (
+          nameLower.includes('wc') ||
+          nameLower.includes('workcover') ||
+          nameLower.includes('work cover') ||
+          nameLower.includes('workers compensation')
+        ) {
+          code = 'WC';
+        } else if (
+          nameLower.includes('epc') ||
+          nameLower.includes('enhanced primary care') ||
+          nameLower.includes('care plan')
+        ) {
+          code = 'EPC';
+        }
+
         processedTypes.push({
-          appointment_id: appointmentType.id,
-          appointment_name: appointmentType.name,
+          appointment_id: id.toString(),
+          appointment_name: name,
           code: code,
         });
 
-        console.log(
-          `📝 Processed appointment type: ${appointmentType.name} (ID: ${appointmentType.id}) -> ${code}`
-        );
+        console.log(`📝 Processed appointment type: ${name} (ID: ${id}) -> ${code}`);
       }
     }
 
     console.log(
-      `✅ Filtered ${processedTypes.length} EPC/WC appointment types from ${appointmentTypes.length} total`
+      `✅ Processed ${processedTypes.length} appointment types from ${appointmentTypes.length} total`
     );
     return processedTypes;
   }
 
-  async getPatientsWithAppointments(
-    lastModified?: string,
-    appointmentTypeIds?: string[]
-  ): Promise<{ patients: PMSPatient[]; appointments: PMSAppointment[] }> {
+  // Remove getAppointmentCounts method - counts are calculated in the route file like Nookal
+
+  // Method to get all appointments for specific patients using /bookings endpoint
+  async getAppointmentsForPatients(
+    patientIds: string[],
+    lastModified?: string
+  ): Promise<PMSAppointment[]> {
     try {
-      console.log(
-        '🔍 Fetching patients and appointments from Cliniko with appointment type filtering...'
-      );
+      console.log(`🔍 Fetching all appointments for ${patientIds.length} patients from Cliniko...`);
       console.log('   Last modified:', lastModified || 'not specified');
-      console.log('   Appointment type IDs:', appointmentTypeIds || 'not specified');
 
-      if (!appointmentTypeIds || appointmentTypeIds.length === 0) {
-        console.log('⚠️ No appointment type IDs provided, cannot filter bookings');
-        return { patients: [], appointments: [] };
-      }
+      const allAppointments: PMSAppointment[] = [];
 
-      // Create the query parameter for appointment type filtering
-      // Format: q[]=appointment_type_id:=ID1,ID2,ID3 (this is the exact format that works in Postman!)
-      const appointmentTypeFilter = appointmentTypeIds.join(',');
-      console.log(`🔍 Filtering bookings by appointment types: ${appointmentTypeFilter}`);
+      // Fetch appointments for each patient using Cliniko's API format
+      for (const patientId of patientIds) {
+        try {
+          console.log(`🔍 Fetching appointments for patient ${patientId}...`);
 
-      const params: Record<string, string> = {
-        per_page: '100', // Keep at 100 as per API limit
-        'q[]': `appointment_type_id:=${appointmentTypeFilter}`, // Fixed: using the exact working Postman format
-      };
+          const params: Record<string, string> = {
+            'q[]': `patient_ids:~${patientId}`, // Format: patient_ids:~PATIENT_ID (as per curl example)
+            per_page: '100', // Use Cliniko's per_page parameter
+          };
 
-      if (lastModified) {
-        params.updated_since = lastModified;
-      }
+          if (lastModified) {
+            params.updated_since = lastModified; // Use Cliniko's updated_since parameter
+          }
 
-      const allBookings: any[] = [];
-      const MAX_PARALLEL_PAGES = 5; // Don't overwhelm the API
-      const DELAY_BETWEEN_BATCHES = 100; // 100ms delay between parallel batches
+          let currentPage = 1;
+          let hasMore = true;
 
-      console.log(`🚀 Starting parallel fetch for unlimited records...`);
-      console.log(`⚡ Using ${MAX_PARALLEL_PAGES} parallel pages for optimal performance`);
+          while (hasMore) {
+            params.page = currentPage.toString(); // Use Cliniko's page parameter
 
-      let currentPage = 1;
-      let totalPagesFetched = 0;
+            try {
+              const response = await this.makeRequest('/bookings', params);
+              const bookings = response.bookings || [];
 
-      while (true) {
-        // Calculate how many pages we need to fetch in this batch
-        const pagesToFetch = MAX_PARALLEL_PAGES;
+              if (bookings.length === 0) {
+                hasMore = false;
+                break;
+              }
 
-        console.log(
-          `🔄 Fetching pages ${currentPage} to ${currentPage + pagesToFetch - 1} in parallel...`
-        );
-        console.log(`📊 Current total: ${allBookings.length} records`);
+              // Filter valid bookings (same as Nookal flow logic, but using Cliniko data structure)
+              const validBookings = bookings.filter((booking: any) => {
+                const today = new Date();
+                const createdDate = new Date(booking.created_at);
 
-        // Create array of page promises to fetch in parallel
-        const pagePromises = [];
-        for (let i = 0; i < pagesToFetch; i++) {
-          const pageNumber = currentPage + i;
-          pagePromises.push(
-            this.makeRequest('/bookings', {
-              ...params,
-              page: pageNumber.toString(),
-            }).catch((error) => {
-              console.error(`❌ Failed to fetch page ${pageNumber}:`, error);
-              return { bookings: [] }; // Return empty on failure, don't break the entire process
-            })
-          );
-        }
+                // Check the 3 conditions (same as Nookal):
+                // 1. cancelled_at is null
+                // 2. did_not_arrive is false
+                // 3. created_date <= today
+                const isValid =
+                  !booking.cancelled_at && // cancelled_at is null
+                  !booking.did_not_arrive && // did_not_arrive is false
+                  createdDate <= today; // created_date <= today
 
-        // Execute all pages in parallel (this is the key performance improvement!)
-        const responses = await Promise.all(pagePromises);
-        totalPagesFetched += pagesToFetch;
+                return isValid;
+              });
 
-        // Process all responses
-        let batchTotalBookings = 0;
-        for (let i = 0; i < responses.length; i++) {
-          const response = responses[i];
-          const pageNumber = currentPage + i;
-          const bookings = response.bookings || [];
+              // Convert valid bookings to appointments
+              const patientAppointments = validBookings
+                .map((booking: any) => this.mapBookingToAppointment(booking))
+                .filter(
+                  (appointment: PMSAppointment | null): appointment is PMSAppointment =>
+                    appointment !== null
+                );
 
-          console.log(`📋 Page ${pageNumber}: Found ${bookings.length} bookings`);
+              allAppointments.push(...patientAppointments);
 
-          // Filter bookings by the 3 conditions you specified
-          const validBookings = bookings.filter((booking: any) => {
-            const today = new Date();
-            const createdDate = new Date(booking.created_at);
+              console.log(
+                `📋 Patient ${patientId} page ${currentPage}: ${validBookings.length}/${bookings.length} valid bookings -> ${patientAppointments.length} appointments`
+              );
 
-            // Check the 3 conditions:
-            // 1. cancelled_at is null
-            // 2. did_not_arrive is false
-            // 3. created_date <= today
-            const isValid =
-              !booking.cancelled_at && // cancelled_at is null
-              !booking.did_not_arrive && // did_not_arrive is false
-              createdDate <= today; // created_date <= today
+              // Check if there are more pages using Cliniko's links format
+              hasMore = response.links?.next !== undefined;
+              currentPage++;
 
-            return isValid;
-          });
+              // Safety check
+              if (currentPage > 50) {
+                console.warn(
+                  `⚠️ Safety limit reached for patient ${patientId}, stopping pagination`
+                );
+                break;
+              }
+            } catch (error) {
+              console.error(
+                `❌ Error fetching page ${currentPage} for patient ${patientId}:`,
+                error
+              );
+              hasMore = false;
+            }
+          }
 
           console.log(
-            `✅ Page ${pageNumber}: ${validBookings.length}/${bookings.length} valid bookings`
+            `✅ Patient ${patientId}: Total appointments: ${allAppointments.filter((apt) => apt.patientId.toString() === patientId).length}`
           );
-
-          // Add all valid bookings (no limit)
-          allBookings.push(...validBookings);
-          batchTotalBookings += validBookings.length;
+        } catch (error) {
+          console.error(`❌ Error fetching appointments for patient ${patientId}:`, error);
+          // Continue with next patient
         }
-
-        console.log(`📈 Batch completed: Added ${batchTotalBookings} valid bookings`);
-        console.log(`📊 Running total: ${allBookings.length} records`);
-
-        // Check if we should continue (look for more pages)
-        const lastResponse = responses[responses.length - 1];
-        const hasMore = lastResponse.links?.next !== undefined;
-
-        if (!hasMore) {
-          console.log(`📄 No more pages available, stopping parallel fetch`);
-          break;
-        }
-
-        // Move to next batch of pages
-        currentPage += pagesToFetch;
-
-        // Safety check to prevent infinite loops
-        if (currentPage > 50) {
-          console.log(`⚠️ Reached maximum page limit (50), stopping parallel fetch`);
-          break;
-        }
-
-        // Small delay between batches to be respectful to the API
-        console.log(`⏳ Waiting ${DELAY_BETWEEN_BATCHES}ms before next parallel batch...`);
-        await new Promise((resolve) => setTimeout(resolve, DELAY_BETWEEN_BATCHES));
       }
 
       console.log(
-        `✅ Total synced records: ${allBookings.length} valid bookings from ${totalPagesFetched} pages`
+        `🎯 Total appointments fetched for ${patientIds.length} patients: ${allAppointments.length}`
       );
-      console.log(
-        `🚀 Parallel fetch completed in ${totalPagesFetched} pages with ${MAX_PARALLEL_PAGES} parallel calls per batch`
-      );
-
-      // Process valid bookings to extract patients
-      const patients = await this.processBookingsForPatients(allBookings);
-      console.log(
-        `✅ Processed ${allBookings.length} valid bookings, found ${patients.length} EPC/WC patients`
-      );
-
-      // Convert valid bookings to appointments
-      const appointments = allBookings
-        .map((booking: any) => this.mapBookingToAppointment(booking))
-        .filter((appointment): appointment is PMSAppointment => appointment !== null);
-      const skippedBookings = allBookings.length - appointments.length;
-      if (skippedBookings > 0) {
-        console.log(
-          `⚠️ Skipped ${skippedBookings} bookings due to incomplete data (missing patient info)`
-        );
-      }
-      console.log(
-        `✅ Converted ${allBookings.length} valid bookings to ${appointments.length} valid appointments`
-      );
-
-      return { patients, appointments };
+      return allAppointments;
     } catch (error) {
-      console.error('❌ Error fetching patients and appointments from Cliniko:', error);
+      console.error('❌ Error fetching appointments for patients from Cliniko:', error);
       throw error;
     }
   }

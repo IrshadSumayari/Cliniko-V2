@@ -276,7 +276,7 @@ async function performInitialSync(supabase: any, userId: string, pmsClient: any,
       .from('appointment_types')
       .select('appointment_id')
       .eq('user_id', userId)
-      .eq('pms_type', pmsType);
+      .eq('pms_type', pmsType); //cliniko or nookal
 
     if (typesError) {
       console.error('[SERVER] Error fetching appointment types:', typesError);
@@ -569,9 +569,13 @@ async function performInitialSync(supabase: any, userId: string, pmsClient: any,
             issues.push('Could not count WC appointments');
           } else {
             // Count unique patients (not appointments)
-            const uniquePatientIds = new Set(wcAppointments?.map((apt: any) => apt.patient_id).filter(Boolean));
+            const uniquePatientIds = new Set(
+              wcAppointments?.map((apt: any) => apt.patient_id).filter(Boolean)
+            );
             wcPatients = uniquePatientIds.size;
-            console.log(`[SERVER] WC: Found ${wcAppointments?.length || 0} appointments for ${wcPatients} unique patients`);
+            console.log(
+              `[SERVER] WC: Found ${wcAppointments?.length || 0} appointments for ${wcPatients} unique patients`
+            );
           }
         }
 
@@ -589,9 +593,13 @@ async function performInitialSync(supabase: any, userId: string, pmsClient: any,
             issues.push('Could not count EPC appointments');
           } else {
             // Count unique patients (not appointments)
-            const uniquePatientIds = new Set(epcAppointments?.map((apt: any) => apt.patient_id).filter(Boolean));
+            const uniquePatientIds = new Set(
+              epcAppointments?.map((apt: any) => apt.patient_id).filter(Boolean)
+            );
             epcPatients = uniquePatientIds.size;
-            console.log(`[SERVER] EPC: Found ${epcAppointments?.length || 0} appointments for ${epcPatients} unique patients`);
+            console.log(
+              `[SERVER] EPC: Found ${epcAppointments?.length || 0} appointments for ${epcPatients} unique patients`
+            );
           }
         }
       }

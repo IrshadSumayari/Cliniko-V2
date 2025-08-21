@@ -500,25 +500,6 @@ export class NookalAPI implements PMSApiInterface {
     };
   }
 
-  private async getPatientDetails(patientId: string): Promise<any> {
-    try {
-      console.log(`[NOOKAL] Fetching details for patient ${patientId}...`);
-      const response = await this.makeRequest('/getPatient', {
-        patient_id: patientId,
-      });
-
-      const patient = response.data?.results?.patient || response.data?.patient || response.patient;
-      if (patient) {
-        console.log(`[NOOKAL] ✅ Found patient details for ${patientId}`);
-        return patient;
-      }
-      return null;
-    } catch (error) {
-      console.warn(`[NOOKAL] Could not fetch patient details for ${patientId}:`, error);
-      return null;
-    }
-  }
-
   async getModifiedPatients(lastModified: Date): Promise<PMSPatient[]> {
     try {
       // For modified patients, we'll use getAppointments with appt_status=Completed
