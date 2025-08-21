@@ -1,12 +1,15 @@
 {
   "name": "my-v0-project",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "private": true,
   "scripts": {
     "build": "next build",
     "dev": "next dev",
     "lint": "next lint",
-    "start": "next start"
+    "start": "next start",
+    "format": "prettier --write .",
+    "test-sync": "node scripts/test-sync.js",
+    "test-sync-http": "node scripts/test-sync-http.js"
   },
   "dependencies": {
     "@hookform/resolvers": "^3.9.1",
@@ -46,12 +49,14 @@
     "cmdk": "latest",
     "crypto": "latest",
     "date-fns": "4.1.0",
+    "dotenv": "^17.2.1",
     "embla-carousel-react": "latest",
     "geist": "^1.3.1",
     "input-otp": "latest",
     "lucide-react": "^0.454.0",
     "next": "15.2.4",
     "next-themes": "latest",
+    "node-fetch": "^3.3.2",
     "react": "^19",
     "react-day-picker": "latest",
     "react-dom": "^19",
@@ -62,7 +67,6 @@
     "stripe": "latest",
     "tailwind-merge": "^2.5.5",
     "tailwindcss-animate": "^1.0.7",
-    "vaul": "latest",
     "zod": "^3.24.1"
   },
   "devDependencies": {
@@ -70,6 +74,7 @@
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "postcss": "^8.5",
+    "prettier": "^3.6.2",
     "tailwindcss": "^3.4.17",
     "typescript": "^5"
   }

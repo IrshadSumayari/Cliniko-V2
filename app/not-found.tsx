@@ -1,15 +1,12 @@
-"use client";
-import { useRouter } from "next/navigation";
-import { useEffect } from "react";
+'use client';
+import { useRouter } from 'next/navigation';
+import { useEffect } from 'react';
 
 const NotFound = () => {
   const location = useRouter();
 
   useEffect(() => {
-    console.error(
-      "404 Error: User attempted to access non-existent route:",
-      location.push("/")
-    );
+    console.error('404 Error: User attempted to access non-existent route:', location.push('/'));
   }, [location]);
 
   return (

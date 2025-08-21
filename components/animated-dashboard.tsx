@@ -1,9 +1,9 @@
-"use client";
+'use client';
 
-import { useState, useEffect } from "react";
-import { Card, CardContent } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
+import { useState, useEffect } from 'react';
+import { Card, CardContent } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
 import {
   Users,
   Calendar,
@@ -15,88 +15,88 @@ import {
   Edit,
   Archive,
   MoreHorizontal,
-} from "lucide-react";
+} from 'lucide-react';
 
 const AnimatedDashboard = () => {
-  const [activeTab, setActiveTab] = useState("all");
+  const [activeTab, setActiveTab] = useState('all');
   const [animationStep, setAnimationStep] = useState(0);
 
   // Mock patient data for the animated dashboard
   const patients = [
     {
       id: 1,
-      name: "Sarah Johnson",
-      program: "EPC",
-      sessions: "4/5",
-      nextAppt: "Dec 15",
-      status: "warning",
-      physio: "Dr. Smith",
-      location: "Main Clinic",
+      name: 'Sarah Johnson',
+      program: 'EPC',
+      sessions: '4/5',
+      nextAppt: 'Dec 15',
+      status: 'warning',
+      physio: 'Dr. Smith',
+      location: 'Main Clinic',
     },
     {
       id: 2,
-      name: "Michael Chen",
-      program: "Workers Comp",
-      sessions: "8/12",
-      nextAppt: "Dec 18",
-      status: "good",
-      physio: "Dr. Wilson",
-      location: "North Branch",
+      name: 'Michael Chen',
+      program: 'Workers Comp',
+      sessions: '8/12',
+      nextAppt: 'Dec 18',
+      status: 'good',
+      physio: 'Dr. Wilson',
+      location: 'North Branch',
     },
     {
       id: 3,
-      name: "Emma Davis",
-      program: "EPC",
-      sessions: "1/5",
-      nextAppt: "Dec 20",
-      status: "good",
-      physio: "Dr. Smith",
-      location: "Main Clinic",
+      name: 'Emma Davis',
+      program: 'EPC',
+      sessions: '1/5',
+      nextAppt: 'Dec 20',
+      status: 'good',
+      physio: 'Dr. Smith',
+      location: 'Main Clinic',
     },
     {
       id: 4,
-      name: "James Wilson",
-      program: "Workers Comp",
-      sessions: "9/10",
-      nextAppt: "Dec 22",
-      status: "critical",
-      physio: "Dr. Brown",
-      location: "South Branch",
+      name: 'James Wilson',
+      program: 'Workers Comp',
+      sessions: '9/10',
+      nextAppt: 'Dec 22',
+      status: 'critical',
+      physio: 'Dr. Brown',
+      location: 'South Branch',
     },
   ];
 
   const stats = [
     {
-      label: "Active Patients",
-      value: "142",
+      label: 'Active Patients',
+      value: '142',
       icon: Users,
-      color: "text-blue-600",
+      color: 'text-blue-600',
     },
     {
-      label: "Sessions This Week",
-      value: "89",
+      label: 'Sessions This Week',
+      value: '89',
       icon: Calendar,
-      color: "text-green-600",
+      color: 'text-green-600',
     },
     {
-      label: "Action Needed",
-      value: "8",
+      label: 'Action Needed',
+      value: '8',
       icon: Bell,
-      color: "text-orange-600",
+      color: 'text-orange-600',
     },
     {
-      label: "Pending Approvals",
-      value: "3",
+      label: 'Pending Approvals',
+      value: '3',
       icon: Clock,
-      color: "text-purple-600",
+      color: 'text-purple-600',
     },
   ];
 
   const tabs = [
-    { id: "all", label: "All Patients", count: 142, color: "bg-primary" },
-    { id: "action", label: "Action Needed", count: 8, color: "bg-warning" },
-    { id: "pending", label: "Pending", count: 3, color: "bg-blue-500" },
-    { id: "archived", label: "Archived", count: 24, color: "bg-muted" },
+    { id: 'all', label: 'All Patients', count: 142, color: 'bg-primary' },
+    { id: 'action', label: 'Action Needed', count: 8, color: 'bg-warning' },
+    { id: 'pending', label: 'Pending', count: 3, color: 'bg-blue-500' },
+    { id: 'archived', label: 'Archived', count: 24, color: 'bg-muted' },
   ];
 
   // Animation cycle
@@ -110,11 +110,11 @@ const AnimatedDashboard = () => {
 
   const getStatusIcon = (status: string) => {
     switch (status) {
-      case "critical":
+      case 'critical':
         return <AlertTriangle className="h-4 w-4 text-red-500" />;
-      case "warning":
+      case 'warning':
         return <Bell className="h-4 w-4 text-orange-500" />;
-      case "good":
+      case 'good':
         return <CheckCircle className="h-4 w-4 text-green-500" />;
       default:
         return <Clock className="h-4 w-4 text-gray-500" />;
@@ -123,12 +123,12 @@ const AnimatedDashboard = () => {
 
   const getProgramBadgeClass = (program: string) => {
     switch (program) {
-      case "EPC":
-        return "bg-green-100 text-green-800 border-green-200";
-      case "Workers Comp":
-        return "bg-blue-100 text-blue-800 border-blue-200";
+      case 'EPC':
+        return 'bg-green-100 text-green-800 border-green-200';
+      case 'Workers Comp':
+        return 'bg-blue-100 text-blue-800 border-blue-200';
       default:
-        return "bg-gray-100 text-gray-800 border-gray-200";
+        return 'bg-gray-100 text-gray-800 border-gray-200';
     }
   };
 
@@ -146,9 +146,7 @@ const AnimatedDashboard = () => {
                 <div className="w-3 h-3 rounded-full bg-warning"></div>
                 <div className="w-3 h-3 rounded-full bg-success"></div>
               </div>
-              <div className="text-sm text-muted-foreground">
-                MyPhysioFlow Dashboard
-              </div>
+              <div className="text-sm text-muted-foreground">MyPhysioFlow Dashboard</div>
             </div>
 
             {/* Stats Grid */}
@@ -157,16 +155,14 @@ const AnimatedDashboard = () => {
                 <div
                   key={index}
                   className={`bg-white/80 dark:bg-gray-500/10 p-4 rounded-lg border border-border/30 transition-all duration-500 ${
-                    animationStep === index ? "scale-105 shadow-lg" : ""
+                    animationStep === index ? 'scale-105 shadow-lg' : ''
                   }`}
                 >
                   <div className="flex items-center gap-3">
                     <stat.icon className={`h-5 w-5 ${stat.color}`} />
                     <div>
                       <div className="text-2xl font-bold">{stat.value}</div>
-                      <div className="text-xs text-muted-foreground">
-                        {stat.label}
-                      </div>
+                      <div className="text-xs text-muted-foreground">{stat.label}</div>
                     </div>
                   </div>
                 </div>
@@ -183,8 +179,8 @@ const AnimatedDashboard = () => {
                   onClick={() => setActiveTab(tab.id)}
                   className={`flex-1 flex items-center justify-center gap-2 px-4 py-2 rounded-md text-sm font-medium transition-all ${
                     activeTab === tab.id
-                      ? "bg-white dark:bg-gray-600/15 shadow-sm text-foreground"
-                      : "text-muted-foreground hover:text-foreground"
+                      ? 'bg-white dark:bg-gray-600/15 shadow-sm text-foreground'
+                      : 'text-muted-foreground hover:text-foreground'
                   }`}
                 >
                   <div className={`w-2 h-2 rounded-full ${tab.color}`}></div>
@@ -199,9 +195,7 @@ const AnimatedDashboard = () => {
             {/* Filters */}
             <div className="flex items-center gap-4 mb-6">
               <div className="flex items-center gap-2">
-                <span className="text-sm text-muted-foreground">
-                  Filter by:
-                </span>
+                <span className="text-sm text-muted-foreground">Filter by:</span>
                 <select className="text-sm border border-border rounded px-2 py-1 bg-background">
                   <option>All Physios</option>
                   <option>Dr. Smith</option>
@@ -225,9 +219,7 @@ const AnimatedDashboard = () => {
                 <div
                   key={patient.id}
                   className={`bg-card border border-border rounded-lg p-4 transition-all duration-500 hover:shadow-md ${
-                    animationStep === 1 && index === 0
-                      ? "ring-2 ring-primary/20 bg-primary/5"
-                      : ""
+                    animationStep === 1 && index === 0 ? 'ring-2 ring-primary/20 bg-primary/5' : ''
                   }`}
                 >
                   <div className="flex items-center justify-between">
@@ -238,11 +230,7 @@ const AnimatedDashboard = () => {
                       <div>
                         <div className="flex items-center gap-3 mb-1">
                           <h4 className="font-semibold">{patient.name}</h4>
-                          <Badge
-                            className={`text-xs ${getProgramBadgeClass(
-                              patient.program
-                            )}`}
-                          >
+                          <Badge className={`text-xs ${getProgramBadgeClass(patient.program)}`}>
                             {patient.program}
                           </Badge>
                           {getStatusIcon(patient.status)}
@@ -256,25 +244,13 @@ const AnimatedDashboard = () => {
                       </div>
                     </div>
                     <div className="flex items-center gap-2">
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        className="h-8 px-2 bg-transparent"
-                      >
+                      <Button variant="outline" size="sm" className="h-8 px-2 bg-transparent">
                         <Edit className="h-3 w-3" />
                       </Button>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        className="h-8 px-2 bg-transparent"
-                      >
+                      <Button variant="outline" size="sm" className="h-8 px-2 bg-transparent">
                         <Archive className="h-3 w-3" />
                       </Button>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        className="h-8 px-2 bg-transparent"
-                      >
+                      <Button variant="outline" size="sm" className="h-8 px-2 bg-transparent">
                         <MoreHorizontal className="h-3 w-3" />
                       </Button>
                     </div>
@@ -289,12 +265,9 @@ const AnimatedDashboard = () => {
                 <div className="flex items-center gap-3">
                   <AlertTriangle className="h-5 w-5 text-warning" />
                   <div>
-                    <p className="font-semibold text-warning">
-                      Action Required
-                    </p>
+                    <p className="font-semibold text-warning">Action Required</p>
                     <p className="text-sm text-muted-foreground">
-                      Sarah Johnson has 1 session remaining. Consider booking
-                      renewal appointment.
+                      Sarah Johnson has 1 session remaining. Consider booking renewal appointment.
                     </p>
                   </div>
                   <Button size="sm" className="ml-auto">

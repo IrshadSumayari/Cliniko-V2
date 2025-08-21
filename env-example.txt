@@ -1,0 +1,13 @@
+# Copy this file to .env.local and fill in your values
+
+# Supabase Configuration (for local development)
+# These values are already hardcoded in lib/config.ts, but you can override them here
+NEXT_PUBLIC_SUPABASE_URL=https://ddsbasqzslznczvqwjph.supabase.co
+SUPABASE_SERVICE_ROLE_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRkc2Jhc3F6c2x6bmN6dnF3anBoIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc1NTQyNzExNCwiZXhwIjoyMDcxMDAzMTE0fQ.FyF2hv3XAaIU6syZ_FxIRrH1LlpPLPvCtl3N_Uc0ENY
+
+# Cron Secret (for testing cron endpoints locally)
+CRON_SECRET=your-cron-secret-key-here
+
+# Nookal API (for testing)
+NOOKAL_API_KEY=your-nookal-api-key-here
+NOOKAL_API_URL=https://api.nookal.com/production/v2

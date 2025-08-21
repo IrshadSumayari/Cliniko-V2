@@ -2,7 +2,7 @@
   "crons": [
     {
       "path": "/api/cron/sync-patients",
-      "schedule": "0 0 */4 * *"
+      "schedule": "*/30 * * * *"
     }
   ],
   "functions": {

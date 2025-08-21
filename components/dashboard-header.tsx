@@ -1,27 +1,18 @@
-"use client";
+'use client';
 
-import { Button } from "@/components/ui/button";
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipProvider,
-  TooltipTrigger,
-} from "@/components/ui/tooltip";
-import { ThemeToggle } from "@/components/theme-toggle";
-import { RefreshCw, Settings, LogOut } from "lucide-react";
-import { useAuth } from "@/contexts/auth-context";
+import { Button } from '@/components/ui/button';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
+import { ThemeToggle } from '@/components/theme-toggle';
+import { RefreshCw, Settings, LogOut } from 'lucide-react';
+import { useAuth } from '@/contexts/auth-context';
 
 interface DashboardHeaderProps {
-  onNavigate?: (view: "settings" | "onboarding") => void;
+  onNavigate?: (view: 'settings' | 'onboarding') => void;
   isSync?: boolean;
   onSync?: () => void;
 }
 
-export default function DashboardHeader({
-  onNavigate,
-  isSync,
-  onSync,
-}: DashboardHeaderProps) {
+export default function DashboardHeader({ onNavigate, isSync, onSync }: DashboardHeaderProps) {
   const { user, logout } = useAuth();
 
   return (
@@ -47,16 +38,12 @@ export default function DashboardHeader({
                     disabled={isSync}
                     className="bg-gradient-to-r from-primary/10 to-primary/20 text-primary hover:from-primary/20 hover:to-primary/30 transition-all duration-300"
                   >
-                    <RefreshCw
-                      className={`h-5 w-5 mr-3 ${isSync ? "animate-spin" : ""}`}
-                    />
-                    {isSync ? "Syncing..." : "Sync Now"}
+                    <RefreshCw className={`h-5 w-5 mr-3 ${isSync ? 'animate-spin' : ''}`} />
+                    {isSync ? 'Syncing...' : 'Sync Now'}
                   </Button>
                 </TooltipTrigger>
                 <TooltipContent>
-                  <p>
-                    Refresh patient data from your practice management system
-                  </p>
+                  <p>Refresh patient data from your practice management system</p>
                 </TooltipContent>
               </Tooltip>
 
@@ -65,7 +52,7 @@ export default function DashboardHeader({
               <Button
                 variant="ghost"
                 size="lg"
-                onClick={() => onNavigate?.("settings")}
+                onClick={() => onNavigate?.('settings')}
                 className="text-muted-foreground hover:text-foreground transition-colors"
               >
                 <Settings className="h-5 w-5" />

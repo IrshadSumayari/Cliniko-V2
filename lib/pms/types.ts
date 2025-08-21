@@ -14,7 +14,7 @@ export interface PMSPatient {
     postcode?: string;
     country?: string;
   };
-  patientType: "EPC" | "WC";
+  patientType: 'EPC' | 'WC';
   physioName?: string;
   lastModified: string;
 }
@@ -24,7 +24,7 @@ export interface PMSAppointment {
   patientId: number;
   date: string;
   type?: string;
-  status: "completed" | "cancelled" | "dna" | "scheduled";
+  status: 'completed' | 'cancelled' | 'dna' | 'scheduled';
   physioName?: string;
   durationMinutes?: number;
   notes?: string;
@@ -59,10 +59,7 @@ export interface SyncResult {
 
 export interface PMSApiInterface {
   testConnection(): Promise<boolean>;
-  getPatients(
-    lastModified?: string,
-    appointmentTypeIds?: string[]
-  ): Promise<PMSPatient[]>;
+  getPatients(lastModified?: string, appointmentTypeIds?: string[]): Promise<PMSPatient[]>;
   getAllPatients(): Promise<PMSPatient[]>;
   getModifiedPatients(lastModified: Date): Promise<PMSPatient[]>;
   isEPCPatient(patient: any): boolean;
@@ -72,26 +69,20 @@ export interface PMSApiInterface {
     lastModified?: string,
     appointmentTypeIds?: string[]
   ): Promise<{ patients: PMSPatient[]; appointments: PMSAppointment[] }>;
-  getAppointments(
-    patientIds: string[],
-    lastModified?: string
-  ): Promise<PMSAppointment[]>;
-  getPatientAppointments(
-    patientId: string,
-    lastModified?: Date
-  ): Promise<PMSAppointment[]>;
+  getAppointments(patientIds: string[], lastModified?: string): Promise<PMSAppointment[]>;
+  getPatientAppointments(patientId: string, lastModified?: Date): Promise<PMSAppointment[]>;
   getAppointmentTypes(): Promise<any[]>;
   processAppointmentTypes(appointmentTypes: any[]): AppointmentType[];
 }
 
-export type PMSType = "cliniko" | "halaxy" | "nookal";
+export type PMSType = 'cliniko' | 'halaxy' | 'nookal';
 
 export interface SyncLogEntry {
   id: string;
   userId: string;
   pmsType: PMSType;
-  syncType: "full" | "incremental" | "manual";
-  status: "running" | "completed" | "failed" | "paused";
+  syncType: 'full' | 'incremental' | 'manual';
+  status: 'running' | 'completed' | 'failed' | 'paused';
   startedAt: string;
   completedAt?: string;
   lastModifiedSync?: string;

@@ -1,9 +1,4 @@
-import type {
-  PMSApiInterface,
-  PMSPatient,
-  PMSAppointment,
-  PMSApiCredentials,
-} from "./types";
+import type { PMSApiInterface, PMSPatient, PMSAppointment, PMSApiCredentials } from './types';
 
 export class HalaxyAPI implements PMSApiInterface {
   private credentials: PMSApiCredentials;
@@ -11,7 +6,7 @@ export class HalaxyAPI implements PMSApiInterface {
 
   constructor(credentials: PMSApiCredentials) {
     this.credentials = credentials;
-    this.baseUrl = credentials.apiUrl || "https://api.halaxy.com/v1";
+    this.baseUrl = credentials.apiUrl || 'https://api.halaxy.com/v1';
   }
 
   private async makeRequest(endpoint: string, params?: Record<string, string>) {
@@ -26,15 +21,13 @@ export class HalaxyAPI implements PMSApiInterface {
     const response = await fetch(url.toString(), {
       headers: {
         Authorization: `Bearer ${this.credentials.apiKey}`,
-        Accept: "application/json",
-        "Content-Type": "application/json",
+        Accept: 'application/json',
+        'Content-Type': 'application/json',
       },
     });
 
     if (!response.ok) {
-      throw new Error(
-        `Halaxy API error: ${response.status} ${response.statusText}`
-      );
+      throw new Error(`Halaxy API error: ${response.status} ${response.statusText}`);
     }
 
     return response.json();
@@ -42,21 +35,18 @@ export class HalaxyAPI implements PMSApiInterface {
 
   async testConnection(): Promise<boolean> {
     try {
-      await this.makeRequest("/profile");
+      await this.makeRequest('/profile');
       return true;
     } catch (error) {
-      console.error("Halaxy connection test failed:", error);
+      console.error('Halaxy connection test failed:', error);
       return false;
     }
   }
 
-  async getPatients(
-    lastModified?: string,
-    appointmentTypeIds?: string[]
-  ): Promise<PMSPatient[]> {
+  async getPatients(lastModified?: string, appointmentTypeIds?: string[]): Promise<PMSPatient[]> {
     try {
       const params: Record<string, string> = {
-        limit: "100",
+        limit: '100',
       };
 
       if (lastModified) {
@@ -71,12 +61,12 @@ export class HalaxyAPI implements PMSApiInterface {
         );
       }
 
-      const response = await this.makeRequest("/patients", params);
+      const response = await this.makeRequest('/patients', params);
       const patients = response.data || [];
 
       return await this.filterEPCWCPatients(patients);
     } catch (error) {
-      console.error("Error fetching Halaxy patients:", error);
+      console.error('Error fetching Halaxy patients:', error);
       throw error;
     }
   }
@@ -91,8 +81,8 @@ export class HalaxyAPI implements PMSApiInterface {
       if (patientType) {
         filtered.push({
           id: patient.id,
-          firstName: patient.first_name || "",
-          lastName: patient.last_name || "",
+          firstName: patient.first_name || '',
+          lastName: patient.last_name || '',
           email: patient.email,
           phone: patient.mobile_phone || patient.home_phone,
           dateOfBirth: patient.date_of_birth,
@@ -114,66 +104,53 @@ export class HalaxyAPI implements PMSApiInterface {
     return filtered;
   }
 
-  private determinePatientType(
-    appointments: PMSAppointment[]
-  ): "EPC" | "WC" | null {
+  private determinePatientType(appointments: PMSAppointment[]): 'EPC' | 'WC' | null {
     for (const appointment of appointments) {
-      const type = appointment.type?.toLowerCase() || "";
-      const notes = appointment.notes?.toLowerCase() || "";
+      const type = appointment.type?.toLowerCase() || '';
+      const notes = appointment.notes?.toLowerCase() || '';
 
-      if (
-        type.includes("epc") ||
-        notes.includes("epc") ||
-        type.includes("enhanced primary care")
-      ) {
-        return "EPC";
+      if (type.includes('epc') || notes.includes('epc') || type.includes('enhanced primary care')) {
+        return 'EPC';
       }
 
       if (
-        type.includes("workers comp") ||
-        type.includes("workcover") ||
-        type.includes("wc") ||
-        notes.includes("workers comp")
+        type.includes('workers comp') ||
+        type.includes('workcover') ||
+        type.includes('wc') ||
+        notes.includes('workers comp')
       ) {
-        return "WC";
+        return 'WC';
       }
     }
 
     return null;
   }
 
-  async getAllAppointments(
-    patientIds: string[],
-    lastModified?: string
-  ): Promise<PMSAppointment[]> {
+  async getAllAppointments(patientIds: string[], lastModified?: string): Promise<PMSAppointment[]> {
     try {
       const allAppointments: PMSAppointment[] = [];
 
       for (const patientId of patientIds) {
-        const appointments = await this.getPatientAppointments(patientId)
+        const appointments = await this.getPatientAppointments(patientId);
         const completedAppointments = appointments.filter(
-          (apt) => apt.status === "completed" && (!lastModified || apt.lastModified > lastModified),
-        )
-        
+          (apt) => apt.status === 'completed' && (!lastModified || apt.lastModified > lastModified)
+        );
+
         // Add all appointments (no limit)
         allAppointments.push(...completedAppointments);
       }
 
-      console.log(
-        `✅ Halaxy sync completed: ${allAppointments.length} appointments`
-      );
+      console.log(`✅ Halaxy sync completed: ${allAppointments.length} appointments`);
       return allAppointments;
     } catch (error) {
-      console.error("Error fetching Halaxy appointments:", error);
+      console.error('Error fetching Halaxy appointments:', error);
       throw error;
     }
   }
 
   async getPatientAppointments(patientId: string): Promise<PMSAppointment[]> {
     try {
-      const response = await this.makeRequest(
-        `/patients/${patientId}/appointments`
-      );
+      const response = await this.makeRequest(`/patients/${patientId}/appointments`);
       const appointments = response.data || [];
 
       return appointments.map((apt: any) => ({
@@ -193,43 +170,36 @@ export class HalaxyAPI implements PMSApiInterface {
         appointment_type_id: apt.appointment_type?.id,
       }));
     } catch (error) {
-      console.error(
-        `Error fetching Halaxy appointments for patient ${patientId}:`,
-        error
-      );
+      console.error(`Error fetching Halaxy appointments for patient ${patientId}:`, error);
       return [];
     }
   }
 
-  private mapAppointmentStatus(
-    status: string
-  ): "completed" | "cancelled" | "dna" | "scheduled" {
-    const statusLower = status?.toLowerCase() || "";
+  private mapAppointmentStatus(status: string): 'completed' | 'cancelled' | 'dna' | 'scheduled' {
+    const statusLower = status?.toLowerCase() || '';
 
-    if (statusLower.includes("completed") || statusLower.includes("attended")) {
-      return "completed";
+    if (statusLower.includes('completed') || statusLower.includes('attended')) {
+      return 'completed';
     }
-    if (statusLower.includes("cancelled")) {
-      return "cancelled";
+    if (statusLower.includes('cancelled')) {
+      return 'cancelled';
     }
-    if (statusLower.includes("dna") || statusLower.includes("no show")) {
-      return "dna";
+    if (statusLower.includes('dna') || statusLower.includes('no show')) {
+      return 'dna';
     }
 
-    return "scheduled";
+    return 'scheduled';
   }
 
   async getAppointmentTypes(): Promise<any[]> {
     try {
-      console.log("🔍 Fetching appointment types from Halaxy...");
-      const response = await this.makeRequest("/appointment-types");
+      console.log('🔍 Fetching appointment types from Halaxy...');
+      const response = await this.makeRequest('/appointment-types');
       const appointmentTypes = response.data || [];
-      console.log(
-        `✅ Found ${appointmentTypes.length} appointment types from Halaxy`
-      );
+      console.log(`✅ Found ${appointmentTypes.length} appointment types from Halaxy`);
       return appointmentTypes;
     } catch (error) {
-      console.error("❌ Error fetching Halaxy appointment types:", error);
+      console.error('❌ Error fetching Halaxy appointment types:', error);
       return [];
     }
   }
@@ -255,9 +225,7 @@ export class HalaxyAPI implements PMSApiInterface {
           code: code,
         });
 
-        console.log(
-          `📝 Processed appointment type: ${appointmentType.name} -> ${code}`
-        );
+        console.log(`📝 Processed appointment type: ${appointmentType.name} -> ${code}`);
       }
     }
 
@@ -271,20 +239,20 @@ export class HalaxyAPI implements PMSApiInterface {
     const nameLower = name.toLowerCase();
 
     if (
-      nameLower.includes("epc") ||
-      nameLower.includes("enhanced primary care") ||
-      nameLower.includes("medicare")
+      nameLower.includes('epc') ||
+      nameLower.includes('enhanced primary care') ||
+      nameLower.includes('medicare')
     ) {
-      return "EPC";
+      return 'EPC';
     }
 
     if (
-      nameLower.includes("wc") ||
-      nameLower.includes("workers comp") ||
-      nameLower.includes("workcover") ||
-      nameLower.includes("work injury")
+      nameLower.includes('wc') ||
+      nameLower.includes('workers comp') ||
+      nameLower.includes('workcover') ||
+      nameLower.includes('work injury')
     ) {
-      return "WC";
+      return 'WC';
     }
 
     return null;

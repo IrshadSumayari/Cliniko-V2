@@ -1,55 +1,55 @@
-"use client"
+'use client';
 
-import { HelpCircle, ExternalLink } from "lucide-react"
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
-import { Button } from "@/components/ui/button"
+import { HelpCircle, ExternalLink } from 'lucide-react';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
+import { Button } from '@/components/ui/button';
 
 interface ApiHelpTooltipProps {
-  pmsName: string
+  pmsName: string;
 }
 
 export default function ApiHelpTooltip({ pmsName }: ApiHelpTooltipProps) {
   const getHelpContent = () => {
     switch (pmsName) {
-      case "Cliniko":
+      case 'Cliniko':
         return {
           steps: [
-            "Login to Cliniko → Settings",
-            "Go to Developer → API Keys",
+            'Login to Cliniko → Settings',
+            'Go to Developer → API Keys',
             "Click 'Generate new API key'",
             "Copy the key (starts with 'ck_')",
           ],
-          url: "https://support.cliniko.com/hc/en-us/articles/115003485526-API-Keys",
-        }
-      case "Nookal":
+          url: 'https://support.cliniko.com/hc/en-us/articles/115003485526-API-Keys',
+        };
+      case 'Nookal':
         return {
           steps: [
-            "Login to Nookal → Setup",
-            "Go to System → API Management",
+            'Login to Nookal → Setup',
+            'Go to System → API Management',
             "Click 'Create API Key'",
-            "Copy the generated key (format: xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx)",
+            'Copy the generated key (format: xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx)',
           ],
-          url: "https://help.nookal.com/article/api-access",
-        }
-      case "Halaxy":
+          url: 'https://help.nookal.com/article/api-access',
+        };
+      case 'Halaxy':
         return {
           steps: [
-            "Login to Halaxy → Settings",
-            "Go to Integrations → API",
+            'Login to Halaxy → Settings',
+            'Go to Integrations → API',
             "Click 'Generate API Key'",
             "Copy the key (starts with 'hx_')",
           ],
-          url: "https://help.halaxy.com/api-integration",
-        }
+          url: 'https://help.halaxy.com/api-integration',
+        };
       default:
         return {
-          steps: ["Contact your PMS provider for API access"],
-          url: "",
-        }
+          steps: ['Contact your PMS provider for API access'],
+          url: '',
+        };
     }
-  }
+  };
 
-  const helpContent = getHelpContent()
+  const helpContent = getHelpContent();
 
   return (
     <TooltipProvider>
@@ -85,5 +85,5 @@ export default function ApiHelpTooltip({ pmsName }: ApiHelpTooltipProps) {
         </TooltipContent>
       </Tooltip>
     </TooltipProvider>
-  )
+  );
 }
