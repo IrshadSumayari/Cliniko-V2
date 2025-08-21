@@ -160,7 +160,7 @@ export default function OnboardingFlow() {
         try {
           const result = await Promise.race([
             apiCallPromise,
-            new Promise((resolve) => setTimeout(resolve, 1200)),
+            new Promise((resolve) => setTimeout(resolve, 1600)),
           ]);
 
           if (result && typeof result === 'object' && 'ok' in result) {
@@ -266,9 +266,9 @@ export default function OnboardingFlow() {
       if (success) {
         toast.success('Setup complete! Welcome to your dashboard.');
         // Force a page reload to update the auth context
-        setTimeout(() => {
-          window.location.reload();
-        }, 1000);
+        // setTimeout(() => {
+        //   window.location.reload();
+        // }, 1000);
       } else {
         toast.error('Failed to complete setup. Please try again.');
       }
@@ -288,10 +288,10 @@ export default function OnboardingFlow() {
       toast.info('You can connect your PMS later in settings.');
       const success = await updateUserOnboardingStatus(false);
       if (success) {
-        // Force a page reload to update the auth context
-        setTimeout(() => {
-          window.location.reload();
-        }, 1000);
+        // // Force a page reload to update the auth context
+        // setTimeout(() => {
+        //   window.location.reload();
+        // }, 1000);
       } else {
         toast.error('Failed to update status. Please try again.');
       }

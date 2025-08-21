@@ -71,6 +71,19 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         
         // For other database errors, also default to not onboarded but keep them authenticated
         console.log('Database error, defaulting to not onboarded. Error:', error.message);
+        
+        // Try to get onboarding status from localStorage as fallback
+        try {
+          const storedStatus = localStorage.getItem('user_onboarding_status');
+          if (storedStatus) {
+            const isOnboarded = storedStatus === 'true';
+            console.log('Using localStorage fallback for onboarding status:', isOnboarded);
+            return { ...authUser, isOnboarded };
+          }
+        } catch (localStorageError) {
+          console.warn('Failed to read from localStorage:', localStorageError);
+        }
+        
         return { ...authUser, isOnboarded: false };
       }
 
@@ -85,6 +98,19 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       // If it's a timeout or connection error, default to not onboarded
       if (error instanceof Error && error.message.includes('timeout')) {
         console.log('Database query timed out, defaulting to not onboarded');
+        
+        // Try to get onboarding status from localStorage as fallback
+        try {
+          const storedStatus = localStorage.getItem('user_onboarding_status');
+          if (storedStatus) {
+            const isOnboarded = storedStatus === 'true';
+            console.log('Using localStorage fallback for onboarding status:', isOnboarded);
+            return { ...authUser, isOnboarded };
+          }
+        } catch (localStorageError) {
+          console.warn('Failed to read from localStorage:', localStorageError);
+        }
+        
         return { ...authUser, isOnboarded: false };
       }
       
@@ -279,27 +305,98 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       return false;
     }
 
+    console.log('updateUserOnboardingStatus called with:', { isOnboarded, userId: user.id, userEmail: user.email });
     setIsLoading(true);
+    
     try {
       console.log('Updating onboarding status to:', isOnboarded, 'for user:', user.id);
 
-      const { data, error } = await supabase
+      // Add timeout protection for database operations
+      const dbTimeout = 10000; // 10 seconds
+      
+      // First, let's check if the user exists in the database
+      const checkPromise = supabase
         .from('users')
-        .update({ is_onboarded: isOnboarded })
+        .select('id, auth_user_id, is_onboarded')
         .eq('auth_user_id', user.id)
-        .select('is_onboarded');
+        .single();
+      
+      const timeoutPromise = new Promise<never>((_, reject) => {
+        setTimeout(() => reject(new Error('Database operation timeout')), dbTimeout);
+      });
 
-      if (error) {
-        console.error('Error updating onboarding status:', error);
-        return false;
+      const { data: existingUser, error: checkError } = await Promise.race([checkPromise, timeoutPromise]);
+
+      if (checkError) {
+        console.error('Error checking existing user:', checkError);
+        if (checkError.code === 'PGRST116') {
+          console.log('User not found in database, creating new user record...');
+          
+          // Create a new user record with timeout
+          const createPromise = supabase
+            .from('users')
+            .insert({
+              auth_user_id: user.id,
+              email: user.email || '',
+              is_onboarded: isOnboarded,
+              created_at: new Date().toISOString(),
+              updated_at: new Date().toISOString(),
+            })
+            .select('id, is_onboarded')
+            .single();
+
+          const { data: newUser, error: createError } = await Promise.race([createPromise, timeoutPromise]);
+
+          if (createError) {
+            console.error('Error creating new user record:', createError);
+            return false;
+          }
+
+          console.log('New user record created:', newUser);
+        } else {
+          return false;
+        }
+      } else {
+        console.log('Existing user found:', existingUser);
+        
+        // Update existing user with timeout
+        const updatePromise = supabase
+          .from('users')
+          .update({ 
+            is_onboarded: isOnboarded,
+            updated_at: new Date().toISOString()
+          })
+          .eq('auth_user_id', user.id)
+          .select('is_onboarded');
+
+        const { data, error } = await Promise.race([updatePromise, timeoutPromise]);
+
+        if (error) {
+          console.error('Error updating onboarding status:', error);
+          return false;
+        }
+
+        console.log('User updated successfully:', data);
       }
 
       // Update local state directly without calling refreshUserData to prevent loops
       setUser((prev) => (prev ? { ...prev, isOnboarded } : null));
+      console.log('Local user state updated successfully');
+      
+      // Also store in localStorage as a fallback
+      try {
+        localStorage.setItem('user_onboarding_status', isOnboarded.toString());
+        console.log('Onboarding status stored in localStorage');
+      } catch (localStorageError) {
+        console.warn('Failed to store in localStorage:', localStorageError);
+      }
 
       return true;
     } catch (error) {
       console.error('Error updating onboarding status:', error);
+      if (error instanceof Error && error.message.includes('timeout')) {
+        console.error('Database operation timed out');
+      }
       return false;
     } finally {
       setIsLoading(false);

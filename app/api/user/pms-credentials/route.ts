@@ -59,7 +59,7 @@ export async function GET(request: NextRequest) {
     const { data: profileData, error: profileError } = await supabase
       .from('profiles')
       .select('pms_type, pms_connected, pms_last_sync')
-      .eq('id', user.id)
+      .eq('id', userId)
       .single();
 
     if (profileError && profileError.code !== 'PGRST116') {

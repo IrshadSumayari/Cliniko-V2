@@ -18,10 +18,6 @@ function AuthenticatedApp() {
     return <Settings onBack={() => setView('dashboard')} />;
   }
 
-  if (view === 'onboarding') {
-    return <OnboardingFlow />;
-  }
-
   return <Dashboard onNavigate={setView} />;
 }
 
@@ -45,7 +41,7 @@ export default function HomePage() {
     }
 
     return <AuthenticatedApp />;
-  }, [user, loading]);
+  }, [user?.isOnboarded, loading]);
 
   return <div key={`${user?.id || 'no-user'}-${loading}`}>{content}</div>;
 }
