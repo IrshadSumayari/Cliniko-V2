@@ -45,22 +45,32 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const fetchUserData = async (authUser: User): Promise<AuthUser> => {
     try {
       console.log('Fetching user data for:', authUser.id);
-      const { data: userData, error } = await supabase
+      
+      // Add timeout protection for database queries
+      const queryPromise = supabase
         .from('users')
         .select('is_onboarded')
         .eq('auth_user_id', authUser.id)
         .single();
+      
+      const timeoutPromise = new Promise<never>((_, reject) => {
+        setTimeout(() => reject(new Error('Database query timeout')), 8000); // 8 second timeout
+      });
+
+      const { data: userData, error } = await Promise.race([queryPromise, timeoutPromise]);
 
       if (error) {
         console.error('Error fetching user data:', error);
+        
         // If user doesn't exist in database, default to not onboarded
         // Don't sign them out - they are still authenticated
         if (error.code === 'PGRST116') {
           console.log('User not found in database, defaulting to not onboarded');
           return { ...authUser, isOnboarded: false };
         }
-        // For other errors, also default to not onboarded but keep them authenticated
-        console.log('Database error, defaulting to not onboarded');
+        
+        // For other database errors, also default to not onboarded but keep them authenticated
+        console.log('Database error, defaulting to not onboarded. Error:', error.message);
         return { ...authUser, isOnboarded: false };
       }
 
@@ -70,7 +80,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         isOnboarded: userData?.is_onboarded || false,
       };
     } catch (error) {
-      console.error('Error fetching user data:', error);
+      console.error('Error in fetchUserData:', error);
+      
+      // If it's a timeout or connection error, default to not onboarded
+      if (error instanceof Error && error.message.includes('timeout')) {
+        console.log('Database query timed out, defaulting to not onboarded');
+        return { ...authUser, isOnboarded: false };
+      }
+      
+      // For any other errors, default to not onboarded but keep them authenticated
+      console.log('Unexpected error in fetchUserData, defaulting to not onboarded');
       return { ...authUser, isOnboarded: false };
     }
   };
@@ -134,17 +153,34 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     let mounted = true;
     let timeoutId: NodeJS.Timeout;
+    let authTimeoutId: NodeJS.Timeout;
 
     const initializeAuth = async () => {
       try {
         console.log('Initializing token-based auth...');
-        const authUser = await validateTokenAndGetUser();
+        
+        // Add timeout protection for auth initialization
+        const authPromise = validateTokenAndGetUser();
+        const timeoutPromise = new Promise<never>((_, reject) => {
+          authTimeoutId = setTimeout(() => reject(new Error('Auth timeout')), 10000); // 10 second timeout
+        });
+
+        const authUser = await Promise.race([authPromise, timeoutPromise]);
 
         if (authUser && mounted) {
           console.log('Valid token found, fetching user data...');
-          const userWithData = await fetchUserData(authUser);
-          if (mounted) {
-            setUser(userWithData);
+          try {
+            const userWithData = await fetchUserData(authUser);
+            if (mounted) {
+              setUser(userWithData);
+            }
+          } catch (dbError) {
+            console.error('Database query failed, but user is authenticated:', dbError);
+            // Even if database fails, we know the user is authenticated
+            // Set them as not onboarded and let them proceed
+            if (mounted) {
+              setUser({ ...authUser, isOnboarded: false });
+            }
           }
         } else if (mounted) {
           console.log('No valid token found');
@@ -176,18 +212,34 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
       try {
         if (event === 'SIGNED_IN' && session?.user) {
-          const userWithData = await fetchUserData(session.user);
-          if (mounted) {
-            setUser(userWithData);
+          try {
+            const userWithData = await fetchUserData(session.user);
+            if (mounted) {
+              setUser(userWithData);
+            }
+          } catch (dbError) {
+            console.error('Database query failed during sign in, but user is authenticated:', dbError);
+            // Even if database fails, we know the user is authenticated
+            if (mounted) {
+              setUser({ ...session.user, isOnboarded: false });
+            }
           }
         } else if (event === 'SIGNED_OUT') {
           if (mounted) {
             setUser(null);
           }
         } else if (event === 'TOKEN_REFRESHED' && session?.user) {
-          const userWithData = await fetchUserData(session.user);
-          if (mounted) {
-            setUser(userWithData);
+          try {
+            const userWithData = await fetchUserData(session.user);
+            if (mounted) {
+              setUser(userWithData);
+            }
+          } catch (dbError) {
+            console.error('Database query failed during token refresh, but user is authenticated:', dbError);
+            // Even if database fails, we know the user is authenticated
+            if (mounted) {
+              setUser({ ...session.user, isOnboarded: false });
+            }
           }
         }
       } catch (error) {
@@ -213,6 +265,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       mounted = false;
       if (timeoutId) {
         clearTimeout(timeoutId);
+      }
+      if (authTimeoutId) {
+        clearTimeout(authTimeoutId);
       }
       subscription.unsubscribe();
     };
