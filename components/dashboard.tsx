@@ -1079,14 +1079,14 @@ const Dashboard = ({ onNavigate }: DashboardProps) => {
                 </div>
 
                 <div className="flex items-center gap-4">
-                  <Button
+                  {/* <Button
                     variant="outline"
                     size="lg"
                     className="gap-2 h-12 px-6 border-border/60 hover:border-primary/60 hover:bg-primary/5"
                   >
                     <Plus className="h-5 w-5" />
                     Add Patient
-                  </Button>
+                  </Button> */}
                   <Button
                     variant="outline"
                     size="lg"

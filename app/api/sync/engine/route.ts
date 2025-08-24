@@ -32,7 +32,6 @@ interface AppointmentData {
   status: string;
   appointment_date: string;
   practitioner_name?: string;
-  is_completed: boolean;
   pms_last_modified: string;
 }
 
@@ -146,11 +145,21 @@ export async function POST(req: NextRequest) {
         pmsType
       );
 
-      // Step 4: Check for Action Needed patients and send notifications
+      // Step 4: Create cases from synced data
+      console.log(`Creating cases for user ${userId}...`);
+      const casesResult = await createCasesFromSyncedData(
+        processedData,
+        userId,
+        pmsType,
+        wcTag,
+        epcTag
+      );
+
+      // Step 5: Check for Action Needed patients and send notifications
       const actionNeededPatients = await checkActionNeededPatients(userId);
       await sendActionNeededNotifications(actionNeededPatients, userData);
 
-      // Step 5: Update sync log
+      // Step 6: Update sync log
       await createAdminClient()
         .from('sync_logs')
         .update({
@@ -159,6 +168,8 @@ export async function POST(req: NextRequest) {
           patients_added: dbResult.patientsAdded,
           patients_synced: dbResult.patientsUpdated,
           appointments_synced: processedData.appointments.length,
+          cases_created: casesResult.casesCreated || 0,
+          cases_updated: casesResult.casesUpdated || 0,
           completed_at: new Date().toISOString(),
           last_modified_sync: new Date().toISOString()
         })
@@ -173,6 +184,8 @@ export async function POST(req: NextRequest) {
         patientsAdded: dbResult.patientsAdded,
         patientsUpdated: dbResult.patientsUpdated,
         appointmentsSynced: processedData.appointments.length,
+        casesCreated: casesResult.casesCreated || 0,
+        casesUpdated: casesResult.casesUpdated || 0,
         actionNeededCount: actionNeededPatients.length,
         errors: [],
         lastSyncTime: new Date().toISOString(),
@@ -182,12 +195,13 @@ export async function POST(req: NextRequest) {
 
     } catch (error) {
       // Update sync log with error
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
       await createAdminClient()
         .from('sync_logs')
         .update({
           status: 'failed',
           errors_count: 1,
-          error_details: { error: error.message },
+          error_details: { error: errorMessage },
           completed_at: new Date().toISOString()
         })
         .eq('id', syncLog.id);
@@ -197,14 +211,15 @@ export async function POST(req: NextRequest) {
 
   } catch (error) {
     console.error('Sync engine error:', error);
+    const errorMessage = error instanceof Error ? error.message : 'Sync failed';
     return NextResponse.json({
       success: false,
-      error: error.message || 'Sync failed',
+      error: errorMessage,
       patientsProcessed: 0,
       patientsAdded: 0,
       patientsUpdated: 0,
       appointmentsSynced: 0,
-      errors: [error.message],
+      errors: [errorMessage],
       lastSyncTime: new Date().toISOString(),
       nextSyncTime: new Date(Date.now() + 4 * 60 * 60 * 1000).toISOString()
     }, { status: 500 });
@@ -244,44 +259,55 @@ async function processPMSData(
   epcTag: string,
   userId: string
 ) {
-  // Filter only completed appointments
-  const completedAppointments = appointments.filter(apt => apt.is_completed);
+  // Filter only completed appointments using status field
+  const completedAppointments = appointments.filter(apt => 
+    apt.status === 'completed' || apt.status === 'attended' || apt.status === 'finished'
+  );
+  
+  console.log(`[SYNC ENGINE] Total appointments: ${appointments.length}`);
+  console.log(`[SYNC ENGINE] Completed appointments: ${completedAppointments.length}`);
   
   // Filter appointments by funding scheme
   const relevantAppointments = completedAppointments.filter(apt => 
     apt.appointment_type === wcTag || apt.appointment_type === epcTag
   );
+  
+  console.log(`[SYNC ENGINE] Relevant appointments (${wcTag}/${epcTag}): ${relevantAppointments.length}`);
+
+  // Determine the active year based on user's latest appointment
+  const activeYear = await determineActiveYear(userId);
+  console.log(`[SYNC ENGINE] Using active year: ${activeYear} for user ${userId}`);
 
   // Process patients with their appointments
   const processedPatients = patients.map(patient => {
     const patientAppointments = relevantAppointments.filter(apt => apt.patient_id === patient.id);
     
-    // Count sessions by type
-    const wcSessions = patientAppointments.filter(apt => apt.appointment_type === wcTag).length;
-    const epcSessions = patientAppointments.filter(apt => apt.appointment_type === epcTag).length;
+    // Count sessions by type using smart counting logic
+    const wcSessions = countWCSessions(patientAppointments, wcTag);
+    const epcSessions = countEPCSessions(patientAppointments, epcTag, activeYear);
     
     // Determine patient type and calculate quota
     let patientType = patient.patient_type;
     let sessionsUsed = 0;
-    let totalSessions = 0;
+    let totalSessions = 5; // Default EPC quota
     
     if (wcSessions > 0) {
       patientType = 'WC';
       sessionsUsed = wcSessions;
       totalSessions = 8; // Default WC quota
       
-      // Check if > 3 months post-injury
-      const isOldInjury = patient.date_of_birth && 
-        new Date(patient.date_of_birth) < new Date(Date.now() - 90 * 24 * 60 * 60 * 1000);
-      
-      if (isOldInjury) {
-        totalSessions = 1;
-      }
+      // TODO: Add injury_date field to patients table for proper old injury logic
+      // For now, we'll use the default 8 sessions
+      // if (patient.injury_date && isOlderThan3Months(patient.injury_date)) {
+      //   totalSessions = 1; // Old injury
+      // }
     } else if (epcSessions > 0) {
       patientType = 'EPC';
       sessionsUsed = epcSessions;
-      totalSessions = 5; // Default EPC quota
+      totalSessions = 5; // EPC quota per calendar year
     }
+
+    console.log(`[SYNC ENGINE] Patient ${patient.id} (${patientType}): ${sessionsUsed}/${totalSessions} sessions`);
 
     return {
       ...patient,
@@ -296,6 +322,65 @@ async function processPMSData(
     patients: processedPatients,
     appointments: relevantAppointments
   };
+}
+
+// Function to determine the active year based on user's latest appointment
+async function determineActiveYear(userId: string): Promise<number> {
+  try {
+    // First try to get from existing appointments in database
+    const { data: latestAppointment } = await createAdminClient()
+      .from('appointments')
+      .select('appointment_date')
+      .eq('user_id', userId)
+      .in('status', ['completed', 'attended', 'finished']) // Use status field instead of is_completed
+      .order('appointment_date', { ascending: false })
+      .limit(1)
+      .single();
+
+    if (latestAppointment) {
+      const activeYear = new Date(latestAppointment.appointment_date).getFullYear();
+      console.log(`[SYNC ENGINE] Latest appointment date: ${latestAppointment.appointment_date}, using year: ${activeYear}`);
+      return activeYear;
+    }
+
+    // If no appointments in database, use current year
+    const currentYear = new Date().getFullYear();
+    console.log(`[SYNC ENGINE] No appointments found in database, using current year: ${currentYear}`);
+    return currentYear;
+
+  } catch (error) {
+    console.error(`[SYNC ENGINE] Error determining active year:`, error);
+    const currentYear = new Date().getFullYear();
+    console.log(`[SYNC ENGINE] Error occurred, falling back to current year: ${currentYear}`);
+    return currentYear;
+  }
+}
+
+// Function to count WorkCover sessions (injury-based, no year limit)
+function countWCSessions(appointments: AppointmentData[], wcTag: string): number {
+  const wcCount = appointments.filter(apt => apt.appointment_type === wcTag).length;
+  console.log(`[SYNC ENGINE] Found ${wcCount} WC sessions for tag: ${wcTag}`);
+  return wcCount;
+}
+
+// Function to count EPC sessions (calendar year based)
+function countEPCSessions(appointments: AppointmentData[], epcTag: string, activeYear: number): number {
+  const epcCount = appointments.filter(apt => {
+    if (apt.appointment_type !== epcTag) return false;
+    
+    const appointmentYear = new Date(apt.appointment_date).getFullYear();
+    return appointmentYear === activeYear;
+  }).length;
+  
+  console.log(`[SYNC ENGINE] Found ${epcCount} EPC sessions for tag: ${epcTag} in year: ${activeYear}`);
+  return epcCount;
+}
+
+// Helper function to check if an injury is older than 3 months
+function isOlderThan3Months(injuryDate: Date): boolean {
+  const threeMonthsAgo = new Date();
+  threeMonthsAgo.setMonth(threeMonthsAgo.getMonth() - 3);
+  return injuryDate < threeMonthsAgo;
 }
 
 // Update database with processed data
@@ -384,8 +469,7 @@ async function updateDatabase(processedData: any, userId: string, pmsType: strin
             appointment_type: appointment.appointment_type,
             status: appointment.status,
             appointment_date: appointment.appointment_date,
-            practitioner_name: appointment.practitioner_name,
-            is_completed: appointment.is_completed
+            practitioner_name: appointment.practitioner_name
           });
       }
     } catch (error) {
@@ -427,5 +511,179 @@ async function sendActionNeededNotifications(patients: any[], userData: any) {
     // 2. Use a queue system for reliability
     // 3. Retry failed emails
     // 4. Log all notifications
+  }
+}
+
+// Function to create cases from synced patients and appointments data
+async function createCasesFromSyncedData(
+  processedData: any,
+  userId: string,
+  pmsType: string,
+  wcTag: string,
+  epcTag: string
+) {
+  try {
+    console.log(`[CASES] Starting case creation for user ${userId} (${pmsType})`);
+    
+    let casesCreated = 0;
+    let casesUpdated = 0;
+    const issues: string[] = [];
+
+    if (!processedData.patients || processedData.patients.length === 0) {
+      console.log(`[CASES] No patients found for user ${userId}`);
+      return { casesCreated: 0, casesUpdated: 0 };
+    }
+
+    console.log(`[CASES] Found ${processedData.patients.length} patients to process for cases`);
+
+    // Process each patient to create/update cases
+    for (const patient of processedData.patients) {
+      try {
+        // Get the most recent appointment for this patient
+        const patientAppointments = processedData.appointments.filter(
+          (apt: any) => apt.patient_id === patient.id
+        );
+
+        const latestPatientAppointment = patientAppointments.length > 0 
+          ? patientAppointments.reduce((latest: any, current: any) => 
+              new Date(current.appointment_date) > new Date(latest.appointment_date) ? current : latest
+            )
+          : null;
+
+        // Set default values
+        const locationName = latestPatientAppointment?.location_name || 'Main Clinic';
+        const physioName = latestPatientAppointment?.practitioner_name || patient.physio_name || null;
+        const appointmentTypeName = latestPatientAppointment?.appointment_type || patient.patient_type;
+        const nextVisitDate = latestPatientAppointment?.appointment_date
+          ? new Date(latestPatientAppointment.appointment_date)
+          : new Date(Date.now() + 7 * 24 * 60 * 60 * 1000); // 7 days from now
+        const lastVisitDate = latestPatientAppointment?.appointment_date || null;
+
+        // Use processed session data
+        const programType = patient.patient_type;
+        const quota = patient.total_sessions;
+        const sessionsUsed = patient.sessions_used;
+        const sessionsRemaining = patient.remaining_sessions;
+
+        // Determine case status and priority
+        let caseStatus = 'active';
+        let priority = 'low';
+        let alertMessage = null;
+        let isAlertActive = false;
+
+        if (sessionsRemaining <= 0) {
+          caseStatus = 'critical';
+          priority = 'urgent';
+          alertMessage = `${programType} quota exhausted - renewal needed immediately`;
+          isAlertActive = true;
+        } else if (sessionsRemaining <= 2) {
+          caseStatus = 'warning';
+          priority = 'high';
+          alertMessage = `${programType} referral expires soon - ${sessionsRemaining} sessions left`;
+          isAlertActive = true;
+        } else if (sessionsRemaining <= 3) {
+          caseStatus = 'warning';
+          priority = 'normal';
+          alertMessage = `${programType} sessions running low - ${sessionsRemaining} sessions left`;
+          isAlertActive = true;
+        }
+
+        // Check if case already exists
+        const { data: existingCase, error: caseLookupError } = await createAdminClient()
+          .from('cases')
+          .select('id')
+          .eq('user_id', userId)
+          .eq('patient_id', patient.id)
+          .eq('pms_type', pmsType)
+          .single();
+
+        const caseData = {
+          user_id: userId,
+          patient_id: patient.id,
+          pms_type: pmsType,
+          case_number: `CASE-${patient.id}`,
+          case_title: `${patient.first_name} ${patient.last_name} - ${programType}`,
+          patient_first_name: patient.first_name,
+          patient_last_name: patient.last_name,
+          patient_email: patient.email,
+          patient_phone: patient.phone,
+          patient_date_of_birth: patient.date_of_birth,
+          location_name: locationName,
+          physio_name: physioName,
+          appointment_type_name: appointmentTypeName,
+          program_type: programType,
+          quota: quota,
+          sessions_used: sessionsUsed,
+          status: caseStatus,
+          priority: priority,
+          next_visit_date: nextVisitDate.toISOString().split('T')[0],
+          last_visit_date: lastVisitDate
+            ? new Date(lastVisitDate).toISOString().split('T')[0]
+            : null,
+          case_start_date: new Date().toISOString().split('T')[0],
+          alert_preference: 2, // Default alert preference
+          is_alert_active: isAlertActive,
+          alert_message: alertMessage,
+          updated_at: new Date().toISOString(),
+        };
+
+        if (existingCase) {
+          // Update existing case
+          const { error: updateError } = await createAdminClient()
+            .from('cases')
+            .update(caseData)
+            .eq('id', existingCase.id);
+
+          if (updateError) {
+            console.error(`[CASES] Error updating case for patient ${patient.id}:`, updateError);
+            issues.push(`Failed to update case for patient ${patient.id}`);
+          } else {
+            casesUpdated++;
+            console.log(`[CASES] ✅ Updated case for patient ${patient.id} - Sessions: ${sessionsUsed}/${quota} (${sessionsRemaining} remaining)`);
+          }
+        } else {
+          // Create new case
+          const { error: insertError } = await createAdminClient().from('cases').insert({
+            ...caseData,
+            created_at: new Date().toISOString(),
+          });
+
+          if (insertError) {
+            console.error(`[CASES] Error creating case for patient ${patient.id}:`, insertError);
+            issues.push(`Failed to create case for patient ${patient.id}`);
+          } else {
+            casesCreated++;
+            console.log(`[CASES] ✅ Created case for patient ${patient.id} - Sessions: ${sessionsUsed}/${quota} (${sessionsRemaining} remaining)`);
+          }
+        }
+
+      } catch (error) {
+        console.error(`[CASES] Error processing patient ${patient.id} for case creation:`, error);
+        const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+        issues.push(`Error processing patient ${patient.id}: ${errorMessage}`);
+      }
+    }
+
+    console.log(`[CASES] Case creation completed for user ${userId}`);
+    console.log(`[CASES] Summary: ${casesCreated} created, ${casesUpdated} updated`);
+
+    if (issues.length > 0) {
+      console.log(`[CASES] Issues encountered:`, issues);
+    }
+
+    return {
+      casesCreated,
+      casesUpdated,
+      issues: issues.length > 0 ? issues : undefined
+    };
+
+  } catch (error) {
+    console.error(`[CASES] Case creation failed for user ${userId}:`, error);
+    const errorMessage = error instanceof Error ? error.message : 'Case creation failed';
+    return {
+      casesCreated: 0,
+      casesUpdated: 0,
+      error: errorMessage,
+    };
   }
 }
