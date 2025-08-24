@@ -70,12 +70,24 @@ export async function GET(request: NextRequest) {
       console.log('User already exists with ID:', userId);
     }
 
-    // Now fetch user profile from the profiles table
+    // Now fetch user profile from the profiles table and user tags from users table
     const { data: profile, error: profileError } = await supabase
       .from('profiles')
       .select('*')
       .eq('id', userId)
       .single();
+
+    // Also fetch user tags (WC and EPC) from the users table
+    const { data: userTags, error: tagsError } = await supabase
+      .from('users')
+      .select('wc, epc')
+      .eq('id', userId)
+      .single();
+
+    if (tagsError) {
+      console.error('Error fetching user tags:', tagsError);
+      // Don't fail the request if tags fetch fails
+    }
 
     if (profileError) {
       console.error('Error fetching profile:', profileError);
@@ -120,10 +132,17 @@ export async function GET(request: NextRequest) {
       }
 
       console.log('Successfully created profile:', newProfile);
-      return NextResponse.json(newProfile);
+      return NextResponse.json({
+        ...newProfile,
+        userTags: userTags || { wc: 'WC', epc: 'EPC' } // Default values if tags not found
+      });
     }
 
-    return NextResponse.json(profile);
+    // Return profile with user tags
+    return NextResponse.json({
+      ...profile,
+      userTags: userTags || { wc: 'WC', epc: 'EPC' } // Default values if tags not found
+    });
   } catch (error) {
     console.error('Profile GET error:', error);
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });

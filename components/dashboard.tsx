@@ -38,6 +38,7 @@ import {
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/contexts/auth-context';
 import { useRouter } from 'next/navigation';
+import { QuotaEditModal } from './quota-edit-modal';
 
 interface DashboardProps {
   onNavigate?: (view: 'settings' | 'onboarding') => void;
@@ -58,112 +59,46 @@ const Dashboard = ({ onNavigate }: DashboardProps) => {
   const [showApiHelp, setShowApiHelp] = useState(false);
   const [showPendingReason, setShowPendingReason] = useState<number | null>(null);
   const [showTutorial, setShowTutorial] = useState(false);
-  const [clientsData, setClientsData] = useState([
-    {
-      id: 1,
-      name: 'Sarah Mitchell',
-      program: 'EPC',
-      sessionsUsed: 3,
-      totalSessions: 5,
-      remainingSessions: 2,
-      nextAppointment: '2024-01-25',
-      physio: 'Dr. Smith',
-      location: 'Main Clinic',
-      status: 'warning',
-      alert: 'EPC referral expires in 3 days',
-      urgency: 'high',
-      lastSync: '2 mins ago',
-    },
-    {
-      id: 2,
-      name: 'John Davidson',
-      program: "Workers' Compensation",
-      sessionsUsed: 8,
-      totalSessions: 12,
-      remainingSessions: 4,
-      nextAppointment: '2024-01-26',
-      physio: 'Dr. Jones',
-      location: 'North Branch',
-      status: 'good',
-      alert: null,
-      urgency: 'low',
-      lastSync: '5 mins ago',
-    },
-    {
-      id: 3,
-      name: 'Emma Wilson',
-      program: "Workers' Compensation",
-      sessionsUsed: 1,
-      totalSessions: 10,
-      remainingSessions: 9,
-      nextAppointment: '2024-01-27',
-      physio: 'Dr. Brown',
-      location: 'South Clinic',
-      status: 'pending',
-      alert: 'Insurer approval pending',
-      urgency: 'medium',
-      lastSync: '1 min ago',
-    },
-    {
-      id: 4,
-      name: 'Michael Chen',
-      program: 'EPC',
-      sessionsUsed: 4,
-      totalSessions: 5,
-      remainingSessions: 1,
-      nextAppointment: '2024-01-24',
-      physio: 'Dr. Smith',
-      location: 'Main Clinic',
-      status: 'critical',
-      alert: 'Final session - renewal needed immediately',
-      urgency: 'critical',
-      lastSync: '3 mins ago',
-    },
-    {
-      id: 5,
-      name: 'Lisa Taylor',
-      program: "Workers' Compensation",
-      sessionsUsed: 18,
-      totalSessions: 20,
-      remainingSessions: 2,
-      nextAppointment: '2024-01-28',
-      physio: 'Dr. Jones',
-      location: 'North Branch',
-      status: 'warning',
-      alert: 'Pre-approval for additional sessions required',
-      urgency: 'medium',
-      lastSync: '4 mins ago',
-    },
-  ]);
+  const [clientsData, setClientsData] = useState([]);
+  const [isLoadingData, setIsLoadingData] = useState(true);
+  const [dataError, setDataError] = useState<string | null>(null);
+
+  // Modal states for patient actions
+  const [showQuotaModal, setShowQuotaModal] = useState(false);
+
+  const [selectedPatient, setSelectedPatient] = useState<any>(null);
+
+  // Loading states for action buttons
+  const [loadingActions, setLoadingActions] = useState<{ [key: string]: boolean }>({});
 
   const [archivedClients, setArchivedClients] = useState([]);
 
-  const kpiData = [
+  const [kpiData, setKpiData] = useState([
     {
       label: 'Active Patients',
-      value: '142',
+      value: '0',
       icon: Users,
       color: 'text-primary',
     },
     {
       label: 'Sessions Remaining (All)',
-      value: '1,234',
+      value: '0',
       icon: Clock,
       color: 'text-primary',
     },
     {
       label: 'Patients Needing Action',
-      value: '8',
+      value: '0',
       icon: Bell,
       color: 'text-warning',
     },
     {
       label: 'Last Sync Status',
-      value: '2 min ago',
+      value: 'Never',
       icon: CheckCircle,
       color: 'text-success',
     },
-  ];
+  ]);
   const handleSignOut = () => {
     localStorage.clear();
     setTimeout(() => {
@@ -171,18 +106,341 @@ const Dashboard = ({ onNavigate }: DashboardProps) => {
       window.location.reload();
     }, 800);
   };
+
+  // Patient action handlers
+  const handleUpdateQuota = (patient: any) => {
+    setSelectedPatient(patient);
+    setShowQuotaModal(true);
+  };
+
+  const handleMoveToPending = async (patient: any) => {
+    const actionKey = `pending_${patient.id}`;
+    setLoadingActions((prev) => ({ ...prev, [actionKey]: true }));
+
+    try {
+      const response = await fetch('/api/cases/update-status', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${localStorage.getItem('auth-token')}`,
+        },
+        body: JSON.stringify({
+          caseId: patient.id,
+          action: 'move_to_pending',
+          newData: { reason: 'Moved to pending' },
+        }),
+      });
+
+      if (response.ok) {
+        toast({
+          title: 'Patient Moved to Pending',
+          description: `${patient.name} has been moved to pending status`,
+        });
+
+        // Add a small delay to ensure the database update is complete
+        setTimeout(() => {
+          fetchDashboardData(); // Refresh data
+        }, 500);
+      } else {
+        throw new Error('Failed to move patient to pending');
+      }
+    } catch (error) {
+      toast({
+        title: 'Error',
+        description: 'Failed to move patient to pending',
+        variant: 'destructive',
+      });
+    } finally {
+      setLoadingActions((prev) => ({ ...prev, [actionKey]: false }));
+    }
+  };
+
+  const handleMoveBackToActive = async (caseId: string, patientName: string) => {
+    const actionKey = `active_${caseId}`;
+    setLoadingActions((prev) => ({ ...prev, [actionKey]: true }));
+
+    try {
+      const response = await fetch('/api/cases/update-status', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${localStorage.getItem('auth-token')}`,
+        },
+        body: JSON.stringify({
+          caseId,
+          action: 'move_to_active',
+          newData: { reason: 'Moved back to active' },
+        }),
+      });
+
+      if (response.ok) {
+        toast({
+          title: 'Case Activated',
+          description: `${patientName} has been moved back to active status`,
+        });
+
+        // Add a small delay to ensure the database update is complete
+        setTimeout(() => {
+          fetchDashboardData(); // Refresh data
+        }, 500);
+      } else {
+        throw new Error('Failed to update case status');
+      }
+    } catch (error) {
+      toast({
+        title: 'Error',
+        description: 'Failed to update case status',
+        variant: 'destructive',
+      });
+    } finally {
+      setLoadingActions((prev) => ({ ...prev, [actionKey]: false }));
+    }
+  };
+
+  const handleDischarge = async (caseId: string, patientName: string) => {
+    const actionKey = `discharge_${caseId}`;
+    setLoadingActions((prev) => ({ ...prev, [actionKey]: true }));
+
+    try {
+      const response = await fetch('/api/cases/update-status', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${localStorage.getItem('auth-token')}`,
+        },
+        body: JSON.stringify({
+          caseId,
+          action: 'archive_case',
+          newData: { reason: 'Case closed' },
+        }),
+      });
+
+      if (response.ok) {
+        toast({
+          title: 'Case Closed',
+          description: `${patientName} has been moved to archived`,
+        });
+
+        // Add a small delay to ensure the database update is complete
+        setTimeout(() => {
+          fetchDashboardData(); // Refresh data
+        }, 500);
+      } else {
+        throw new Error('Failed to close case');
+      }
+    } catch (error) {
+      toast({
+        title: 'Error',
+        description: 'Failed to close case',
+        variant: 'destructive',
+      });
+    } finally {
+      setLoadingActions((prev) => ({ ...prev, [actionKey]: false }));
+    }
+  };
+
+  const handleQuotaUpdate = async (data: {
+    quota: number;
+    sessionsUsed: number;
+    reason: string;
+  }) => {
+    if (!selectedPatient) return;
+
+    const actionKey = `quota_${selectedPatient.id}`;
+    setLoadingActions((prev) => ({ ...prev, [actionKey]: true }));
+
+    try {
+      const response = await fetch('/api/cases/update-status', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${localStorage.getItem('auth-token')}`,
+        },
+        body: JSON.stringify({
+          caseId: selectedPatient.id,
+          action: 'update_quota',
+          newData: data,
+        }),
+      });
+
+      if (response.ok) {
+        toast({
+          title: 'Quota Updated',
+          description: `Quota updated for ${selectedPatient.name}`,
+        });
+
+        // Add a small delay to ensure the database update is complete
+        setTimeout(() => {
+          fetchDashboardData(); // Refresh data
+        }, 500);
+      } else {
+        throw new Error('Failed to update quota');
+      }
+    } catch (error) {
+      toast({
+        title: 'Error',
+        description: 'Failed to update quota',
+        variant: 'destructive',
+      });
+    } finally {
+      setLoadingActions((prev) => ({ ...prev, [actionKey]: false }));
+    }
+  };
+
+  // Fetch dashboard data
+  const fetchDashboardData = async () => {
+    try {
+      setIsLoadingData(true);
+      setDataError(null);
+
+      // Get token from localStorage
+      const accessToken = localStorage.getItem('auth-token');
+      if (!accessToken) {
+        setDataError('Authentication token not found. Please log in again.');
+        return;
+      }
+
+      const response = await fetch('/api/dashboard-data', {
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+        },
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to fetch dashboard data');
+      }
+
+      const data = await response.json();
+
+      if (data.success) {
+        // Separate active and archived patients
+        const activePatients = data.patients.filter(
+          (patient: any) => patient.status !== 'archived'
+        );
+        const archivedPatients = data.patients.filter(
+          (patient: any) => patient.status === 'archived'
+        );
+
+        setClientsData(activePatients);
+        setArchivedClients(archivedPatients);
+
+        // Update KPI data
+        setKpiData([
+          {
+            label: 'Active Patients',
+            value: activePatients.length.toString(),
+            icon: Users,
+            color: 'text-primary',
+          },
+          {
+            label: 'Sessions Remaining (All)',
+            value: data.kpiData.totalSessionsRemaining.toString(),
+            icon: Clock,
+            color: 'text-primary',
+          },
+          {
+            label: 'Patients Needing Action',
+            value: data.kpiData.actionNeededPatients.toString(),
+            icon: Bell,
+            color: 'text-warning',
+          },
+          {
+            label: 'Last Sync Status',
+            value: 'Just synced',
+            icon: CheckCircle,
+            color: 'text-success',
+          },
+        ]);
+
+        if (activePatients.length > 0 || archivedPatients.length > 0) {
+          toast({
+            title: 'Data Updated',
+            description: `Successfully loaded ${activePatients.length} active and ${archivedPatients.length} archived patients`,
+          });
+        }
+      }
+    } catch (error) {
+      console.error('Error fetching dashboard data:', error);
+      setDataError('Failed to load dashboard data. Please try again.');
+      toast({
+        title: 'Data Fetch Error',
+        description: 'Failed to load dashboard data. Please try again.',
+        variant: 'destructive',
+      });
+    } finally {
+      setIsLoadingData(false);
+    }
+  };
+
+  // Load data on component mount
+  useEffect(() => {
+    fetchDashboardData();
+  }, []);
+
   const handleSync = async () => {
     setIsSync(true);
-    // Simulate progress animation
-    setTimeout(() => {
-      const syncTime = new Date().toLocaleString();
-      localStorage.setItem('last_sync', syncTime);
-      setIsSync(false);
-      toast({
-        title: 'Sync Started Successfully',
-        description: 'Your client data is being updated in background.',
+    try {
+      // Get token from localStorage
+      const accessToken = localStorage.getItem('auth-token');
+      if (!accessToken) {
+        toast({
+          title: 'Authentication Error',
+          description: 'Please log in again to sync data.',
+          variant: 'destructive',
+        });
+        return;
+      }
+
+      // Call the sync engine
+      const syncResponse = await fetch('/api/sync/engine', {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+          'Content-Type': 'application/json',
+        },
       });
-    }, 2000);
+
+      if (!syncResponse.ok) {
+        const errorData = await syncResponse.json();
+
+        if (syncResponse.status === 402 && errorData.dashboardLocked) {
+          toast({
+            title: 'Trial Expired',
+            description: 'Please upgrade your subscription to continue syncing data.',
+            variant: 'destructive',
+          });
+          return;
+        }
+
+        throw new Error(errorData.error || 'Sync failed');
+      }
+
+      const syncResult = await syncResponse.json();
+
+      if (syncResult.success) {
+        // Refresh dashboard data after successful sync
+        await fetchDashboardData();
+
+        const syncTime = new Date().toLocaleString();
+        localStorage.setItem('last_sync', syncTime);
+
+        toast({
+          title: 'Sync Completed Successfully',
+          description: `Processed ${syncResult.patientsProcessed} patients, ${syncResult.appointmentsSynced} appointments. ${syncResult.actionNeededCount} patients need action.`,
+        });
+      } else {
+        throw new Error(syncResult.error || 'Sync failed');
+      }
+    } catch (error) {
+      console.error('Sync error:', error);
+      toast({
+        title: 'Sync Failed',
+        description: error.message || 'Failed to sync data. Please try again.',
+        variant: 'destructive',
+      });
+    } finally {
+      setIsSync(false);
+    }
   };
 
   const handleSendReminder = (clientName: string) => {
@@ -220,45 +478,6 @@ const Dashboard = ({ onNavigate }: DashboardProps) => {
     }
   };
 
-  const handleUpdateQuota = (clientName: string) => {
-    toast({
-      title: 'Quota Updated',
-      description: `${clientName}'s quota has been updated successfully`,
-    });
-  };
-
-  const handleDischarge = (clientId: number, clientName: string) => {
-    const clientToArchive = clientsData.find((client) => client.id === clientId);
-    if (clientToArchive) {
-      setArchivedClients((prev) => [...prev, { ...clientToArchive, status: 'archived' }]);
-      setClientsData((prev) => prev.filter((client) => client.id !== clientId));
-      toast({
-        title: 'Client Discharged',
-        description: `${clientName} has been discharged and moved to archived`,
-      });
-    }
-  };
-
-  const handleMoveToPending = (clientId: number, clientName: string) => {
-    setClientsData((prev) =>
-      prev.map((client) => (client.id === clientId ? { ...client, status: 'pending' } : client))
-    );
-    toast({
-      title: 'Moved to Pending',
-      description: `${clientName} moved to pending - no immediate action required`,
-    });
-  };
-
-  const handleMoveBackToActive = (clientId: number, clientName: string) => {
-    setClientsData((prev) =>
-      prev.map((client) => (client.id === clientId ? { ...client, status: 'good' } : client))
-    );
-    toast({
-      title: 'Moved Back to Active',
-      description: `${clientName} is now back in active status`,
-    });
-  };
-
   const getProgressBarColor = (status: string) => {
     switch (status) {
       case 'critical':
@@ -277,9 +496,11 @@ const Dashboard = ({ onNavigate }: DashboardProps) => {
   };
 
   const getProgramBadgeClass = (program: string) => {
-    switch (program.toLowerCase()) {
+    switch (program?.toLowerCase()) {
       case 'epc':
         return 'program-badge-epc';
+      case 'wc':
+        return 'program-badge-workcover';
       case 'ctp':
         return 'program-badge-ctp';
       case "workers' compensation":
@@ -290,7 +511,9 @@ const Dashboard = ({ onNavigate }: DashboardProps) => {
   };
 
   const getUniquePhysios = () => {
-    const allPhysios = [...clientsData, ...archivedClients].map((client) => client.physio);
+    const allPhysios = [...clientsData, ...archivedClients]
+      .map((client) => client.physio)
+      .filter((physio) => physio !== null && physio !== undefined); // Filter out null/undefined values
     return [...new Set(allPhysios)];
   };
 
@@ -324,7 +547,7 @@ const Dashboard = ({ onNavigate }: DashboardProps) => {
     return baseClients.filter((client) => {
       const matchesSearch = client.name.toLowerCase().includes(searchTerm.toLowerCase());
       const matchesProgram =
-        selectedFilter === 'all' || client.program.toLowerCase() === selectedFilter.toLowerCase();
+        selectedFilter === 'all' || client.program?.toLowerCase() === selectedFilter.toLowerCase();
       const matchesPhysio = selectedPhysio === 'all' || client.physio === selectedPhysio;
       const matchesLocation = selectedLocation === 'all' || client.location === selectedLocation;
 
@@ -404,240 +627,306 @@ const Dashboard = ({ onNavigate }: DashboardProps) => {
           </div>
         )}
 
+        {/* Loading State */}
+        {isLoadingData && (
+          <div className="text-center py-20 space-y-6">
+            <div className="w-32 h-32 bg-gradient-to-br from-muted/20 to-muted/40 rounded-3xl flex items-center justify-center mx-auto">
+              <div className="animate-spin rounded-full h-16 w-16 border-b-2 border-primary"></div>
+            </div>
+            <div className="space-y-2">
+              <h3 className="text-2xl font-semibold text-foreground">Loading patients...</h3>
+              <p className="text-muted-foreground text-lg">Fetching data from your PMS system</p>
+            </div>
+          </div>
+        )}
+
+        {/* Error State */}
+        {dataError && !isLoadingData && (
+          <div className="text-center py-20 space-y-6">
+            <div className="w-32 h-32 bg-gradient-to-br from-red-50 to-red-100 dark:from-red-950/30 dark:to-red-900/30 rounded-3xl flex items-center justify-center mx-auto">
+              <AlertTriangle className="h-16 w-16 text-red-500" />
+            </div>
+            <div className="space-y-2">
+              <h3 className="text-2xl font-semibold text-foreground">Failed to load data</h3>
+              <p className="text-muted-foreground text-lg max-w-md mx-auto">{dataError}</p>
+            </div>
+            <Button variant="outline" size="lg" onClick={fetchDashboardData} className="gap-2 mt-4">
+              <RotateCcw className="h-5 w-5" />
+              Try Again
+            </Button>
+          </div>
+        )}
+
         {/* Client Cards */}
-        <div className="space-y-6" data-tutorial="patient-cards">
-          {clients.map((client, index) => (
-            <div
-              key={client.id}
-              className="group relative overflow-hidden bg-gradient-to-br from-background via-background/95 to-accent/10 border border-border/30 rounded-2xl p-6 hover:shadow-[0_20px_70px_-10px_hsl(var(--primary)_/_0.3)] transition-all duration-700 hover:scale-[1.01] hover:border-primary/40 fade-in-up hover:bg-gradient-to-br hover:from-primary/5 hover:to-secondary/5 w-full"
-              style={{ animationDelay: `${index * 0.05}s` }}
-            >
-              {/* Decorative gradient overlay */}
-              <div className="absolute inset-0 bg-gradient-to-r from-transparent via-primary/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-700" />
+        {!isLoadingData && !dataError && (
+          <div className="space-y-6" data-tutorial="patient-cards">
+            {clients.map((client, index) => (
+              <div
+                key={client.id}
+                className="group relative overflow-hidden bg-gradient-to-br from-background via-background/95 to-accent/10 border border-border/30 rounded-2xl p-6 hover:shadow-[0_20px_70px_-10px_hsl(var(--primary)_/_0.3)] transition-all duration-700 hover:scale-[1.01] hover:border-primary/40 fade-in-up hover:bg-gradient-to-br hover:from-primary/5 hover:to-secondary/5 w-full"
+                style={{ animationDelay: `${index * 0.05}s` }}
+              >
+                {/* Decorative gradient overlay */}
+                <div className="absolute inset-0 bg-gradient-to-r from-transparent via-primary/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-700" />
 
-              <div className="relative grid grid-cols-12 gap-4 items-center w-full">
-                {/* Selection Checkbox */}
-                <div className="col-span-1 flex justify-center">
-                  <Checkbox
-                    checked={selectedClients.includes(client.id)}
-                    onCheckedChange={(checked) =>
-                      handleClientSelection(client.id, checked as boolean)
-                    }
-                    className="w-5 h-5 border-2 border-primary/30 data-[state=checked]:bg-gradient-to-br data-[state=checked]:from-primary data-[state=checked]:to-primary/80"
-                  />
-                </div>
+                <div className="relative grid grid-cols-12 gap-4 items-center w-full">
+                  {/* Selection Checkbox */}
+                  <div className="col-span-1 flex justify-center">
+                    <Checkbox
+                      checked={selectedClients.includes(client.id)}
+                      onCheckedChange={(checked) =>
+                        handleClientSelection(client.id, checked as boolean)
+                      }
+                      className="w-5 h-5 border-2 border-primary/30 data-[state=checked]:bg-gradient-to-br data-[state=checked]:from-primary data-[state=checked]:to-primary/80"
+                    />
+                  </div>
 
-                {/* Patient Avatar & Info */}
-                <div className="col-span-3">
-                  <div className="flex items-center gap-4">
-                    <div className="relative">
-                      <div className="w-16 h-16 bg-gradient-to-br from-primary/15 via-primary/10 to-secondary/15 rounded-2xl flex items-center justify-center shadow-lg border-2 border-primary/20 group-hover:border-primary/40 transition-all duration-500">
-                        <User className="h-8 w-8 text-primary group-hover:text-primary/80 transition-colors duration-300" />
-                      </div>
-                      <div
-                        className={`absolute -bottom-1 -right-1 w-6 h-6 rounded-full border-2 border-background shadow-lg ${
-                          client.status === 'critical'
-                            ? 'bg-gradient-to-br from-red-500 to-red-600'
-                            : client.status === 'warning'
-                              ? 'bg-gradient-to-br from-amber-500 to-orange-500'
-                              : client.status === 'pending'
-                                ? 'bg-gradient-to-br from-blue-500 to-indigo-500'
-                                : 'bg-gradient-to-br from-emerald-500 to-green-500'
-                        } flex items-center justify-center`}
-                      >
-                        {client.status === 'critical' && (
-                          <AlertTriangle className="h-3 w-3 text-white" />
-                        )}
-                        {client.status === 'warning' && <Clock className="h-3 w-3 text-white" />}
-                        {client.status === 'pending' && <Timer className="h-3 w-3 text-white" />}
-                        {client.status === 'good' && <CheckCircle className="h-3 w-3 text-white" />}
-                      </div>
-                    </div>
-
-                    <div className="space-y-1 min-w-0 flex-1">
-                      <div className="flex items-center gap-2">
-                        <h3 className="text-lg font-bold text-foreground group-hover:text-primary transition-all duration-300 truncate">
-                          {client.name}
-                        </h3>
-                        {client.alert && (
-                          <Tooltip>
-                            <TooltipTrigger>
-                              <div
-                                className={`p-1 rounded-full backdrop-blur-sm ${
-                                  client.urgency === 'critical'
-                                    ? 'bg-red-500/20 animate-pulse border border-red-500/30'
-                                    : client.urgency === 'high'
-                                      ? 'bg-amber-500/20 border border-amber-500/30'
-                                      : 'bg-blue-500/20 border border-blue-500/30'
-                                } hover:scale-110 transition-transform duration-300`}
-                              >
-                                <AlertTriangle
-                                  className={`h-3 w-3 ${
-                                    client.urgency === 'critical'
-                                      ? 'text-red-600'
-                                      : client.urgency === 'high'
-                                        ? 'text-amber-600'
-                                        : 'text-blue-600'
-                                  }`}
-                                />
-                              </div>
-                            </TooltipTrigger>
-                            <TooltipContent
-                              side="top"
-                              className="max-w-xs bg-gradient-to-r from-background to-accent/20 border border-border/50"
-                            >
-                              <p className="font-medium text-xs">{client.alert}</p>
-                            </TooltipContent>
-                          </Tooltip>
-                        )}
-                      </div>
-                      <div className="flex items-center gap-3">
-                        <p className="text-muted-foreground font-medium text-sm">{client.physio}</p>
-                        <Badge
-                          variant="outline"
-                          className={`px-2 py-1 text-xs font-bold border ${
-                            client.program === 'EPC'
-                              ? 'bg-emerald-50 border-emerald-300 text-emerald-700 dark:bg-emerald-950/30 dark:border-emerald-700 dark:text-emerald-300'
-                              : 'bg-blue-50 border-blue-300 text-blue-700 dark:bg-blue-950/30 dark:border-blue-700 dark:text-blue-300'
-                          }`}
+                  {/* Patient Avatar & Info */}
+                  <div className="col-span-3">
+                    <div className="flex items-center gap-4">
+                      <div className="relative">
+                        <div className="w-16 h-16 bg-gradient-to-br from-primary/15 via-primary/10 to-secondary/15 rounded-2xl flex items-center justify-center shadow-lg border-2 border-primary/20 group-hover:border-primary/40 transition-all duration-500">
+                          <User className="h-8 w-8 text-primary group-hover:text-primary/80 transition-colors duration-300" />
+                        </div>
+                        <div
+                          className={`absolute -bottom-1 -right-1 w-6 h-6 rounded-full border-2 border-background shadow-lg ${
+                            client.status === 'critical'
+                              ? 'bg-gradient-to-br from-red-500 to-red-600'
+                              : client.status === 'warning'
+                                ? 'bg-gradient-to-br from-amber-500 to-orange-500'
+                                : client.status === 'pending'
+                                  ? 'bg-gradient-to-br from-blue-500 to-indigo-500'
+                                  : 'bg-gradient-to-br from-emerald-500 to-green-500'
+                          } flex items-center justify-center`}
                         >
-                          {client.program}
-                        </Badge>
+                          {client.status === 'critical' && (
+                            <AlertTriangle className="h-3 w-3 text-white" />
+                          )}
+                          {client.status === 'warning' && <Clock className="h-3 w-3 text-white" />}
+                          {client.status === 'pending' && <Timer className="h-3 w-3 text-white" />}
+                          {client.status === 'good' && (
+                            <CheckCircle className="h-3 w-3 text-white" />
+                          )}
+                        </div>
+                      </div>
+
+                      <div className="space-y-1 min-w-0 flex-1">
+                        <div className="flex items-center gap-2">
+                          <h3 className="text-lg font-bold text-foreground group-hover:text-primary transition-all duration-300 truncate">
+                            {client.name}
+                          </h3>
+                          {client.alert && (
+                            <Tooltip>
+                              <TooltipTrigger>
+                                <div
+                                  className={`p-1 rounded-full backdrop-blur-sm ${
+                                    client.urgency === 'critical'
+                                      ? 'bg-red-500/20 animate-pulse border border-red-500/30'
+                                      : client.urgency === 'high'
+                                        ? 'bg-amber-500/20 border border-amber-500/30'
+                                        : 'bg-blue-500/20 border border-blue-500/30'
+                                  } hover:scale-110 transition-transform duration-300`}
+                                >
+                                  <AlertTriangle
+                                    className={`h-3 w-3 ${
+                                      client.urgency === 'critical'
+                                        ? 'text-red-600'
+                                        : client.urgency === 'high'
+                                          ? 'text-amber-600'
+                                          : 'text-blue-600'
+                                    }`}
+                                  />
+                                </div>
+                              </TooltipTrigger>
+                              <TooltipContent
+                                side="top"
+                                className="max-w-xs bg-gradient-to-r from-background to-accent/20 border border-border/50"
+                              >
+                                <p className="font-medium text-xs">{client.alert}</p>
+                              </TooltipContent>
+                            </Tooltip>
+                          )}
+                        </div>
+                        <div className="flex items-center gap-3">
+                          <p className="text-muted-foreground font-medium text-sm">
+                            {client.physio}
+                          </p>
+                          <Badge
+                            variant="outline"
+                            className={`px-2 py-1 text-xs font-bold border ${
+                              client.program === 'EPC'
+                                ? 'bg-emerald-50 border-emerald-300 text-emerald-700 dark:bg-emerald-950/30 dark:border-emerald-700 dark:text-emerald-300'
+                                : 'bg-blue-50 border-blue-300 text-blue-700 dark:bg-blue-950/30 dark:border-blue-700 dark:text-blue-300'
+                            }`}
+                          >
+                            {client.program}
+                          </Badge>
+                        </div>
                       </div>
                     </div>
                   </div>
-                </div>
 
-                {/* Progress Section */}
-                <div className="col-span-3">
-                  <div className="space-y-2">
-                    <div className="flex items-center justify-between">
-                      <span className="text-sm font-medium text-muted-foreground">Sessions</span>
-                      <span className="text-lg font-bold text-foreground">
-                        {client.sessionsUsed}/{client.totalSessions}
+                  {/* Progress Section */}
+                  <div className="col-span-3">
+                    <div className="space-y-2">
+                      <div className="flex items-center justify-between">
+                        <span className="text-sm font-medium text-muted-foreground">Sessions</span>
+                        <span className="text-lg font-bold text-foreground">
+                          {client.sessionsUsed}/{client.totalSessions}
+                        </span>
+                      </div>
+                      <div className="relative w-full bg-gradient-to-r from-muted/50 to-muted/30 rounded-full h-3 overflow-hidden shadow-inner border border-border/30">
+                        <div
+                          className={`h-3 rounded-full transition-all duration-[2000ms] ease-out shadow-lg relative overflow-hidden ${
+                            client.status === 'critical'
+                              ? 'bg-gradient-to-r from-red-500 to-red-600'
+                              : client.status === 'warning'
+                                ? 'bg-gradient-to-r from-amber-500 to-orange-500'
+                                : client.status === 'pending'
+                                  ? 'bg-gradient-to-r from-blue-500 to-indigo-500'
+                                  : 'bg-gradient-to-r from-emerald-500 to-green-500'
+                          }`}
+                          style={{
+                            width: `${getProgressPercentage(
+                              client.sessionsUsed,
+                              client.totalSessions
+                            )}%`,
+                            animationDelay: `${index * 0.1}s`,
+                          }}
+                        >
+                          <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/40 to-transparent animate-[shimmer_3s_infinite]"></div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Sessions Remaining */}
+                  <div className="col-span-2 text-center">
+                    <p className="text-xs font-medium text-muted-foreground mb-2">Sessions Left</p>
+                    <div
+                      className={`inline-flex items-center justify-center w-16 h-16 rounded-2xl font-bold text-xl shadow-lg border-2 backdrop-blur-sm ${
+                        client.remainingSessions <= 2
+                          ? 'bg-gradient-to-br from-amber-100/80 to-orange-100/80 text-amber-700 border-amber-300/50 dark:from-amber-950/50 dark:to-orange-950/50 dark:text-amber-300 dark:border-amber-700/50'
+                          : 'bg-gradient-to-br from-emerald-100/80 to-green-100/80 text-emerald-700 border-emerald-300/50 dark:from-emerald-950/50 dark:to-green-950/50 dark:text-emerald-300 dark:border-emerald-700/50'
+                      } hover:scale-105 transition-transform duration-300`}
+                    >
+                      {client.remainingSessions}
+                    </div>
+                  </div>
+
+                  {/* Next Appointment */}
+                  <div className="col-span-2">
+                    <p className="text-xs font-medium text-muted-foreground mb-2">Next Visit</p>
+                    <div className="flex items-center gap-2 p-3 bg-gradient-to-r from-accent/40 to-secondary/30 rounded-xl border border-border/40 backdrop-blur-sm">
+                      <Calendar className="h-4 w-4 text-primary flex-shrink-0" />
+                      <span className="text-sm font-bold text-foreground">
+                        {client.nextAppointment}
                       </span>
                     </div>
-                    <div className="relative w-full bg-gradient-to-r from-muted/50 to-muted/30 rounded-full h-3 overflow-hidden shadow-inner border border-border/30">
-                      <div
-                        className={`h-3 rounded-full transition-all duration-[2000ms] ease-out shadow-lg relative overflow-hidden ${
-                          client.status === 'critical'
-                            ? 'bg-gradient-to-r from-red-500 to-red-600'
-                            : client.status === 'warning'
-                              ? 'bg-gradient-to-r from-amber-500 to-orange-500'
-                              : client.status === 'pending'
-                                ? 'bg-gradient-to-r from-blue-500 to-indigo-500'
-                                : 'bg-gradient-to-r from-emerald-500 to-green-500'
-                        }`}
-                        style={{
-                          width: `${getProgressPercentage(
-                            client.sessionsUsed,
-                            client.totalSessions
-                          )}%`,
-                          animationDelay: `${index * 0.1}s`,
-                        }}
-                      >
-                        <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/40 to-transparent animate-[shimmer_3s_infinite]"></div>
-                      </div>
-                    </div>
                   </div>
-                </div>
 
-                {/* Sessions Remaining */}
-                <div className="col-span-2 text-center">
-                  <p className="text-xs font-medium text-muted-foreground mb-2">Sessions Left</p>
-                  <div
-                    className={`inline-flex items-center justify-center w-16 h-16 rounded-2xl font-bold text-xl shadow-lg border-2 backdrop-blur-sm ${
-                      client.remainingSessions <= 2
-                        ? 'bg-gradient-to-br from-amber-100/80 to-orange-100/80 text-amber-700 border-amber-300/50 dark:from-amber-950/50 dark:to-orange-950/50 dark:text-amber-300 dark:border-amber-700/50'
-                        : 'bg-gradient-to-br from-emerald-100/80 to-green-100/80 text-emerald-700 border-emerald-300/50 dark:from-emerald-950/50 dark:to-green-950/50 dark:text-emerald-300 dark:border-emerald-700/50'
-                    } hover:scale-105 transition-transform duration-300`}
-                  >
-                    {client.remainingSessions}
+                  {/* 3-Button Actions */}
+                  <div className="col-span-1 flex flex-col gap-2">
+                    {client.status === 'pending' ? (
+                      <>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => handleMoveBackToActive(client.id, client.name)}
+                          disabled={loadingActions[`active_${client.id}`]}
+                          className="justify-center gap-2 h-8 px-3 bg-gradient-to-r from-emerald-50 to-green-50 border border-emerald-300 text-emerald-700 hover:from-emerald-100 hover:to-green-100 hover:border-emerald-400 text-xs font-medium dark:from-emerald-950/30 dark:to-green-950/30 dark:border-emerald-700 dark:text-emerald-300"
+                        >
+                          {loadingActions[`active_${client.id}`] ? (
+                            <div className="w-3 h-3 border-2 border-emerald-600 border-t-transparent rounded-full animate-spin" />
+                          ) : (
+                            <RotateCcw className="h-3 w-3" />
+                          )}
+                          {loadingActions[`active_${client.id}`] ? 'Activating...' : 'Active'}
+                        </Button>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => handleUpdateQuota(client)}
+                          disabled={loadingActions[`quota_${client.id}`]}
+                          className="justify-center gap-2 h-8 px-3 bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-300 text-blue-700 hover:from-blue-100 hover:to-indigo-100 hover:border-blue-400 text-xs font-medium dark:from-blue-950/30 dark:to-indigo-950/30 dark:border-blue-700 dark:text-blue-300"
+                        >
+                          {loadingActions[`quota_${client.id}`] ? (
+                            <div className="w-3 h-3 border-2 border-blue-600 border-t-transparent rounded-full animate-spin" />
+                          ) : (
+                            <Edit className="h-3 w-3" />
+                          )}
+                          {loadingActions[`quota_${client.id}`] ? 'Updating...' : 'Edit Quota'}
+                        </Button>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => handleDischarge(client.id, client.name)}
+                          disabled={loadingActions[`discharge_${client.id}`]}
+                          className="justify-center gap-2 h-8 px-3 bg-gradient-to-r from-red-50 to-rose-50 border border-red-300 text-red-700 hover:from-red-100 hover:to-rose-100 hover:border-red-400 text-xs font-medium dark:from-red-950/30 dark:to-rose-950/30 dark:border-red-700 dark:text-red-300"
+                        >
+                          {loadingActions[`discharge_${client.id}`] ? (
+                            <div className="w-3 h-3 border-2 border-red-600 border-t-transparent rounded-full animate-spin" />
+                          ) : (
+                            <UserX className="h-3 w-3" />
+                          )}
+                          {loadingActions[`discharge_${client.id}`] ? 'Archiving...' : 'Discharge'}
+                        </Button>
+                      </>
+                    ) : (
+                      <>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => handleUpdateQuota(client)}
+                          disabled={loadingActions[`quota_${client.id}`]}
+                          className="justify-center gap-2 h-8 px-3 bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-300 text-blue-700 hover:from-blue-100 hover:to-indigo-100 hover:border-blue-400 text-xs font-medium dark:from-blue-950/30 dark:to-indigo-950/30 dark:border-blue-700 dark:text-blue-300"
+                        >
+                          {loadingActions[`quota_${client.id}`] ? (
+                            <div className="w-3 h-3 border-2 border-blue-600 border-t-transparent rounded-full animate-spin" />
+                          ) : (
+                            <Edit className="h-3 w-3" />
+                          )}
+                          {loadingActions[`quota_${client.id}`] ? 'Updating...' : 'Edit Quota'}
+                        </Button>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => handleMoveToPending(client)}
+                          disabled={loadingActions[`pending_${client.id}`]}
+                          className="justify-center gap-2 h-8 px-3 bg-gradient-to-r from-amber-50 to-orange-50 border border-amber-300 text-amber-700 hover:from-amber-100 hover:to-orange-100 hover:border-amber-400 text-xs font-medium dark:from-amber-950/30 dark:to-indigo-950/30 dark:border-amber-700 dark:text-amber-300"
+                        >
+                          {loadingActions[`pending_${client.id}`] ? (
+                            <div className="w-3 h-3 border-2 border-amber-600 border-t-transparent rounded-full animate-spin" />
+                          ) : (
+                            <Timer className="h-3 w-3" />
+                          )}
+                          {loadingActions[`pending_${client.id}`] ? 'Moving...' : 'Pending'}
+                        </Button>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => handleDischarge(client.id, client.name)}
+                          disabled={loadingActions[`discharge_${client.id}`]}
+                          className="justify-center gap-2 h-8 px-3 bg-gradient-to-r from-red-50 to-rose-50 border border-red-300 text-red-700 hover:from-red-100 hover:to-rose-100 hover:border-red-400 text-xs font-medium dark:from-red-950/30 dark:to-rose-950/30 dark:border-red-700 dark:text-red-300"
+                        >
+                          {loadingActions[`discharge_${client.id}`] ? (
+                            <div className="w-3 h-3 border-2 border-red-600 border-t-transparent rounded-full animate-spin" />
+                          ) : (
+                            <UserX className="h-3 w-3" />
+                          )}
+                          {loadingActions[`discharge_${client.id}`] ? 'Archiving...' : 'Discharge'}
+                        </Button>
+                      </>
+                    )}
                   </div>
-                </div>
-
-                {/* Next Appointment */}
-                <div className="col-span-2">
-                  <p className="text-xs font-medium text-muted-foreground mb-2">Next Visit</p>
-                  <div className="flex items-center gap-2 p-3 bg-gradient-to-r from-accent/40 to-secondary/30 rounded-xl border border-border/40 backdrop-blur-sm">
-                    <Calendar className="h-4 w-4 text-primary flex-shrink-0" />
-                    <span className="text-sm font-bold text-foreground">
-                      {client.nextAppointment}
-                    </span>
-                  </div>
-                </div>
-
-                {/* 3-Button Actions */}
-                <div className="col-span-1 flex flex-col gap-2">
-                  {client.status === 'pending' ? (
-                    <>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => handleMoveBackToActive(client.id, client.name)}
-                        className="justify-center gap-2 h-8 px-3 bg-gradient-to-r from-emerald-50 to-green-50 border border-emerald-300 text-emerald-700 hover:from-emerald-100 hover:to-green-100 hover:border-emerald-400 text-xs font-medium dark:from-emerald-950/30 dark:to-green-950/30 dark:border-emerald-700 dark:text-emerald-300"
-                      >
-                        <RotateCcw className="h-3 w-3" />
-                        Active
-                      </Button>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => handleUpdateQuota(client.name)}
-                        className="justify-center gap-2 h-8 px-3 bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-300 text-blue-700 hover:from-blue-100 hover:to-indigo-100 hover:border-blue-400 text-xs font-medium dark:from-blue-950/30 dark:to-indigo-950/30 dark:border-blue-700 dark:text-blue-300"
-                      >
-                        <Edit className="h-3 w-3" />
-                        Edit Quota
-                      </Button>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => handleDischarge(client.id, client.name)}
-                        className="justify-center gap-2 h-8 px-3 bg-gradient-to-r from-red-50 to-rose-50 border border-red-300 text-red-700 hover:from-red-100 hover:to-rose-100 hover:border-red-400 text-xs font-medium dark:from-red-950/30 dark:to-rose-950/30 dark:border-red-700 dark:text-red-300"
-                      >
-                        <UserX className="h-3 w-3" />
-                        Discharge
-                      </Button>
-                    </>
-                  ) : (
-                    <>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => handleUpdateQuota(client.name)}
-                        className="justify-center gap-2 h-8 px-3 bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-300 text-blue-700 hover:from-blue-100 hover:to-indigo-100 hover:border-blue-400 text-xs font-medium dark:from-blue-950/30 dark:to-indigo-950/30 dark:border-blue-700 dark:text-blue-300"
-                      >
-                        <Edit className="h-3 w-3" />
-                        Edit Quota
-                      </Button>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => handleMoveToPending(client.id, client.name)}
-                        className="justify-center gap-2 h-8 px-3 bg-gradient-to-r from-amber-50 to-orange-50 border border-amber-300 text-amber-700 hover:from-amber-100 hover:to-orange-100 hover:border-amber-400 text-xs font-medium dark:from-amber-950/30 dark:to-orange-950/30 dark:border-amber-700 dark:text-amber-300"
-                      >
-                        <Timer className="h-3 w-3" />
-                        Pending
-                      </Button>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => handleDischarge(client.id, client.name)}
-                        className="justify-center gap-2 h-8 px-3 bg-gradient-to-r from-red-50 to-rose-50 border border-red-300 text-red-700 hover:from-red-100 hover:to-rose-100 hover:border-red-400 text-xs font-medium dark:from-red-950/30 dark:to-rose-950/30 dark:border-red-700 dark:text-red-300"
-                      >
-                        <UserX className="h-3 w-3" />
-                        Discharge
-                      </Button>
-                    </>
-                  )}
                 </div>
               </div>
-            </div>
-          ))}
-        </div>
+            ))}
+          </div>
+        )}
 
         {/* Enhanced Empty State */}
-        {clients.length === 0 && (
+        {!isLoadingData && !dataError && clients.length === 0 && (
           <div className="text-center py-20 space-y-6">
             <div className="w-32 h-32 bg-gradient-to-br from-muted/20 to-muted/40 rounded-3xl flex items-center justify-center mx-auto">
               <Users className="h-16 w-16 text-muted-foreground/60" />
@@ -672,7 +961,7 @@ const Dashboard = ({ onNavigate }: DashboardProps) => {
 
   return (
     <TooltipProvider>
-      <div className="min-h-screen bg-gradient-to-br from-background to-accent">
+      <main className="min-h-screen bg-gradient-to-br from-background to-accent">
         {/* Header */}
         <div className="bg-background/95 backdrop-blur-sm border-b border-border/30 sticky top-0 z-50">
           <div className="container mx-auto px-8 py-6">
@@ -850,9 +1139,9 @@ const Dashboard = ({ onNavigate }: DashboardProps) => {
                         EPC
                       </Button>
                       <Button
-                        variant={selectedFilter === "workers' compensation" ? 'default' : 'outline'}
+                        variant={selectedFilter === 'wc' ? 'default' : 'outline'}
                         size="sm"
-                        onClick={() => setSelectedFilter("workers' compensation")}
+                        onClick={() => setSelectedFilter('wc')}
                         className="h-10 px-4"
                       >
                         WC
@@ -862,31 +1151,33 @@ const Dashboard = ({ onNavigate }: DashboardProps) => {
 
                   <div className="h-8 w-px bg-border/60" />
 
-                  {/* Physio Filter */}
-                  <div className="flex items-center gap-3">
-                    <span className="text-sm font-medium text-muted-foreground">Physio:</span>
-                    <div className="flex gap-2">
-                      <Button
-                        variant={selectedPhysio === 'all' ? 'default' : 'outline'}
-                        size="sm"
-                        onClick={() => setSelectedPhysio('all')}
-                        className="h-10 px-4"
-                      >
-                        All
-                      </Button>
-                      {getUniquePhysios().map((physio) => (
+                  {/* Physio Filter - Only show if there are physio names */}
+                  {getUniquePhysios().length > 0 && (
+                    <div className="flex items-center gap-3">
+                      <span className="text-sm font-medium text-muted-foreground">Physio:</span>
+                      <div className="flex gap-2">
                         <Button
-                          key={physio}
-                          variant={selectedPhysio === physio ? 'default' : 'outline'}
+                          variant={selectedPhysio === 'all' ? 'default' : 'outline'}
                           size="sm"
-                          onClick={() => setSelectedPhysio(physio)}
+                          onClick={() => setSelectedPhysio('all')}
                           className="h-10 px-4"
                         >
-                          {physio}
+                          All
                         </Button>
-                      ))}
+                        {getUniquePhysios().map((physio) => (
+                          <Button
+                            key={physio}
+                            variant={selectedPhysio === physio ? 'default' : 'outline'}
+                            size="sm"
+                            onClick={() => setSelectedPhysio(physio)}
+                            className="h-10 px-4"
+                          >
+                            {physio}
+                          </Button>
+                        ))}
+                      </div>
                     </div>
-                  </div>
+                  )}
 
                   <div className="h-8 w-px bg-border/60" />
 
@@ -988,7 +1279,22 @@ const Dashboard = ({ onNavigate }: DashboardProps) => {
             </div>
           </div>
         </div>
-      </div>
+      </main>
+
+      {/* Patient Action Modals */}
+      {selectedPatient && (
+        <>
+          <QuotaEditModal
+            isOpen={showQuotaModal}
+            onClose={() => {
+              setShowQuotaModal(false);
+              setSelectedPatient(null);
+            }}
+            patient={selectedPatient}
+            onSave={handleQuotaUpdate}
+          />
+        </>
+      )}
     </TooltipProvider>
   );
 };

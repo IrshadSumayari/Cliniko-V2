@@ -63,11 +63,11 @@ export async function POST(request: NextRequest) {
             testResults.data = true;
             testResults.permissions = true;
 
-            // Test 3: EPC/WC filtering
-            const epcWcPatients = patients.filter(
-              (p) => p.patientType === 'EPC' || p.patientType === 'WC'
+            // Test 3: Patient type filtering (check if any patients have patient types)
+            const patientsWithTypes = patients.filter(
+              (p: { patientType: string }) => p.patientType && p.patientType.trim() !== ''
             );
-            testResults.filtering = epcWcPatients.length >= 0; // Even 0 is valid
+            testResults.filtering = patientsWithTypes.length >= 0;
           } catch (error) {
             console.error(`${pmsType} data access test failed:`, error);
           }

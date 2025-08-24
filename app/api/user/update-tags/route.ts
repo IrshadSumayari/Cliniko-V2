@@ -4,7 +4,6 @@ import { createAdminClient } from '@/lib/supabase/server-admin';
 export async function POST(request: NextRequest) {
   try {
     const { wcTag, epcTag } = await request.json();
-    console.log('Update tags request received:', { wcTag, epcTag });
 
     if (!wcTag || !epcTag) {
       return NextResponse.json({ error: 'Both WC and EPC tags are required' }, { status: 400 });
@@ -32,8 +31,6 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Invalid or expired token' }, { status: 401 });
     }
 
-    console.log('Authenticated user:', { id: user.id, email: user.email });
-
     // Update the user's tags using the same pattern as is_onboarded updates
     const { data: updatedUser, error: updateError } = await supabase
       .from('users')
@@ -50,8 +47,6 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Failed to update tags' }, { status: 500 });
     }
 
-    console.log('Tags updated successfully:', updatedUser);
-
     // Get the actual users table ID (not auth_user_id)
     const { data: userRecord, error: userRecordError } = await supabase
       .from('users')
@@ -64,10 +59,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Failed to fetch user record' }, { status: 500 });
     }
 
-    console.log('User IDs:', { authUserId: user.id, usersTableId: userRecord.id });
-
     // Recalculate counts based on new tags using appointment-types table
-    console.log('Recalculating counts using new tags:', { wcTag, epcTag });
 
     // Initialize count variables
     let wcCount = 0;
@@ -81,21 +73,14 @@ export async function POST(request: NextRequest) {
         .select('appointment_id, appointment_name')
         .eq('user_id', userRecord.id);
 
-      if (debugError) {
-        console.error('Debug: Error fetching all appointment types:', debugError);
-      } else {
-        console.log('Debug: All appointment types for user:', allAppointmentTypes);
-      }
-
       // Step 1: Find appointment types from appointment-types table by matching tag names
-      console.log(`Searching for WC tag "${wcTag}" in appointment types...`);
+
       const { data: wcAppointmentTypes, error: wcTypesError } = await supabase
         .from('appointment_types')
         .select('appointment_id, appointment_name')
         .eq('user_id', userRecord.id)
         .ilike('appointment_name', `%${wcTag}%`);
 
-      console.log(`Searching for EPC tag "${epcTag}" in appointment types...`);
       const { data: epcAppointmentTypes, error: epcTypesError } = await supabase
         .from('appointment_types')
         .select('appointment_id, appointment_name')
@@ -113,90 +98,61 @@ export async function POST(request: NextRequest) {
         );
       }
 
-      // Log what we found for debugging
-      console.log('WC appointment types found:', wcAppointmentTypes);
-      console.log('EPC appointment types found:', epcAppointmentTypes);
-
       // Extract appointment type IDs
       const wcTypeIds = wcAppointmentTypes?.map((type: any) => type.appointment_id) || [];
       const epcTypeIds = epcAppointmentTypes?.map((type: any) => type.appointment_id) || [];
 
-      console.log('Found appointment type IDs:', { wcTypeIds, epcTypeIds });
+      try {
+        // Get all appointment type IDs that match user's custom tags
+        const allMatchingTypeIds = [...wcTypeIds, ...epcTypeIds].filter(
+          (id) => id && id !== null && id !== undefined
+        );
 
-      // Step 2: Filter appointments using those IDs to calculate unique patient counts
-      if (wcTypeIds.length > 0) {
-        try {
-          console.log('Querying WC appointments with type IDs:', wcTypeIds);
-          // Safety check: ensure we have valid IDs
-          const validWcTypeIds = wcTypeIds.filter((id) => id && id !== null && id !== undefined);
-          if (validWcTypeIds.length === 0) {
-            console.log('No valid WC type IDs found, skipping WC count');
-            wcCount = 0;
-          } else {
-            const { data: wcAppointments, error: wcCountError } = await supabase
-              .from('appointments')
-              .select('patient_id')
-              .eq('user_id', userRecord.id)
-              .in('appointment_type_id', validWcTypeIds)
-              .not('patient_id', 'is', null);
-
-            if (wcCountError) {
-              console.error('Error counting WC appointments:', wcCountError);
-            } else {
-              // Count unique patients (not appointments)
-              const uniquePatientIds = new Set(
-                wcAppointments?.map((apt) => apt.patient_id).filter(Boolean)
-              );
-              wcCount = uniquePatientIds.size;
-              console.log(
-                `WC: Found ${wcAppointments?.length || 0} appointments for ${wcCount} unique patients`
-              );
-            }
-          }
-        } catch (wcError) {
-          console.error('Error in WC counting logic:', wcError);
+        if (allMatchingTypeIds.length === 0) {
           wcCount = 0;
-        }
-      } else {
-        console.log(`No appointment types found matching WC tag: "${wcTag}"`);
-        wcCount = 0;
-      }
+          epcCount = 0;
+        } else {
+          const { data: matchingPatients, error: countError } = await supabase
+            .from('patients')
+            .select(
+              `
+               id,
+               patient_type,
+               appointments!inner(
+                 appointment_type_id
+               )
+             `
+            )
+            .eq('user_id', userRecord.id)
+            .in('appointments.appointment_type_id', allMatchingTypeIds)
+            .not('id', 'is', null);
 
-      if (epcTypeIds.length > 0) {
-        try {
-          console.log('Querying EPC appointments with type IDs:', epcTypeIds);
-          // Safety check: ensure we have valid IDs
-          const validEpcTypeIds = epcTypeIds.filter((id) => id && id !== null && id !== undefined);
-          if (validEpcTypeIds.length === 0) {
-            console.log('No valid EPC type IDs found, skipping EPC count');
+          if (countError) {
+            console.error('Error counting patients using cases table logic:', countError);
+            wcCount = 0;
             epcCount = 0;
           } else {
-            const { data: epcAppointments, error: epcCountError } = await supabase
-              .from('appointments')
-              .select('patient_id')
-              .eq('user_id', userRecord.id)
-              .in('appointment_type_id', validEpcTypeIds)
-              .not('patient_id', 'is', null);
+            // Count patients by their appointment types, not by patient_type field
+            // This matches exactly how the cases table population works
+            const wcPatients =
+              matchingPatients?.filter((p) => {
+                // Check if patient has WC appointments
+                return p.appointments?.some((apt) => wcTypeIds.includes(apt.appointment_type_id));
+              }) || [];
 
-            if (epcCountError) {
-              console.error('Error counting EPC appointments:', epcCountError);
-            } else {
-              // Count unique patients (not appointments)
-              const uniquePatientIds = new Set(
-                epcAppointments?.map((apt) => apt.patient_id).filter(Boolean)
-              );
-              epcCount = uniquePatientIds.size;
-              console.log(
-                `EPC: Found ${epcAppointments?.length || 0} appointments for ${epcCount} unique patients`
-              );
-            }
+            const epcPatients =
+              matchingPatients?.filter((p) => {
+                // Check if patient has EPC appointments
+                return p.appointments?.some((apt) => epcTypeIds.includes(apt.appointment_type_id));
+              }) || [];
+
+            wcCount = wcPatients.length;
+            epcCount = epcPatients.length;
           }
-        } catch (epcError) {
-          console.error('Error in EPC counting logic:', epcError);
-          epcCount = 0;
         }
-      } else {
-        console.log(`No appointment types found matching EPC tag: "${epcTag}"`);
+      } catch (countError) {
+        console.error('Error in patient counting using cases table logic:', countError);
+        wcCount = 0;
         epcCount = 0;
       }
 
@@ -245,14 +201,148 @@ export async function POST(request: NextRequest) {
 
       // Total appointments is the sum of WC + EPC appointments
       totalAppointmentsCount = wcAppointmentCount + epcAppointmentCount;
-      console.log('Appointment counts for total:', {
-        wcAppointmentCount,
-        epcAppointmentCount,
-        totalAppointmentsCount,
-      });
+
+      try {
+        // Get all patients for this user
+        const { data: allPatients, error: patientsError } = await supabase
+          .from('patients')
+          .select('id, pms_patient_id, pms_type, patient_type')
+          .eq('user_id', userRecord.id);
+
+        if (patientsError) {
+          console.error('Error fetching patients for type update:', patientsError);
+        } else if (allPatients && allPatients.length > 0) {
+          // Get all appointments for these patients to determine their type
+          const patientIds = allPatients.map((p) => p.id);
+          const { data: allAppointments, error: appointmentsError } = await supabase
+            .from('appointments')
+            .select('patient_id, appointment_type_id')
+            .eq('user_id', userRecord.id)
+            .in('patient_id', patientIds);
+
+          if (appointmentsError) {
+            console.error(
+              'Error fetching appointments for patient type update:',
+              appointmentsError
+            );
+          } else {
+            // Create a map of patient_id -> appointment_type_ids
+            const patientAppointmentTypes = new Map();
+            allAppointments?.forEach((apt) => {
+              const patientId = apt.patient_id;
+              if (!patientAppointmentTypes.has(patientId)) {
+                patientAppointmentTypes.set(patientId, []);
+              }
+              patientAppointmentTypes.get(patientId).push(apt.appointment_type_id);
+            });
+
+            // Only update patients that actually have WC or EPC appointments (not all 200 patients)
+            let updatedPatients = 0;
+            for (const patient of allPatients) {
+              const appointmentTypeIds = patientAppointmentTypes.get(patient.id) || [];
+
+              // Determine patient type based on appointment types
+              let newPatientType = 'Private'; // Default
+
+              // Check if patient has WC appointments
+              const hasWCAppointments = appointmentTypeIds.some((typeId: string | number) =>
+                wcTypeIds.includes(typeId)
+              );
+
+              // Check if patient has EPC appointments
+              const hasEPCAppointments = appointmentTypeIds.some((typeId: string | number) =>
+                epcTypeIds.includes(typeId)
+              );
+
+              // Only update if patient actually has WC or EPC appointments
+              if (hasWCAppointments || hasEPCAppointments) {
+                if (hasWCAppointments && hasEPCAppointments) {
+                  // If patient has both, prioritize WC (as per business logic)
+                  newPatientType = wcTag;
+                } else if (hasWCAppointments) {
+                  newPatientType = wcTag;
+                } else if (hasEPCAppointments) {
+                  newPatientType = epcTag;
+                }
+
+                // Update patient type if it changed
+                if (patient.patient_type !== newPatientType) {
+                  const { error: updateError } = await supabase
+                    .from('patients')
+                    .update({
+                      patient_type: newPatientType,
+                      updated_at: new Date().toISOString(),
+                    })
+                    .eq('id', patient.id);
+
+                  if (updateError) {
+                    console.error(`Error updating patient ${patient.id} type:`, updateError);
+                  } else {
+                    updatedPatients++;
+                  }
+                }
+              }
+            }
+
+            console.log(
+              `Successfully updated types for ${updatedPatients} patients with ${wcTag}/${epcTag} appointments`
+            );
+          }
+        }
+      } catch (patientUpdateError) {
+        console.error('Error updating patient types:', patientUpdateError);
+        // Don't fail the entire operation, just log the error
+      }
+
+      // NEW: Populate cases table after updating patient types
+      console.log('Populating cases table with updated patient data...');
+      try {
+        // Call the populate_cases_from_existing_data function to populate cases with user ID
+        const { data: casesResult, error: casesError } = await supabase.rpc(
+          'populate_cases_from_existing_data',
+          {
+            p_user_id: userRecord.id,
+          }
+        );
+
+        if (casesError) {
+          console.error('Error populating cases table:', casesError);
+        } else {
+          console.log('Cases table populated successfully');
+
+          // Verify the cases were created and get the FINAL counts from cases table
+          const { data: casesData, error: countError } = await supabase
+            .from('cases')
+            .select('id, program_type')
+            .eq('user_id', userRecord.id);
+
+          if (countError) {
+            console.error('Error counting cases:', countError);
+          } else {
+            console.log(`Cases table now contains ${casesData?.length || 0} cases`);
+
+            // IMPORTANT: Recalculate counts from the ACTUAL cases table data
+            // This ensures the counts match exactly what's in the cases table
+            const finalWcCount = casesData?.filter((c) => c.program_type === wcTag).length || 0;
+            const finalEpcCount = casesData?.filter((c) => c.program_type === epcTag).length || 0;
+
+            // Update the count variables to match the cases table
+            wcCount = finalWcCount;
+            epcCount = finalEpcCount;
+
+            console.log(
+              `Final counts from cases table: ${finalWcCount} WC + ${finalEpcCount} EPC = ${finalWcCount + finalEpcCount} total`
+            );
+          }
+        }
+      } catch (casesPopulationError) {
+        console.error('Error in cases population:', casesPopulationError);
+        // Don't fail the entire operation, just log the error
+      }
+
       console.log('Final counts:', {
-        wcPatients: wcCount,
-        epcPatients: epcCount,
+        [`${wcTag}Patients`]: wcCount,
+        [`${epcTag}Patients`]: epcCount,
         totalAppointments: totalAppointmentsCount,
       });
     } catch (countingError) {
@@ -267,8 +357,8 @@ export async function POST(request: NextRequest) {
       success: true,
       message: 'Tags updated successfully',
       newCounts: {
-        wcPatients: wcCount,
-        epcPatients: epcCount,
+        [`${wcTag}Patients`]: wcCount,
+        [`${epcTag}Patients`]: epcCount,
         totalAppointments: totalAppointmentsCount,
       },
     });
