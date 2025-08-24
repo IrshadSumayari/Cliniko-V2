@@ -64,7 +64,7 @@ export async function POST(request: NextRequest) {
 
         case 'nookal':
           // Test Nookal API connection
-          const nookalResponse = await fetch('https://api.nookal.com/v1/patients', {
+          const nookalResponse = await fetch('https://api.nookal.com/v2/patients', {
             headers: {
               Authorization: `Bearer ${apiKey}`,
               Accept: 'application/json',

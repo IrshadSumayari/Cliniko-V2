@@ -2,81 +2,116 @@
 
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
-import { ChevronDown, ChevronUp, HelpCircle, Users, Search, Filter, Activity } from 'lucide-react';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
+import { CheckCircle, X, ArrowRight, Lightbulb } from 'lucide-react';
 
-export default function TutorialCard() {
-  const [isOpen, setIsOpen] = useState(false);
-  const [isVisible, setIsVisible] = useState(true);
+interface TutorialCardProps {
+  title: string;
+  description: string;
+  steps: string[];
+  difficulty: 'Beginner' | 'Intermediate' | 'Advanced';
+  estimatedTime: string;
+  onStart?: () => void;
+  onDismiss?: () => void;
+}
 
-  const sections = [
-    {
-      icon: Activity,
-      title: 'KPI Stats',
-      description:
-        "Monitor your practice's key metrics - active patients, remaining sessions, and urgent actions needed.",
-    },
-    {
-      icon: Search,
-      title: 'Search & Filters',
-      description:
-        'Quickly find patients by name or filter by program (EPC/WC), physio, or location.',
-    },
-    {
-      icon: Filter,
-      title: 'Patient Tabs',
-      description:
-        'Organize by priority: All Patients, Action Needed (urgent), Pending (awaiting approval), and Archived.',
-    },
-    {
-      icon: Users,
-      title: 'Patient Cards',
-      description:
-        'Complete view with sessions used/remaining, next appointment, alerts, and quick actions. Color-coded for instant status recognition.',
-    },
-  ];
+export function TutorialCard({
+  title,
+  description,
+  steps,
+  difficulty,
+  estimatedTime,
+  onStart,
+  onDismiss,
+}: TutorialCardProps) {
+  const [isExpanded, setIsExpanded] = useState(false);
 
-  if (!isVisible) return null;
+  const getDifficultyColor = (diff: string) => {
+    switch (diff) {
+      case 'Beginner':
+        return 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300';
+      case 'Intermediate':
+        return 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-300';
+      case 'Advanced':
+        return 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-300';
+      default:
+        return 'bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-300';
+    }
+  };
 
   return (
-    <Card className="mb-6 border-primary/20">
-      <Collapsible open={isOpen} onOpenChange={setIsOpen}>
-        <CollapsibleTrigger asChild>
-          <CardHeader className="cursor-pointer hover:bg-muted/50 transition-colors">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <HelpCircle className="h-5 w-5 text-primary" />
-                <CardTitle className="text-lg">Dashboard Guide</CardTitle>
-              </div>
-              <Button variant="ghost" size="sm">
-                {isOpen ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
-              </Button>
+    <Card className="w-full max-w-md bg-gradient-to-br from-background via-background/95 to-accent/10 border border-border/30 hover:shadow-lg transition-all duration-300">
+      <CardHeader className="pb-4">
+        <div className="flex items-start justify-between">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 bg-gradient-to-br from-primary/15 to-secondary/15 rounded-xl flex items-center justify-center">
+              <Lightbulb className="h-5 w-5 text-primary" />
             </div>
-          </CardHeader>
-        </CollapsibleTrigger>
+            <div className="flex-1">
+              <CardTitle className="text-lg font-semibold text-foreground">{title}</CardTitle>
+              <CardDescription className="text-sm text-muted-foreground mt-1">
+                {description}
+              </CardDescription>
+            </div>
+          </div>
+          {onDismiss && (
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={onDismiss}
+              className="h-8 w-8 p-0 hover:bg-muted/50"
+            >
+              <X className="h-4 w-4" />
+            </Button>
+          )}
+        </div>
+        
+        <div className="flex items-center gap-3 mt-3">
+          <Badge variant="outline" className={getDifficultyColor(difficulty)}>
+            {difficulty}
+          </Badge>
+          <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-950/30 dark:text-blue-300 dark:border-blue-800">
+            {estimatedTime}
+          </Badge>
+        </div>
+      </CardHeader>
 
-        <CollapsibleContent>
-          <CardContent className="pt-0">
-            <div className="grid gap-4 md:grid-cols-2">
-              {sections.map((section, index) => (
-                <div
-                  key={index}
-                  className="flex gap-3 p-3 rounded-lg bg-muted/20 border border-border/50"
-                >
-                  <section.icon className="h-5 w-5 text-primary mt-0.5 flex-shrink-0" />
-                  <div>
-                    <h4 className="font-semibold text-sm mb-1">{section.title}</h4>
-                    <p className="text-sm text-muted-foreground leading-relaxed">
-                      {section.description}
-                    </p>
+      <CardContent className="pt-0">
+        {isExpanded && (
+          <div className="space-y-3 mb-4">
+            <h4 className="font-medium text-sm text-foreground">Steps:</h4>
+            <ol className="space-y-2">
+              {steps.map((step, index) => (
+                <li key={index} className="flex items-start gap-3 text-sm text-muted-foreground">
+                  <div className="w-5 h-5 bg-primary/10 rounded-full flex items-center justify-center flex-shrink-0 mt-0.5">
+                    <span className="text-xs font-medium text-primary">{index + 1}</span>
                   </div>
-                </div>
+                  <span>{step}</span>
+                </li>
               ))}
-            </div>
-          </CardContent>
-        </CollapsibleContent>
-      </Collapsible>
+            </ol>
+          </div>
+        )}
+
+        <div className="flex items-center gap-3">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setIsExpanded(!isExpanded)}
+            className="flex-1"
+          >
+            {isExpanded ? 'Show Less' : 'Show Steps'}
+          </Button>
+          
+          {onStart && (
+            <Button onClick={onStart} className="flex-1 gap-2">
+              Start Tutorial
+              <ArrowRight className="h-4 w-4" />
+            </Button>
+          )}
+        </div>
+      </CardContent>
     </Card>
   );
 }

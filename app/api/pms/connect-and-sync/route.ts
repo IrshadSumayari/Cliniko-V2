@@ -305,11 +305,16 @@ async function performInitialSync(supabase: any, userId: string, pmsClient: any,
       console.log(`[SERVER] Fetched ${patients.length} patients from ${pmsType}`);
     }
 
-    console.log(`[SERVER] Processing ${patients.length} patients...`);
-
-    // BULK INSERT: Process all patients at once instead of one by one
     const patientsToInsert = patients
-      .filter((patient) => patient.patientType === 'EPC' || patient.patientType === 'WC')
+      .filter((patient) => {
+        const isValid = patient.patientType && patient.patientType.trim() !== '';
+        if (!isValid) {
+          console.log(
+            `[SERVER] Filtered out patient ${patient.id} (${patient.firstName} ${patient.lastName}) - no patient type`
+          );
+        }
+        return isValid;
+      })
       .map((patient) => ({
         user_id: userId,
         pms_patient_id: String(patient.id),
@@ -361,18 +366,16 @@ async function performInitialSync(supabase: any, userId: string, pmsClient: any,
       );
     } else {
       // For other PMS systems, fetch appointments for each patient
-      console.log('[SERVER] Fetching appointments for EPC/WC patients...');
+      console.log('[SERVER] Fetching appointments for all patients...');
       for (const patient of patients) {
-        if (patient.patientType === 'EPC' || patient.patientType === 'WC') {
-          try {
-            const patientAppointments = await pmsClient.getPatientAppointments(patient.id);
-            appointmentsToProcess.push(...patientAppointments);
-          } catch (error) {
-            console.error(`[SERVER] Error fetching appointments for patient ${patient.id}:`, error);
-            issues.push(
-              `Failed to fetch appointments for patient: ${patient.firstName} ${patient.lastName}`
-            );
-          }
+        try {
+          const patientAppointments = await pmsClient.getPatientAppointments(patient.id);
+          appointmentsToProcess.push(...patientAppointments);
+        } catch (error) {
+          console.error(`[SERVER] Error fetching appointments for patient ${patient.id}:`, error);
+          issues.push(
+            `Failed to fetch appointments for patient: ${patient.firstName} ${patient.lastName}`
+          );
         }
       }
     }
@@ -502,115 +505,15 @@ async function performInitialSync(supabase: any, userId: string, pmsClient: any,
       }
     }
 
-    // Calculate WC and EPC counts based on appointment types from appointment-types table
-    console.log('[SERVER] Calculating WC and EPC counts based on appointment types...');
-
-    // Get user's custom tags - only proceed if they have set custom tags
-    const { data: userData, error: userError } = await supabase
-      .from('users')
-      .select('wc, epc')
-      .eq('id', userId)
-      .single();
-
-    if (userError) {
-      console.error('[SERVER] Error fetching user tags:', userError);
-      issues.push('Could not fetch user custom tags');
-      // Skip counting if we can't get user tags
-      wcPatients = 0;
-      epcPatients = 0;
-    } else if (!userData?.wc || !userData?.epc) {
-      console.log('[SERVER] User has not set custom tags yet, skipping appointment counting');
-      // Skip counting if user hasn't set custom tags
-      wcPatients = 0;
-      epcPatients = 0;
-    } else {
-      const wcTag = userData.wc;
-      const epcTag = userData.epc;
-
-      const { data: wcAppointmentTypes, error: wcTypesError } = await supabase
-        .from('appointment_types')
-        .select('appointment_id, appointment_name')
-        .eq('user_id', userId)
-        .eq('pms_type', pmsType)
-        .ilike('appointment_name', `%${wcTag}%`);
-
-      const { data: epcAppointmentTypes, error: epcTypesError } = await supabase
-        .from('appointment_types')
-        .select('appointment_id, appointment_name')
-        .eq('user_id', userId)
-        .eq('pms_type', pmsType)
-        .ilike('appointment_name', `%${epcTag}%`);
-
-      if (wcTypesError || epcTypesError) {
-        console.error('[SERVER] Error fetching appointment types:', {
-          wcTypesError,
-          epcTypesError,
-        });
-        issues.push('Could not fetch appointment types for counting');
-      } else {
-        console.log('WC appointment types found:', wcAppointmentTypes);
-        console.log('EPC appointment types found:', epcAppointmentTypes);
-        // Extract appointment type IDs
-        const wcTypeIds = wcAppointmentTypes?.map((type: any) => type.appointment_id) || [];
-        const epcTypeIds = epcAppointmentTypes?.map((type: any) => type.appointment_id) || [];
-
-        // Step 2: Filter appointments using those IDs to calculate unique patient counts
-        if (wcTypeIds.length > 0) {
-          const { data: wcAppointments, error: wcCountError } = await supabase
-            .from('appointments')
-            .select('patient_id')
-            .eq('user_id', userId)
-            .eq('pms_type', pmsType)
-            .in('appointment_type_id', wcTypeIds)
-            .not('patient_id', 'is', null);
-
-          if (wcCountError) {
-            console.error('[SERVER] Error counting WC appointments:', wcCountError);
-            issues.push('Could not count WC appointments');
-          } else {
-            // Count unique patients (not appointments)
-            const uniquePatientIds = new Set(
-              wcAppointments?.map((apt: any) => apt.patient_id).filter(Boolean)
-            );
-            wcPatients = uniquePatientIds.size;
-            console.log(
-              `[SERVER] WC: Found ${wcAppointments?.length || 0} appointments for ${wcPatients} unique patients`
-            );
-          }
-        }
-
-        if (epcTypeIds.length > 0) {
-          const { data: epcAppointments, error: epcCountError } = await supabase
-            .from('appointments')
-            .select('patient_id')
-            .eq('user_id', userId)
-            .eq('pms_type', pmsType)
-            .in('appointment_type_id', epcTypeIds)
-            .not('patient_id', 'is', null);
-
-          if (epcCountError) {
-            console.error('[SERVER] Error counting EPC appointments:', epcCountError);
-            issues.push('Could not count EPC appointments');
-          } else {
-            // Count unique patients (not appointments)
-            const uniquePatientIds = new Set(
-              epcAppointments?.map((apt: any) => apt.patient_id).filter(Boolean)
-            );
-            epcPatients = uniquePatientIds.size;
-            console.log(
-              `[SERVER] EPC: Found ${epcAppointments?.length || 0} appointments for ${epcPatients} unique patients`
-            );
-          }
-        }
-      }
-    }
+    // Set counts to 0 to indicate they need to be calculated after user sets tags
+    wcPatients = 0;
+    epcPatients = 0;
 
     // Add summary for verification
-    const totalSyncedRecords = wcPatients + epcPatients + totalAppointments;
+    const totalSyncedRecords = totalAppointments; // Only count appointments since patient counts are 0
     console.log(`[SERVER] 🎯 SYNC COMPLETED SUCCESSFULLY!`);
-    console.log(
-      `[SERVER] 📊 Final Results: ${wcPatients} WC patients + ${epcPatients} EPC patients + ${totalAppointments} appointments = ${totalSyncedRecords} total records`
-    );
+    console.log(`[SERVER] 📊 Final Results: ${totalAppointments} appointments synced successfully`);
+    console.log(`[SERVER] 📋 Patient counts will be calculated after user sets custom WC/EPC tags`);
 
     // Create sync log entry for progress tracking
     try {
@@ -638,9 +541,9 @@ async function performInitialSync(supabase: any, userId: string, pmsClient: any,
         pms_type: pmsType,
         sync_type: 'initial',
         status: 'completed',
-        patients_processed: wcPatients + epcPatients,
-        patients_added: wcPatients + epcPatients,
-        patients_synced: wcPatients + epcPatients,
+        patients_processed: 0,
+        patients_added: 0,
+        patients_synced: 0,
         appointments_synced: totalAppointments,
         started_at: new Date().toISOString(),
         completed_at: new Date().toISOString(),

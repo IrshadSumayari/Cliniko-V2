@@ -72,9 +72,26 @@ export default function OnboardingFlow() {
 
         if (!token) return;
 
-        console.log('Using default WC/EPC tags for now');
+        // Fetch current user tags from the API
+        const response = await fetch('/api/user/tags', {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        });
+
+        if (response.ok) {
+          const userTags = await response.json();
+          setCustomTags({
+            wc: userTags.wc || 'WC',
+            epc: userTags.epc || 'EPC',
+          });
+          console.log('Fetched user tags:', userTags);
+        } else {
+          console.log('Using default WC/EPC tags');
+        }
       } catch (error) {
-        console.error('Error in tag initialization:', error);
+        console.error('Error fetching user tags:', error);
+        console.log('Using default WC/EPC tags');
       }
     };
 
@@ -370,13 +387,21 @@ export default function OnboardingFlow() {
       }
 
       const result = await response.json();
+      console.log('Tags API response:', result);
 
       // Update the sync results with new counts
+      // The API returns dynamic property names based on user's custom tags
+      const wcKey = `${customTags.wc}Patients`;
+      const epcKey = `${customTags.epc}Patients`;
+      
+      console.log('Looking for count keys:', { wcKey, epcKey });
+      console.log('Available keys in newCounts:', Object.keys(result.newCounts || {}));
+      
       setSyncResults((prev) => ({
         ...prev,
-        wcPatients: result.newCounts.wcPatients,
-        epcPatients: result.newCounts.epcPatients,
-        totalAppointments: result.newCounts.totalAppointments,
+        wcPatients: result.newCounts[wcKey] || 0,
+        epcPatients: result.newCounts[epcKey] || 0,
+        totalAppointments: result.newCounts.totalAppointments || 0,
         customTags: {
           wc: customTags.wc,
           epc: customTags.epc,

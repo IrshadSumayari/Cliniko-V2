@@ -248,7 +248,7 @@ export class ClinikoAPI implements PMSApiInterface {
                 postcode: patient.post_code,
                 country: patient.country,
               },
-              patientType: null,
+              patientType: 'EPC',
               physioName: `${patient.first_name || ''} ${patient.last_name || ''}`.trim(),
               lastModified: patient.updated_at,
             };
@@ -257,7 +257,7 @@ export class ClinikoAPI implements PMSApiInterface {
           }
 
           console.log(
-            `✅ Page ${currentPage}: Added ${patients[0]} patients, total now: ${allPatients.length}`
+            `✅ Page ${currentPage}: Added ${patients.length} patients, total now: ${allPatients.length}`
           );
 
           // Check if there are more pages
@@ -373,6 +373,44 @@ export class ClinikoAPI implements PMSApiInterface {
       console.error(`❌ Error fetching appointments for patient ${patientId} from Cliniko:`, error);
       return [];
     }
+  }
+
+  // Required interface methods
+  async getAllPatients(): Promise<PMSPatient[]> {
+    try {
+      console.log('🔍 Fetching all patients from Cliniko...');
+      const { patients } = await this.getPatientsWithAppointments();
+      return patients;
+    } catch (error) {
+      console.error('❌ Error fetching all patients from Cliniko:', error);
+      return [];
+    }
+  }
+
+  async getModifiedPatients(lastModified: Date): Promise<PMSPatient[]> {
+    try {
+      console.log('🔍 Fetching modified patients from Cliniko...');
+      const { patients } = await this.getPatientsWithAppointments(lastModified.toISOString());
+      return patients;
+    } catch (error) {
+      console.error('❌ Error fetching modified patients from Cliniko:', error);
+      return [];
+    }
+  }
+
+  isEPCPatient(patient: any): boolean {
+    // For Cliniko, we'll default to EPC since we don't have appointment type filtering yet
+    return true;
+  }
+
+  isWCPatient(patient: any): boolean {
+    // For Cliniko, we'll default to false since we don't have appointment type filtering yet
+    return false;
+  }
+
+  isCompletedAppointment(appointment: any): boolean {
+    // Check if appointment is completed based on Cliniko's status
+    return appointment.status === 'completed' || appointment.status === 'Completed';
   }
 
   // Keep existing helper methods

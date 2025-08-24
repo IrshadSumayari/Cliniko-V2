@@ -20,7 +20,7 @@ import {
   Activity,
 } from 'lucide-react';
 import Header from './header';
-import AnimatedDashboard from './animated-dashboard';
+import { AnimatedDashboard } from './animated-dashboard';
 import Link from 'next/link';
 import { useAuth } from '@/contexts/auth-context';
 import { usePathname, useRouter } from 'next/navigation';

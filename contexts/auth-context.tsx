@@ -139,13 +139,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const getAccessToken = (): string | null => {
     try {
-      const supabaseToken = localStorage.getItem('sb-ddsbasqzslznczvqwjph-auth-token');
-      if (supabaseToken) {
-        const parsed = JSON.parse(supabaseToken);
-        return parsed.access_token || null;
-      }
-
-      return localStorage.getItem('supabase.auth.token');
+      return localStorage.getItem('auth-token');
     } catch (error) {
       console.warn('Error getting access token:', error);
       return null;
@@ -195,6 +189,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
         if (authUser && mounted) {
           console.log('Valid token found, fetching user data...');
+          
+          // Store the token in localStorage for consistency
+          const token = getAccessToken();
+          if (token) {
+            localStorage.setItem('auth-token', token);
+          }
+          
           try {
             const userWithData = await fetchUserData(authUser);
             if (mounted) {
@@ -239,6 +240,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       try {
         if (event === 'SIGNED_IN' && session?.user) {
           try {
+            // Store the access token in localStorage
+            if (session.access_token) {
+              localStorage.setItem('auth-token', session.access_token);
+            }
+            
             const userWithData = await fetchUserData(session.user);
             if (mounted) {
               setUser(userWithData);
@@ -251,11 +257,19 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             }
           }
         } else if (event === 'SIGNED_OUT') {
+          // Remove the auth token from localStorage
+          localStorage.removeItem('auth-token');
+          
           if (mounted) {
             setUser(null);
           }
         } else if (event === 'TOKEN_REFRESHED' && session?.user) {
           try {
+            // Update the access token in localStorage
+            if (session.access_token) {
+              localStorage.setItem('auth-token', session.access_token);
+            }
+            
             const userWithData = await fetchUserData(session.user);
             if (mounted) {
               setUser(userWithData);
@@ -518,6 +532,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const signOut = async () => {
     try {
+      // Remove the auth token from localStorage
+      localStorage.removeItem('auth-token');
+      
       await supabase.auth.signOut();
       setUser(null);
       // Don't set loading to true during signout to prevent infinite loops

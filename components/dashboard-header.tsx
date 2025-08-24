@@ -1,75 +1,84 @@
 'use client';
 
 import { Button } from '@/components/ui/button';
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
-import { ThemeToggle } from '@/components/theme-toggle';
-import { RefreshCw, Settings, LogOut } from 'lucide-react';
+import { Badge } from '@/components/ui/badge';
+import { RefreshCw, Settings, LogOut, Activity } from 'lucide-react';
 import { useAuth } from '@/contexts/auth-context';
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from '@/components/ui/tooltip';
 
 interface DashboardHeaderProps {
+  onSync: () => void;
+  isSync: boolean;
   onNavigate?: (view: 'settings' | 'onboarding') => void;
-  isSync?: boolean;
-  onSync?: () => void;
+  onSignOut: () => void;
 }
 
-export default function DashboardHeader({ onNavigate, isSync, onSync }: DashboardHeaderProps) {
-  const { user, logout } = useAuth();
+export function DashboardHeader({ onSync, isSync, onNavigate, onSignOut }: DashboardHeaderProps) {
+  const { user } = useAuth();
 
   return (
-    <TooltipProvider>
-      <header className="border-b border-border bg-card/95 backdrop-blur-sm sticky top-0 z-50">
-        <div className="container mx-auto px-6 py-4">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-6">
-              <div className="text-2xl font-bold">MyPhysioFlow</div>
-              <div className="text-sm text-muted-foreground">
-                {user?.clinicName} • Welcome back, {user?.firstName}
-              </div>
+    <div className="bg-background/95 backdrop-blur-sm border-b border-border/30 sticky top-0 z-50">
+      <div className="container mx-auto px-8 py-6">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-6">
+            <div className="w-12 h-12 bg-gradient-to-br from-primary/10 to-primary/20 rounded-2xl flex items-center justify-center shadow-sm">
+              <Activity className="h-6 w-6 text-primary" />
             </div>
+            <div>
+              <h1 className="text-2xl font-bold text-foreground tracking-tight">PhysioFlow</h1>
+              <p className="text-muted-foreground text-sm">Welcome back, {user?.email}</p>
+            </div>
+          </div>
 
-            {/* Actions */}
-            <div className="flex items-center gap-6">
+          <div className="flex items-center gap-4">
+            <TooltipProvider>
               <Tooltip>
                 <TooltipTrigger asChild>
                   <Button
-                    variant="ghost"
+                    variant="outline"
                     size="lg"
                     onClick={onSync}
                     disabled={isSync}
-                    className="bg-gradient-to-r from-primary/10 to-primary/20 text-primary hover:from-primary/20 hover:to-primary/30 transition-all duration-300"
+                    className="gap-2 h-12 px-6 border-border/60 hover:border-primary/60 hover:bg-primary/5"
                   >
-                    <RefreshCw className={`h-5 w-5 mr-3 ${isSync ? 'animate-spin' : ''}`} />
-                    {isSync ? 'Syncing...' : 'Sync Now'}
+                    <RefreshCw className={`h-5 w-5 ${isSync ? 'animate-spin' : ''}`} />
+                    {isSync ? 'Syncing...' : 'Sync Data'}
                   </Button>
                 </TooltipTrigger>
                 <TooltipContent>
-                  <p>Refresh patient data from your practice management system</p>
+                  <p>Manually sync your latest data from your PMS</p>
                 </TooltipContent>
               </Tooltip>
-
-              <ThemeToggle />
-
+            </TooltipProvider>
+            
+            {onNavigate && (
               <Button
-                variant="ghost"
+                variant="outline"
                 size="lg"
-                onClick={() => onNavigate?.('settings')}
-                className="text-muted-foreground hover:text-foreground transition-colors"
+                onClick={() => onNavigate('settings')}
+                className="gap-2 h-12 px-6 border-border/60 hover:border-secondary/60 hover:bg-secondary/5"
               >
                 <Settings className="h-5 w-5" />
+                Settings
               </Button>
-
-              <Button
-                variant="ghost"
-                size="lg"
-                onClick={logout}
-                className="text-muted-foreground hover:text-destructive transition-colors"
-              >
-                <LogOut className="h-5 w-5" />
-              </Button>
-            </div>
+            )}
+            
+            <Button
+              variant="ghost"
+              size="lg"
+              onClick={onSignOut}
+              className="gap-2 h-12 px-4 text-muted-foreground hover:text-foreground"
+            >
+              <LogOut className="h-5 w-5" />
+            </Button>
           </div>
         </div>
-      </header>
-    </TooltipProvider>
+      </div>
+    </div>
   );
 }

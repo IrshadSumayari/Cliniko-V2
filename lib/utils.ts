@@ -15,23 +15,7 @@ export async function authenticatedFetch(
 ): Promise<Response> {
   try {
     // Get access token from localStorage
-    let accessToken: string | null = null;
-
-    try {
-      // Check for Supabase auth token
-      const supabaseToken = localStorage.getItem('sb-ddsbasqzslznczvqwjph-auth-token');
-      if (supabaseToken) {
-        const parsed = JSON.parse(supabaseToken);
-        accessToken = parsed.access_token || null;
-      }
-
-      // Fallback to generic auth token
-      if (!accessToken) {
-        accessToken = localStorage.getItem('supabase.auth.token');
-      }
-    } catch (error) {
-      console.warn('Error getting access token from localStorage:', error);
-    }
+    const accessToken = localStorage.getItem('auth-token');
 
     if (!accessToken) {
       console.error('No access token found in localStorage');
