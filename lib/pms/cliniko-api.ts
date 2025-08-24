@@ -230,7 +230,7 @@ export class ClinikoAPI implements PMSApiInterface {
               console.log(`🎯 Reached target of ${targetTotal} patients`);
               break;
             }
-
+            console.log(patients, 'allPatients');
             // Map Cliniko patient data to our standard format
             const mappedPatient: PMSPatient = {
               id: patient.id,
@@ -248,7 +248,7 @@ export class ClinikoAPI implements PMSApiInterface {
                 postcode: patient.post_code,
                 country: patient.country,
               },
-              patientType: 'EPC', // Default to EPC as per your requirement
+              patientType: null,
               physioName: `${patient.first_name || ''} ${patient.last_name || ''}`.trim(),
               lastModified: patient.updated_at,
             };
@@ -257,7 +257,7 @@ export class ClinikoAPI implements PMSApiInterface {
           }
 
           console.log(
-            `✅ Page ${currentPage}: Added ${patients.length} patients, total now: ${allPatients.length}`
+            `✅ Page ${currentPage}: Added ${patients[0]} patients, total now: ${allPatients.length}`
           );
 
           // Check if there are more pages

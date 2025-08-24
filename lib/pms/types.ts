@@ -14,7 +14,7 @@ export interface PMSPatient {
     postcode?: string;
     country?: string;
   };
-  patientType: 'EPC' | 'WC';
+  patientType: 'EPC' | 'WC' | null;
   physioName?: string;
   lastModified: string;
 }
