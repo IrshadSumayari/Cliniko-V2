@@ -297,7 +297,11 @@ export async function POST(request: NextRequest) {
       // NEW: Populate cases table after updating patient types
       console.log('Populating cases table with updated patient data...');
       try {
-        // Call the populate_cases_from_existing_data function to populate cases with user ID
+        // FIRST: Calculate and update actual sessions for all patients before populating cases
+        console.log('Calculating actual sessions for all patients...');
+        await calculateAndUpdatePatientSessions(supabase, userRecord.id, wcTag, epcTag);
+        
+        // SECOND: Now call the populate_cases_from_existing_data function to populate cases with user ID
         const { data: casesResult, error: casesError } = await supabase.rpc(
           'populate_cases_from_existing_data',
           {
@@ -371,4 +375,237 @@ export async function POST(request: NextRequest) {
       { status: 500 }
     );
   }
+}
+
+// Function to calculate and update actual sessions for all patients
+async function calculateAndUpdatePatientSessions(
+  supabase: any,
+  userId: string,
+  wcTag: string,
+  epcTag: string
+) {
+  try {
+    console.log(`[SESSIONS] Starting session calculation for user ${userId}`);
+    
+    // Determine the active year based on user's latest appointment
+    const { data: latestAppointment } = await supabase
+      .from('appointments')
+      .select('appointment_date')
+      .eq('user_id', userId)
+      .in('status', ['completed', 'attended', 'finished'])
+      .order('appointment_date', { ascending: false })
+      .limit(1)
+      .single();
+
+    const activeYear = latestAppointment 
+      ? new Date(latestAppointment.appointment_date).getFullYear()
+      : new Date().getFullYear();
+
+    console.log(`[SESSIONS] Using active year: ${activeYear} for user ${userId}`);
+    if (latestAppointment) {
+      console.log(`[SESSIONS] Latest appointment date: ${latestAppointment.appointment_date}`);
+    } else {
+      console.log(`[SESSIONS] No appointments found, using current year: ${activeYear}`);
+    }
+
+    // Get appointment type IDs that match the user's tags
+    const { data: wcAppointmentTypes } = await supabase
+      .from('appointment_types')
+      .select('appointment_id')
+      .eq('user_id', userId)
+      .ilike('appointment_name', `%${wcTag}%`);
+
+    const { data: epcAppointmentTypes } = await supabase
+      .from('appointment_types')
+      .select('appointment_id')
+      .eq('user_id', userId)
+      .ilike('appointment_name', `%${epcTag}%`);
+
+    const wcTypeIds = wcAppointmentTypes?.map((type: any) => type.appointment_id) || [];
+    const epcTypeIds = epcAppointmentTypes?.map((type: any) => type.appointment_id) || [];
+
+    console.log(`[SESSIONS] Found WC type IDs: ${wcTypeIds.join(', ')}, EPC type IDs: ${epcTypeIds.join(', ')}`);
+
+    // OPTIMIZATION: Only get patients that actually have WC or EPC appointments
+    const allMatchingTypeIds = [...wcTypeIds, ...epcTypeIds].filter(id => id && id !== null && id !== undefined);
+    
+    if (allMatchingTypeIds.length === 0) {
+      console.log(`[SESSIONS] No matching appointment types found for tags ${wcTag}/${epcTag}`);
+      return;
+    }
+
+    // Get only patients that have appointments matching the user's tags
+    const { data: relevantPatients, error: patientsError } = await supabase
+      .from('patients')
+      .select(`
+        id,
+        patient_type,
+        appointments!inner(
+          appointment_type_id,
+          status,
+          appointment_date
+        )
+      `)
+      .eq('user_id', userId)
+      .in('appointments.appointment_type_id', allMatchingTypeIds)
+      .not('id', 'is', null);
+
+    if (patientsError) {
+      console.error(`[SESSIONS] Error fetching relevant patients:`, patientsError);
+      return;
+    }
+
+    if (!relevantPatients || relevantPatients.length === 0) {
+      console.log(`[SESSIONS] No patients found with ${wcTag}/${epcTag} appointments`);
+      return;
+    }
+
+    console.log(`[SESSIONS] Found ${relevantPatients.length} patients with ${wcTag}/${epcTag} appointments (instead of all 200)`);
+
+    let updatedPatients = 0;
+
+    // Process only the relevant patients
+    for (const patient of relevantPatients) {
+      try {
+        // Calculate actual sessions used based on funding scheme and year
+        const sessionData = await calculatePatientSessionsOptimized(
+          patient,
+          wcTag,
+          epcTag,
+          activeYear,
+          wcTypeIds,
+          epcTypeIds
+        );
+
+        console.log(`[SESSIONS] Patient ${patient.id} (${patient.patient_type}): ${sessionData.sessionsUsed}/${sessionData.quota} sessions, ${sessionData.sessionsRemaining} remaining`);
+
+        // Update patient record with correct session count and quota
+        const { error: updateError } = await supabase
+          .from('patients')
+          .update({ 
+            sessions_used: sessionData.sessionsUsed,
+            quota: sessionData.quota,
+            updated_at: new Date().toISOString()
+          })
+          .eq('id', patient.id);
+
+        if (updateError) {
+          console.error(`[SESSIONS] Error updating patient ${patient.id}:`, updateError);
+        } else {
+          updatedPatients++;
+        }
+
+      } catch (error) {
+        console.error(`[SESSIONS] Error processing patient ${patient.id}:`, error);
+      }
+    }
+
+    console.log(`[SESSIONS] Session calculation completed for user ${userId}`);
+    console.log(`[SESSIONS] Updated ${updatedPatients} relevant patients with correct session counts (much faster!)`);
+
+  } catch (error) {
+    console.error(`[SESSIONS] Session calculation failed for user ${userId}:`, error);
+  }
+}
+
+// Optimized function to calculate patient sessions using pre-fetched data
+async function calculatePatientSessionsOptimized(
+  patient: any,
+  wcTag: string,
+  epcTag: string,
+  activeYear: number,
+  wcTypeIds: string[],
+  epcTypeIds: string[]
+) {
+  let sessionsUsed = 0;
+  let quota = 5; // Default EPC quota
+  
+  try {
+    // Use the pre-fetched appointments data instead of making new database calls
+    const patientAppointments = patient.appointments || [];
+    
+    if (patient.patient_type === 'WC') {
+      // WorkCover: Count ALL completed WC sessions (injury-based, no year limit)
+      if (wcTypeIds.length > 0) {
+        sessionsUsed = patientAppointments.filter((apt: any) => 
+          wcTypeIds.includes(apt.appointment_type_id) && 
+          ['completed', 'attended', 'finished'].includes(apt.status)
+        ).length;
+        
+        console.log(`[SESSIONS] WC Patient ${patient.id}: Found ${sessionsUsed} completed ${wcTag} sessions from pre-fetched data`);
+      }
+      quota = 8; // Default WC quota
+      
+    } else if (patient.patient_type === 'EPC') {
+      // EPC: STRICTLY count only current active year sessions
+      if (epcTypeIds.length > 0) {
+        // DEBUG: Show all EPC appointments for this patient
+        const allEpcAppointments = patientAppointments.filter((apt: any) => 
+          epcTypeIds.includes(apt.appointment_type_id)
+        );
+        
+        console.log(`[SESSIONS] EPC Patient ${patient.id}: Found ${allEpcAppointments.length} total EPC appointments`);
+        
+        // Show breakdown by year for debugging
+        const appointmentsByYear = new Map();
+        allEpcAppointments.forEach((apt: any) => {
+          const year = new Date(apt.appointment_date).getFullYear();
+          const status = apt.status;
+          if (!appointmentsByYear.has(year)) {
+            appointmentsByYear.set(year, { total: 0, completed: 0, other: 0 });
+          }
+          const yearData = appointmentsByYear.get(year);
+          yearData.total++;
+          if (['completed', 'attended', 'finished'].includes(status)) {
+            yearData.completed++;
+          } else {
+            yearData.other++;
+          }
+        });
+        
+        console.log(`[SESSIONS] EPC Patient ${patient.id}: Appointments by year:`, Object.fromEntries(appointmentsByYear));
+        console.log(`[SESSIONS] EPC Patient ${patient.id}: Active year for counting: ${activeYear}`);
+        
+        // CRITICAL FIX: Only count appointments from the active year
+        sessionsUsed = patientAppointments.filter((apt: any) => {
+          // Must match EPC appointment type
+          if (!epcTypeIds.includes(apt.appointment_type_id)) return false;
+          
+          // Must be completed/attended/finished
+          if (!['completed', 'attended', 'finished'].includes(apt.status)) return false;
+          
+          // CRITICAL: Must be from the active year only
+          const appointmentYear = new Date(apt.appointment_date).getFullYear();
+          const isFromActiveYear = appointmentYear === activeYear;
+          
+          if (!isFromActiveYear) {
+            console.log(`[SESSIONS] EPC Patient ${patient.id}: Skipping appointment from ${appointmentYear} (not from active year ${activeYear})`);
+            return false;
+          }
+          
+          return true;
+        }).length;
+        
+        console.log(`[SESSIONS] EPC Patient ${patient.id}: Found ${sessionsUsed} completed ${epcTag} sessions ONLY from ${activeYear} (strictly filtered)`);
+         
+         // REMOVED: Safety cap - let users see actual session count and modify quota as needed
+         // if (sessionsUsed > quota) {
+         //   console.warn(`[SESSIONS] WARNING: EPC Patient ${patient.id} has ${sessionsUsed} sessions but quota is ${quota}. Capping at quota.`);
+         //   sessionsUsed = quota; // Cap at quota to prevent overflow
+         // }
+      }
+      quota = 5; // EPC quota per calendar year
+    }
+  } catch (error) {
+    console.error(`[SESSIONS] Error calculating sessions for patient ${patient.id}:`, error);
+    sessionsUsed = 0;
+  }
+  
+  const sessionsRemaining = Math.max(0, quota - sessionsUsed);
+  
+  return {
+    sessionsUsed,
+    quota,
+    sessionsRemaining
+  };
 }
