@@ -537,6 +537,14 @@ const Dashboard = ({ onNavigate }: DashboardProps) => {
       case 'pending':
         baseClients = clientsData.filter((client) => client.status === 'pending');
         break;
+      case 'overdue':
+        baseClients = clientsData.filter((client) => {
+          // Check if patient has exceeded their quota
+          const sessionsUsed = parseInt(client.sessionsUsed) || 0;
+          const quota = parseInt(client.quota) || 0;
+          return sessionsUsed > quota;
+        });
+        break;
       case 'archived':
         baseClients = archivedClients;
         break;
@@ -816,7 +824,9 @@ const Dashboard = ({ onNavigate }: DashboardProps) => {
 
                   {/* Next Appointment */}
                   <div className="col-span-2">
-                    <p className="text-xs font-medium text-muted-foreground mb-2">Next Visit</p>
+                    <p className="text-xs font-medium text-muted-foreground mb-2">
+                      Last Appointment
+                    </p>
                     <div className="flex items-center gap-2 p-3 bg-gradient-to-r from-accent/40 to-secondary/30 rounded-xl border border-border/40 backdrop-blur-sm">
                       <Calendar className="h-4 w-4 text-primary flex-shrink-0" />
                       <span className="text-sm font-bold text-foreground">
@@ -1213,7 +1223,7 @@ const Dashboard = ({ onNavigate }: DashboardProps) => {
             {/* Modern Tabs Interface */}
             <div className="container mx-auto px-8 py-8">
               <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-                <TabsList className="grid w-full grid-cols-4 mb-8 h-14 bg-muted/30 rounded-2xl p-2">
+                <TabsList className="grid w-full grid-cols-5 mb-8 h-14 bg-muted/30 rounded-2xl p-2">
                   <TabsTrigger
                     value="all-patients"
                     className="text-base font-semibold h-10 rounded-xl data-[state=active]:bg-background data-[state=active]:shadow-sm"
@@ -1248,6 +1258,23 @@ const Dashboard = ({ onNavigate }: DashboardProps) => {
                     </Badge>
                   </TabsTrigger>
                   <TabsTrigger
+                    value="overdue"
+                    className="text-base font-semibold h-10 rounded-xl data-[state=active]:bg-background data-[state=active]:shadow-sm"
+                  >
+                    <AlertTriangle className="h-5 w-5 mr-2" />
+                    Overdue
+                    <Badge variant="destructive" className="ml-2">
+                      {
+                        clientsData.filter((c) => {
+                          // Check if patient has exceeded their quota
+                          const sessionsUsed = parseInt(c.sessionsUsed) || 0;
+                          const quota = parseInt(c.quota) || 0;
+                          return sessionsUsed > quota;
+                        }).length
+                      }
+                    </Badge>
+                  </TabsTrigger>
+                  <TabsTrigger
                     value="archived"
                     className="text-base font-semibold h-10 rounded-xl data-[state=active]:bg-background data-[state=active]:shadow-sm"
                   >
@@ -1270,6 +1297,10 @@ const Dashboard = ({ onNavigate }: DashboardProps) => {
 
                 <TabsContent value="pending" className="mt-0">
                   {renderClientList('pending')}
+                </TabsContent>
+
+                <TabsContent value="overdue" className="mt-0">
+                  {renderClientList('overdue')}
                 </TabsContent>
 
                 <TabsContent value="archived" className="mt-0">

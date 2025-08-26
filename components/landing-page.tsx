@@ -332,7 +332,7 @@ const LandingPage = ({ onGetStarted, onLogin, onSignup }: LandingPageProps) => {
                 </p>
 
                 {/* Dashboard Sections Explanation */}
-                <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-4 max-w-4xl mx-auto mb-8">
+                <div className="grid md:grid-cols-2 lg:grid-cols-5 gap-4 max-w-6xl mx-auto mb-8">
                   <div className="bg-card/50 border border-border rounded-lg p-4">
                     <div className="h-3 w-3 bg-primary rounded-full mx-auto mb-2"></div>
                     <h4 className="font-semibold text-sm mb-1">All Patients</h4>
@@ -352,6 +352,13 @@ const LandingPage = ({ onGetStarted, onLogin, onSignup }: LandingPageProps) => {
                     <h4 className="font-semibold text-sm mb-1">Pending</h4>
                     <p className="text-xs text-muted-foreground">
                       Waiting on GP renewal or approval
+                    </p>
+                  </div>
+                  <div className="bg-card/50 border border-red-500/20 rounded-lg p-4">
+                    <div className="h-3 w-3 bg-red-500 rounded-full mx-auto mb-2"></div>
+                    <h4 className="font-semibold text-sm mb-1">Overdue</h4>
+                    <p className="text-xs text-muted-foreground">
+                      Patients exceeding session quota
                     </p>
                   </div>
                   <div className="bg-card/50 border border-muted/20 rounded-lg p-4">
