@@ -11,6 +11,8 @@ export async function POST(request: NextRequest) {
     }
 
     console.log('=== Starting Manual Dev Sync ===');
+    console.log('=== Environment:', process.env.NODE_ENV);
+    console.log('=== Database URL:', process.env.NEXT_PUBLIC_SUPABASE_URL ? 'Set' : 'Not Set');
 
     const supabase = createAdminClient();
 
@@ -78,22 +80,58 @@ export async function POST(request: NextRequest) {
           );
         }
 
-        // Create cases after syncing patients and appointments
+        // Sync practitioners after syncing patients and appointments
+        console.log(`[SYNC] 🔍 Full result object:`, result);
+        console.log(`[SYNC] 🔍 Checking if sync was successful:`, result.success);
+        console.log(`[SYNC] 🔍 Result type:`, typeof result.success);
         if (result.success) {
-          console.log(`Creating cases for user ${credential.user_id}...`);
-          const casesResult = await createCasesFromSyncedData(
-            supabase,
-            credential.user_id,
-            credential.pms_type
-          );
+          console.log(`[SYNC] ✅ Sync successful, proceeding with practitioners and cases...`);
+          console.log(`[SYNC] Syncing practitioners for user ${credential.user_id}...`);
+          try {
+            await syncPractitioners(supabase, credential.user_id, pmsClient, credential.pms_type);
+            console.log('[SYNC] Practitioner sync completed successfully');
+          } catch (practitionerError) {
+            console.error('[SYNC] Error syncing practitioners:', practitionerError);
+            // Don't fail the whole sync if practitioners fail
+          }
+
+          console.log(`[SYNC] Creating cases for user ${credential.user_id}...`);
+          console.log(`[SYNC] About to call createCasesFromSyncedData with:`, {
+            userId: credential.user_id,
+            pmsType: credential.pms_type,
+            supabaseType: typeof supabase
+          });
+          
+          let casesResult;
+          try {
+            casesResult = await createCasesFromSyncedData(
+              supabase,
+              credential.user_id,
+              credential.pms_type
+            );
+            console.log(`[SYNC] ✅ createCasesFromSyncedData completed successfully`);
+            console.log(`[SYNC] Cases result:`, casesResult);
+          } catch (caseError) {
+            console.error(`[SYNC] ❌ Error calling createCasesFromSyncedData:`, caseError);
+            console.error(`[SYNC] Case error details:`, {
+              name: caseError instanceof Error ? caseError.name : 'Unknown',
+              message: caseError instanceof Error ? caseError.message : 'Unknown error',
+              stack: caseError instanceof Error ? caseError.stack : 'No stack trace'
+            });
+            // Don't fail the whole sync if cases fail
+            casesResult = { casesCreated: 0, casesUpdated: 0, error: 'Case creation failed' };
+          }
 
           // Add cases info to the result
           result.casesCreated = casesResult.casesCreated;
           result.casesUpdated = casesResult.casesUpdated;
 
           console.log(
-            `Cases created: ${casesResult.casesCreated}, updated: ${casesResult.casesUpdated}`
+            `[SYNC] Cases created: ${casesResult.casesCreated}, updated: ${casesResult.casesUpdated}`
           );
+
+          // DEBUG: Log the full cases result
+          console.log(`[SYNC] Full cases result:`, casesResult);
         }
 
         syncResults.push({
@@ -142,7 +180,8 @@ export async function POST(request: NextRequest) {
     }
 
     console.log('=== Manual Dev Sync Complete ===');
-    console.log(`Processed ${syncResults.length} users`);
+    console.log(`📊 Processed ${syncResults.length} users`);
+    console.log(`🔍 Sync results:`, syncResults);
 
     // Calculate totals for summary
     const totalPatients = syncResults.reduce(
@@ -163,10 +202,11 @@ export async function POST(request: NextRequest) {
     );
 
     console.log(`📊 Sync Summary:`);
-    console.log(`   Patients: ${totalPatients}`);
-    console.log(`   Appointments: ${totalAppointments}`);
-    console.log(`   Cases Created: ${totalCasesCreated}`);
-    console.log(`   Cases Updated: ${totalCasesUpdated}`);
+    console.log(`   🏥 Patients: ${totalPatients}`);
+    console.log(`   📅 Appointments: ${totalAppointments}`);
+    console.log(`   📋 Cases Created: ${totalCasesCreated}`);
+    console.log(`   🔄 Cases Updated: ${totalCasesUpdated}`);
+    console.log(`   📈 Total Cases: ${totalCasesCreated + totalCasesUpdated}`);
 
     return NextResponse.json({
       success: true,
@@ -558,27 +598,52 @@ async function performNookalBatchSync(
 }
 
 // Function to create cases from synced patients and appointments data
-async function createCasesFromSyncedData(
-  supabase: any,
-  userId: string,
-  pmsType: string
-) {
+async function createCasesFromSyncedData(supabase: any, userId: string, pmsType: string) {
+  console.log(`[CASES] 🚀 FUNCTION ENTRY - createCasesFromSyncedData called!`);
+  console.log(`[CASES] 📍 Function parameters:`, { userId, pmsType, supabaseType: typeof supabase });
+  
   try {
-    console.log(`[CASES] Starting case creation for user ${userId} (${pmsType})`);
-    
+    console.log(`[CASES] 🚀 Starting case creation for user ${userId} (${pmsType})`);
+    console.log(`[CASES] 📊 Supabase client type:`, typeof supabase);
+    console.log(`[CASES] 🔑 User ID:`, userId);
+    console.log(`[CASES] 🏥 PMS Type:`, pmsType);
+    console.log(`[CASES] 🔍 Function called successfully!`);
+
     let casesCreated = 0;
     let casesUpdated = 0;
     const issues: string[] = [];
 
+    // Test database connection first
+    console.log(`[CASES] 🧪 Testing database connection...`);
+    try {
+      const { data: testData, error: testError } = await supabase
+        .from('users')
+        .select('id')
+        .limit(1);
+      
+      if (testError) {
+        console.error(`[CASES] ❌ Database connection test failed:`, testError);
+        throw new Error(`Database connection failed: ${testError.message}`);
+      } else {
+        console.log(`[CASES] ✅ Database connection test successful`);
+      }
+    } catch (dbError) {
+      console.error(`[CASES] ❌ Database connection error:`, dbError);
+      throw dbError;
+    }
+
     // Get user's custom WC and EPC tags
+    console.log(`[CASES] 🔍 Fetching user tags for user ${userId}...`);
     const { data: userData, error: userError } = await supabase
       .from('users')
       .select('wc, epc')
       .eq('id', userId)
       .single();
 
+    console.log(`[CASES] User tags query result:`, { userData, userError });
+
     if (userError) {
-      console.error(`[CASES] Error fetching user tags:`, userError);
+      console.error(`[CASES] ❌ Error fetching user tags:`, userError);
       return { casesCreated: 0, casesUpdated: 0, error: 'Failed to fetch user tags' };
     }
 
@@ -597,7 +662,7 @@ async function createCasesFromSyncedData(
       .limit(1)
       .single();
 
-    const activeYear = latestAppointment 
+    const activeYear = latestAppointment
       ? new Date(latestAppointment.appointment_date).getFullYear()
       : new Date().getFullYear();
 
@@ -609,9 +674,11 @@ async function createCasesFromSyncedData(
     }
 
     // Get all patients for this user that have appointments
+    console.log(`[CASES] 🔍 Fetching patients for user ${userId}, pms_type ${pmsType}...`);
     const { data: patients, error: patientsError } = await supabase
       .from('patients')
-      .select(`
+      .select(
+        `
         id,
         pms_patient_id,
         first_name,
@@ -625,9 +692,16 @@ async function createCasesFromSyncedData(
         sessions_used,
         status,
         alert_preference
-      `)
+      `
+      )
       .eq('user_id', userId)
       .eq('pms_type', pmsType);
+
+    console.log(`[CASES] Patients query result:`, {
+      count: patients?.length || 0,
+      error: patientsError,
+      samplePatient: patients?.[0],
+    });
 
     if (patientsError) {
       console.error(`[CASES] Error fetching patients:`, patientsError);
@@ -654,31 +728,45 @@ async function createCasesFromSyncedData(
           activeYear
         );
 
-        console.log(`[CASES] Patient ${patient.id} (${patient.patient_type}): ${sessionData.sessionsUsed}/${sessionData.quota} sessions, ${sessionData.sessionsRemaining} remaining`);
+        console.log(
+          `[CASES] Patient ${patient.id} (${patient.patient_type}): ${sessionData.sessionsUsed}/${sessionData.quota} sessions, ${sessionData.sessionsRemaining} remaining`
+        );
 
         // Update patient record with correct session count and quota
         await supabase
           .from('patients')
-          .update({ 
+          .update({
             sessions_used: sessionData.sessionsUsed,
             quota: sessionData.quota,
-            updated_at: new Date().toISOString()
+            updated_at: new Date().toISOString(),
           })
           .eq('id', patient.id);
 
         // Get the most recent appointment for this patient
+        console.log(`[CASES] 🔍 Fetching appointments for patient ${patient.id}...`);
         const { data: latestPatientAppointment, error: appointmentError } = await supabase
           .from('appointments')
-          .select(`
+          .select(
+            `
             appointment_date,
+            practitioner_id,
             practitioner_name,
             appointment_type,
             location_name
-          `)
+          `
+          )
           .eq('patient_id', patient.id)
           .order('appointment_date', { ascending: false })
           .limit(1)
           .single();
+
+        console.log(`[CASES] 📅 Appointment query result for patient ${patient.id}:`, {
+          appointment: latestPatientAppointment,
+          error: appointmentError,
+          hasAppointment: !!latestPatientAppointment,
+          practitionerName: latestPatientAppointment?.practitioner_name,
+          practitionerId: latestPatientAppointment?.practitioner_id,
+        });
 
         if (appointmentError && appointmentError.code !== 'PGRST116') {
           console.error(
@@ -690,8 +778,118 @@ async function createCasesFromSyncedData(
 
         // Set default values
         const locationName = latestPatientAppointment?.location_name || 'Main Clinic';
-        const physioName = latestPatientAppointment?.practitioner_name || patient.physio_name || null;
-        const appointmentTypeName = latestPatientAppointment?.appointment_type || patient.patient_type;
+        const appointmentTypeName =
+          latestPatientAppointment?.appointment_type || patient.patient_type;
+
+        // Get practitioner ID and name from appointment data
+        let practitionerId = null;
+        let physioName = null;
+
+        console.log(`[CASES] DEBUG: Latest appointment data:`, {
+          practitioner_name: latestPatientAppointment?.practitioner_name,
+          practitioner_id: latestPatientAppointment?.practitioner_id,
+          appointment_type: latestPatientAppointment?.appointment_type,
+        });
+
+        // Priority 1: Use practitioner name from appointment if available
+        if (latestPatientAppointment?.practitioner_name) {
+          physioName = latestPatientAppointment.practitioner_name;
+          console.log(`[CASES] Using practitioner name from appointment: ${physioName}`);
+
+          // Try to find practitioner by name for ID
+          const { data: practitioner } = await supabase
+            .from('practitioners')
+            .select('id, display_name, first_name, last_name')
+            .eq('user_id', userId)
+            .eq('pms_type', pmsType)
+            .or(
+              `display_name.eq.${physioName},first_name.eq.${physioName},last_name.eq.${physioName}`
+            )
+            .single();
+
+          if (practitioner) {
+            practitionerId = practitioner.id;
+            console.log(
+              `[CASES] Found practitioner by name: ${physioName} (ID: ${practitionerId})`
+            );
+          }
+        }
+
+        // Priority 2: If no practitioner name, try to find by practitioner ID from appointment
+        if (!physioName && latestPatientAppointment?.practitioner_id) {
+          console.log(
+            `[CASES] Looking for practitioner by ID: ${latestPatientAppointment.practitioner_id}`
+          );
+          const { data: practitioner } = await supabase
+            .from('practitioners')
+            .select('id, display_name, first_name, last_name')
+            .eq('user_id', userId)
+            .eq('pms_type', pmsType)
+            .eq('pms_practitioner_id', latestPatientAppointment.practitioner_id.toString())
+            .single();
+
+          if (practitioner) {
+            practitionerId = practitioner.id;
+            physioName =
+              practitioner.display_name ||
+              `${practitioner.first_name} ${practitioner.last_name}`.trim();
+            console.log(`[CASES] Found practitioner by ID: ${physioName} (${practitionerId})`);
+          } else {
+            console.log(
+              `[CASES] No practitioner found by ID: ${latestPatientAppointment.practitioner_id}`
+            );
+          }
+        }
+
+        // Priority 3: If still no practitioner found, use patient's physio_name as fallback
+        if (!physioName && patient.physio_name) {
+          physioName = patient.physio_name;
+          console.log(`[CASES] Using patient's physio_name as fallback: ${physioName}`);
+        }
+
+        // Priority 4: Use the first available practitioner as final fallback
+        if (!physioName) {
+          console.log(`[CASES] 🔍 No physio name found, looking for fallback practitioner...`);
+          const { data: fallbackPractitioner, error: fallbackError } = await supabase
+            .from('practitioners')
+            .select('id, display_name, first_name, last_name')
+            .eq('user_id', userId)
+            .eq('pms_type', pmsType)
+            .limit(1)
+            .single();
+
+          console.log(`[CASES] 👨‍⚕️ Fallback practitioner query result:`, {
+            practitioner: fallbackPractitioner,
+            error: fallbackError,
+            hasPractitioner: !!fallbackPractitioner,
+            displayName: fallbackPractitioner?.display_name,
+            firstName: fallbackPractitioner?.first_name,
+            lastName: fallbackPractitioner?.last_name,
+          });
+
+          if (fallbackPractitioner) {
+            practitionerId = fallbackPractitioner.id;
+            physioName =
+              fallbackPractitioner.display_name ||
+              `${fallbackPractitioner.first_name} ${fallbackPractitioner.last_name}`.trim();
+            console.log(
+              `[CASES] Using first available practitioner as fallback: ${physioName} for patient ${patient.id}`
+            );
+          } else {
+            console.log(
+              `[CASES] No fallback practitioner found for user ${userId}, pms_type ${pmsType}`
+            );
+          }
+        }
+
+        // Final fallback: Use a default name if nothing else works
+        if (!physioName) {
+          physioName = 'Unknown Practitioner';
+          console.log(`[CASES] No practitioner found, using default: ${physioName}`);
+        }
+
+        console.log(`[CASES] Final physio_name for patient ${patient.id}: ${physioName}`);
+
         const nextVisitDate = latestPatientAppointment?.appointment_date
           ? new Date(latestPatientAppointment.appointment_date)
           : new Date(Date.now() + 7 * 24 * 60 * 60 * 1000); // 7 days from now
@@ -735,6 +933,25 @@ async function createCasesFromSyncedData(
           .eq('pms_type', pmsType)
           .single();
 
+        // DEBUG: Log the case data being created
+        console.log(`[CASES] Creating case data for patient ${patient.id}:`, {
+          physio_name: physioName,
+          practitioner_id: practitionerId,
+          location_name: locationName,
+          appointment_type_name: appointmentTypeName,
+        });
+
+        // Validate physio_name before creating case data
+        if (!physioName || physioName === '') {
+          console.warn(
+            `[CASES] ⚠️ physio_name is empty or null for patient ${patient.id}, setting to 'Unknown Practitioner'`
+          );
+          physioName = 'Unknown Practitioner';
+        }
+
+        // DEBUG: Test database insert with a simple case to verify schema
+        console.log(`[CASES] 🧪 Testing database schema with physio_name: "${physioName}"`);
+
         const caseData = {
           user_id: userId,
           patient_id: patient.id,
@@ -747,7 +964,8 @@ async function createCasesFromSyncedData(
           patient_phone: patient.phone,
           patient_date_of_birth: patient.date_of_birth,
           location_name: locationName,
-          physio_name: physioName,
+          practitioner_id: practitionerId,
+          physio_name: 'physioName',
           appointment_type_name: appointmentTypeName,
           program_type: programType,
           quota: quota,
@@ -767,34 +985,47 @@ async function createCasesFromSyncedData(
 
         if (existingCase) {
           // Update existing case
+          console.log(
+            `[CASES] 🔄 Updating existing case for patient ${patient.id} with physio_name: ${physioName}`
+          );
+          console.log(`[CASES] 📝 Case data being updated:`, caseData);
+
           const { error: updateError } = await supabase
             .from('cases')
             .update(caseData)
             .eq('id', existingCase.id);
 
           if (updateError) {
-            console.error(`[CASES] Error updating case for patient ${patient.id}:`, updateError);
+            console.error(`[CASES] ❌ Error updating case for patient ${patient.id}:`, updateError);
             issues.push(`Failed to update case for patient ${patient.id}`);
           } else {
             casesUpdated++;
-            console.log(`[CASES] ✅ Updated case for patient ${patient.id} - Sessions: ${sessionsUsed}/${quota} (${sessionsRemaining} remaining)`);
+            console.log(
+              `[CASES] ✅ Updated case for patient ${patient.id} - Sessions: ${sessionsUsed}/${quota} (${sessionsRemaining} remaining), physio_name: ${physioName}`
+            );
           }
         } else {
           // Create new case
+          console.log(
+            `[CASES] 🆕 Creating new case for patient ${patient.id} with physio_name: ${physioName}`
+          );
+          console.log(`[CASES] 📝 Case data being inserted:`, caseData);
+
           const { error: insertError } = await supabase.from('cases').insert({
             ...caseData,
             created_at: new Date().toISOString(),
           });
 
           if (insertError) {
-            console.error(`[CASES] Error creating case for patient ${patient.id}:`, insertError);
+            console.error(`[CASES] ❌ Error creating case for patient ${patient.id}:`, insertError);
             issues.push(`Failed to create case for patient ${patient.id}`);
           } else {
             casesCreated++;
-            console.log(`[CASES] ✅ Created case for patient ${patient.id} - Sessions: ${sessionsUsed}/${quota} (${sessionsRemaining} remaining)`);
+            console.log(
+              `[CASES] ✅ Created case for patient ${patient.id} - Sessions: ${sessionsUsed}/${quota} (${sessionsRemaining} remaining), physio_name: ${physioName}`
+            );
           }
         }
-
       } catch (error) {
         console.error(`[CASES] Error processing patient ${patient.id} for case creation:`, error);
         const errorMessage = error instanceof Error ? error.message : 'Unknown error';
@@ -802,21 +1033,29 @@ async function createCasesFromSyncedData(
       }
     }
 
-    console.log(`[CASES] Case creation completed for user ${userId}`);
-    console.log(`[CASES] Summary: ${casesCreated} created, ${casesUpdated} updated`);
+    console.log(`[CASES] 🎉 Case creation completed for user ${userId}`);
+    console.log(`[CASES] 📊 Summary: ${casesCreated} created, ${casesUpdated} updated`);
+    console.log(`[CASES] 🔍 Total patients processed: ${patients?.length || 0}`);
 
     if (issues.length > 0) {
-      console.log(`[CASES] Issues encountered:`, issues);
+      console.log(`[CASES] ⚠️ Issues encountered:`, issues);
+    } else {
+      console.log(`[CASES] ✅ No issues encountered during case creation`);
     }
 
     return {
       casesCreated,
       casesUpdated,
-      issues: issues.length > 0 ? issues : undefined
+      issues: issues.length > 0 ? issues : undefined,
     };
-
   } catch (error) {
-    console.error(`[CASES] Case creation failed for user ${userId}:`, error);
+    console.error(`[CASES] ❌ Case creation failed for user ${userId}:`, error);
+    console.error(`[CASES] 📋 Error details:`, {
+      name: error instanceof Error ? error.name : 'Unknown',
+      message: error instanceof Error ? error.message : 'Unknown error',
+      stack: error instanceof Error ? error.stack : 'No stack trace',
+    });
+
     const errorMessage = error instanceof Error ? error.message : 'Case creation failed';
     return {
       casesCreated: 0,
@@ -837,7 +1076,7 @@ async function calculatePatientSessions(
 ) {
   let sessionsUsed = 0;
   let quota = 5; // Default EPC quota
-  
+
   if (programType === 'WC') {
     // WorkCover: Count ALL completed WC sessions (injury-based, no year limit)
     const { count: wcSessionsTotal } = await supabase
@@ -846,18 +1085,19 @@ async function calculatePatientSessions(
       .eq('patient_id', patientId)
       .eq('appointment_type', wcTag)
       .eq('is_completed', true);
-    
+
     sessionsUsed = wcSessionsTotal || 0;
     quota = 8; // Default WC quota
-    
-    console.log(`[CASES] WC Patient ${patientId}: Found ${sessionsUsed} completed ${wcTag} sessions (quota: ${quota})`);
-    
+
+    console.log(
+      `[CASES] WC Patient ${patientId}: Found ${sessionsUsed} completed ${wcTag} sessions (quota: ${quota})`
+    );
+
     // TODO: Add injury_date field to patients table for proper old injury logic
     // For now, we'll use the default 8 sessions
     // if (patient.injury_date && isOlderThan3Months(patient.injury_date)) {
     //   quota = 1; // Old injury
     // }
-    
   } else if (programType === 'EPC') {
     // EPC: Count only current active year sessions
     const { count: epcSessionsThisYear } = await supabase
@@ -868,19 +1108,21 @@ async function calculatePatientSessions(
       .eq('is_completed', true)
       .gte('appointment_date', `${activeYear}-01-01`)
       .lte('appointment_date', `${activeYear}-12-31`);
-    
+
     sessionsUsed = epcSessionsThisYear || 0;
     quota = 5; // EPC quota per calendar year
-    
-    console.log(`[CASES] EPC Patient ${patientId}: Found ${sessionsUsed} completed ${epcTag} sessions in ${activeYear} (quota: ${quota})`);
+
+    console.log(
+      `[CASES] EPC Patient ${patientId}: Found ${sessionsUsed} completed ${epcTag} sessions in ${activeYear} (quota: ${quota})`
+    );
   }
-  
+
   const sessionsRemaining = Math.max(0, quota - sessionsUsed);
-  
+
   return {
     sessionsUsed,
     quota,
-    sessionsRemaining
+    sessionsRemaining,
   };
 }
 
@@ -895,7 +1137,7 @@ async function calculatePatientSessionsRobust(
 ) {
   let sessionsUsed = 0;
   let quota = 5; // Default EPC quota
-  
+
   try {
     if (programType === 'WC') {
       // WorkCover: Count ALL completed WC sessions (injury-based, no year limit)
@@ -906,7 +1148,7 @@ async function calculatePatientSessionsRobust(
         .eq('patient_id', patientId)
         .eq('appointment_type', wcTag)
         .in('status', ['completed', 'attended', 'finished']);
-      
+
       // If no results, try without status filter (fallback)
       if (!wcSessionsTotal || wcSessionsTotal === 0) {
         const { count: wcSessionsFallback } = await supabase
@@ -914,16 +1156,19 @@ async function calculatePatientSessionsRobust(
           .select('*', { count: 'exact', head: true })
           .eq('patient_id', patientId)
           .eq('appointment_type', wcTag);
-        
+
         wcSessionsTotal = wcSessionsFallback || 0;
-        console.log(`[CASES] WC Patient ${patientId}: Using fallback count (no status filter): ${wcSessionsTotal} ${wcTag} sessions`);
+        console.log(
+          `[CASES] WC Patient ${patientId}: Using fallback count (no status filter): ${wcSessionsTotal} ${wcTag} sessions`
+        );
       }
-      
+
       sessionsUsed = wcSessionsTotal || 0;
       quota = 8; // Default WC quota
-      
-      console.log(`[CASES] WC Patient ${patientId}: Found ${sessionsUsed} completed ${wcTag} sessions (quota: ${quota})`);
-      
+
+      console.log(
+        `[CASES] WC Patient ${patientId}: Found ${sessionsUsed} completed ${wcTag} sessions (quota: ${quota})`
+      );
     } else if (programType === 'EPC') {
       // EPC: Count only current active year sessions
       // First try with status field for completed appointments
@@ -935,7 +1180,7 @@ async function calculatePatientSessionsRobust(
         .in('status', ['completed', 'attended', 'finished'])
         .gte('appointment_date', `${activeYear}-01-01`)
         .lte('appointment_date', `${activeYear}-12-31`);
-      
+
       // If no results, try without status filter (fallback)
       if (!epcSessionsThisYear || epcSessionsThisYear === 0) {
         const { count: epcSessionsFallback } = await supabase
@@ -945,15 +1190,19 @@ async function calculatePatientSessionsRobust(
           .eq('appointment_type', epcTag)
           .gte('appointment_date', `${activeYear}-01-01`)
           .lte('appointment_date', `${activeYear}-12-31`);
-        
+
         epcSessionsThisYear = epcSessionsFallback || 0;
-        console.log(`[CASES] EPC Patient ${patientId}: Using fallback count (no status filter): ${epcSessionsThisYear} ${epcTag} sessions in ${activeYear}`);
+        console.log(
+          `[CASES] EPC Patient ${patientId}: Using fallback count (no status filter): ${epcSessionsThisYear} ${epcTag} sessions in ${activeYear}`
+        );
       }
-      
+
       sessionsUsed = epcSessionsThisYear || 0;
       quota = 5; // EPC quota per calendar year
-      
-      console.log(`[CASES] EPC Patient ${patientId}: Found ${sessionsUsed} completed ${epcTag} sessions in ${activeYear} (quota: ${quota})`);
+
+      console.log(
+        `[CASES] EPC Patient ${patientId}: Found ${sessionsUsed} completed ${epcTag} sessions in ${activeYear} (quota: ${quota})`
+      );
     }
   } catch (error) {
     console.error(`[CASES] Error calculating sessions for patient ${patientId}:`, error);
@@ -963,21 +1212,23 @@ async function calculatePatientSessionsRobust(
         .from('appointments')
         .select('*', { count: 'exact', head: true })
         .eq('patient_id', patientId);
-      
+
       sessionsUsed = basicCount || 0;
-      console.log(`[CASES] Patient ${patientId}: Using basic fallback count: ${sessionsUsed} total appointments`);
+      console.log(
+        `[CASES] Patient ${patientId}: Using basic fallback count: ${sessionsUsed} total appointments`
+      );
     } catch (fallbackError) {
       console.error(`[CASES] Fallback count also failed for patient ${patientId}:`, fallbackError);
       sessionsUsed = 0;
     }
   }
-  
+
   const sessionsRemaining = Math.max(0, quota - sessionsUsed);
-  
+
   return {
     sessionsUsed,
     quota,
-    sessionsRemaining
+    sessionsRemaining,
   };
 }
 
@@ -987,3 +1238,71 @@ function isOlderThan3Months(injuryDate: Date): boolean {
   threeMonthsAgo.setMonth(threeMonthsAgo.getMonth() - 3);
   return injuryDate < threeMonthsAgo;
 }
+
+// Sync practitioners from PMS and store in database
+async function syncPractitioners(supabase: any, userId: string, pmsApi: any, pmsType: string) {
+  try {
+    console.log(`[PRACTITIONERS] Starting practitioner sync for user ${userId} (${pmsType})...`);
+
+    // Fetch practitioners from PMS API
+    const practitioners = await pmsApi.getPractitioners();
+    console.log(`[PRACTITIONERS] Found ${practitioners.length} practitioners from ${pmsType}`);
+
+    if (practitioners.length === 0) {
+      console.log('[PRACTITIONERS] No practitioners found, skipping sync');
+      return;
+    }
+
+    let syncedCount = 0;
+    let errorCount = 0;
+
+    for (const practitioner of practitioners) {
+      try {
+        // Prepare practitioner data for database
+        const practitionerData = {
+          user_id: userId,
+          pms_practitioner_id: practitioner.id.toString(),
+          pms_type: pmsType,
+          first_name: practitioner.first_name || null,
+          last_name: practitioner.last_name || null,
+          username: practitioner.username || null,
+          display_name:
+            practitioner.display_name ||
+            `${practitioner.first_name || ''} ${practitioner.last_name || ''}`.trim(),
+          email: practitioner.email || null,
+          is_active: practitioner.is_active !== false,
+          updated_at: new Date().toISOString(),
+        };
+
+        // Upsert practitioner (insert or update if exists)
+        const { error: upsertError } = await supabase
+          .from('practitioners')
+          .upsert(practitionerData, {
+            onConflict: 'user_id,pms_practitioner_id,pms_type',
+          });
+
+        if (upsertError) {
+          console.error(
+            `[PRACTITIONERS] Error upserting practitioner ${practitioner.id}:`,
+            upsertError
+          );
+          errorCount++;
+        } else {
+          syncedCount++;
+          console.log(
+            `[PRACTITIONERS] Synced: ${practitionerData.display_name} (ID: ${practitioner.id})`
+          );
+        }
+      } catch (error) {
+        console.error(`[PRACTITIONERS] Error processing practitioner ${practitioner.id}:`, error);
+        errorCount++;
+      }
+    }
+
+    console.log(`[PRACTITIONERS] Sync completed: ${syncedCount} synced, ${errorCount} errors`);
+  } catch (error) {
+    console.error('[PRACTITIONERS] Error during practitioner sync:', error);
+    throw error;
+  }
+}
+

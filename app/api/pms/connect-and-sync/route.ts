@@ -187,7 +187,47 @@ export async function POST(request: NextRequest) {
       // Don't fail the entire process, just log the error
     }
 
-    console.log('Connection successful, starting initial sync...');
+    console.log('Connection successful, starting practitioner sync FIRST...');
+
+    // Step 1: Sync practitioners BEFORE anything else
+    try {
+      console.log('[SERVER] 🔍 Starting practitioner sync FIRST...');
+      await syncPractitioners(adminSupabase, userRecordData.id, pmsClient, pmsType);
+      console.log('[SERVER] ✅ Practitioner sync completed successfully');
+    } catch (practitionerError) {
+      console.error('[SERVER] ❌ Error syncing practitioners:', practitionerError);
+      // Don't fail the whole sync if practitioners fail
+    }
+
+    console.log('Starting initial sync for patients and appointments...');
+
+    // Verify that practitioners were synced successfully
+    const { data: practitionerCount, error: practitionerCountError } = await adminSupabase
+      .from('practitioners')
+      .select('*', { count: 'exact', head: true })
+      .eq('user_id', userRecordData.id)
+      .eq('pms_type', pmsType);
+
+    if (practitionerCountError) {
+      console.log('[SERVER] ⚠️ Could not verify practitioner count:', practitionerCountError);
+    } else {
+      console.log(
+        `[SERVER] ✅ Verified ${practitionerCount} practitioners in database before processing appointments`
+      );
+    }
+
+    // Also show the actual practitioner data for debugging
+    const { data: actualPractitioners, error: practitionersError } = await adminSupabase
+      .from('practitioners')
+      .select('pms_practitioner_id, display_name, first_name, last_name')
+      .eq('user_id', userRecordData.id)
+      .eq('pms_type', pmsType);
+
+    if (practitionersError) {
+      console.log('[SERVER] ⚠️ Could not fetch practitioner details:', practitionersError);
+    } else {
+      console.log('[SERVER] 📋 Actual practitioners in database:', actualPractitioners);
+    }
 
     const syncResults = await performInitialSync(
       adminSupabase,
@@ -422,8 +462,8 @@ async function performInitialSync(supabase: any, userId: string, pmsClient: any,
     }
 
     // BULK INSERT: Prepare all appointments for bulk insert
-    const appointmentsToInsert = validCompletedAppointments
-      .map((appointment) => {
+    const appointmentsToInsert = await Promise.all(
+      validCompletedAppointments.map(async (appointment) => {
         const appointmentPatientId = appointment.patientId || appointment.patient_id;
         const patientIdForAppointment = patientIdMap.get(String(appointmentPatientId)) || null;
 
@@ -441,6 +481,63 @@ async function performInitialSync(supabase: any, userId: string, pmsClient: any,
 
         if (!appointment.date && !appointment.appointment_date) return null;
 
+        // Get practitioner name from the practitioners table using practitioner_id
+        let practitionerName = null;
+        if (appointment.practitioner_id) {
+          console.log(
+            `[SERVER] 🔍 Looking up practitioner ID: ${appointment.practitioner_id} for appointment ${appointment.id}`
+          );
+          console.log(
+            `[SERVER] 🔍 Appointment object practitioner_id:`,
+            appointment.practitioner_id
+          );
+          console.log(`[SERVER] 🔍 Appointment object physioName:`, appointment.physioName);
+
+          // Look up practitioner name from practitioners table
+          const { data: practitioner, error: practitionerError } = await supabase
+            .from('practitioners')
+            .select('display_name, first_name, last_name')
+            .eq('user_id', userId)
+            .eq('pms_type', pmsType)
+            .eq('pms_practitioner_id', appointment.practitioner_id.toString())
+            .single();
+
+          if (practitionerError) {
+            console.log(
+              `[SERVER] ⚠️ Practitioner lookup error for ID ${appointment.practitioner_id}:`,
+              practitionerError
+            );
+          }
+
+          if (practitioner) {
+            practitionerName =
+              practitioner.display_name ||
+              `${practitioner.first_name} ${practitioner.last_name}`.trim();
+            console.log(
+              `[SERVER] ✅ Found practitioner: ${practitionerName} for appointment ${appointment.id}`
+            );
+          } else {
+            console.log(
+              `[SERVER] ⚠️ No practitioner found in database for ID: ${appointment.practitioner_id}`
+            );
+            console.log(
+              `[SERVER] 🔍 Checking if practitioners exist for user ${userId} and pms_type ${pmsType}`
+            );
+
+            // Debug: Check if any practitioners exist for this user and PMS type
+            const { data: allPractitioners, error: checkError } = await supabase
+              .from('practitioners')
+              .select('pms_practitioner_id, display_name, first_name, last_name')
+              .eq('user_id', userId)
+              .eq('pms_type', pmsType);
+
+            // Fallback: Try to get practitioner name from appointment data if available
+            if (appointment.physioName && appointment.physioName !== 'Unknown Practitioner') {
+              practitionerName = appointment.physioName;
+            }
+          }
+        }
+
         return {
           user_id: userId,
           patient_id: patientIdForAppointment,
@@ -450,12 +547,18 @@ async function performInitialSync(supabase: any, userId: string, pmsClient: any,
           appointment_type: appointment.type || appointment.appointment_type || null,
           appointment_type_id: appointment.appointment_type_id || null,
           status: appointment.status || 'unknown',
-          practitioner_name: appointment.physioName || appointment.practitioner_name || null,
+          practitioner_id: appointment.practitioner_id || null, // NEW: Store PMS practitioner ID
+          // Use practitioner name from database lookup first, then fallback to appointment data, finally default to 'Unknown Practitioner'
+          practitioner_name:
+            practitionerName ||
+            appointment.physioName ||
+            appointment.practitioner_name ||
+            'Unknown Practitioner',
           notes: appointment.notes || null,
           is_completed: appointment.status === 'completed' || appointment.status === 'Completed',
         };
       })
-      .filter(Boolean); // Remove null entries
+    ).then((results) => results.filter(Boolean)); // Remove null entries
 
     console.log(`[SERVER] Prepared ${appointmentsToInsert.length} appointments for bulk insert`);
 
@@ -508,6 +611,9 @@ async function performInitialSync(supabase: any, userId: string, pmsClient: any,
     // Set counts to 0 to indicate they need to be calculated after user sets tags
     wcPatients = 0;
     epcPatients = 0;
+
+    // Practitioners are already synced before this function is called
+    console.log('[SERVER] ✅ Practitioners already synced in previous step');
 
     // Add summary for verification
     const totalSyncedRecords = totalAppointments; // Only count appointments since patient counts are 0
@@ -571,5 +677,84 @@ async function performInitialSync(supabase: any, userId: string, pmsClient: any,
       totalAppointments: 0,
       issues: [`Sync failed: ${error instanceof Error ? error.message : 'Unknown error'}`],
     };
+  }
+}
+
+// Sync practitioners from PMS and store in database
+async function syncPractitioners(supabase: any, userId: string, pmsApi: any, pmsType: string) {
+  try {
+    console.log(`[PRACTITIONERS] 🔍 DEBUG: Function called with:`);
+    console.log(`[PRACTITIONERS] 🔍 DEBUG: - userId: ${userId}`);
+    console.log(`[PRACTITIONERS] 🔍 DEBUG: - pmsType: ${pmsType}`);
+    console.log(`[PRACTITIONERS] 🔍 DEBUG: - pmsApi type: ${typeof pmsApi}`);
+    console.log(
+      `[PRACTITIONERS] 🔍 DEBUG: - pmsApi.getPractitioners: ${typeof pmsApi.getPractitioners}`
+    );
+
+    console.log(`[PRACTITIONERS] Starting practitioner sync for user ${userId} (${pmsType})...`);
+
+    // Fetch practitioners from PMS API
+    console.log(`[PRACTITIONERS] 🔍 DEBUG: About to call pmsApi.getPractitioners()...`);
+    const practitioners = await pmsApi.getPractitioners();
+    console.log(`[PRACTITIONERS] 🔍 DEBUG: getPractitioners() returned:`, practitioners);
+    console.log(`[PRACTITIONERS] Found ${practitioners.length} practitioners from ${pmsType}`);
+
+    if (practitioners.length === 0) {
+      console.log('[PRACTITIONERS] No practitioners found, skipping sync');
+      return;
+    }
+
+    let syncedCount = 0;
+    let errorCount = 0;
+
+    for (const practitioner of practitioners) {
+      try {
+        // Prepare practitioner data for database
+        const practitionerData = {
+          user_id: userId,
+          pms_practitioner_id: practitioner.id.toString(),
+          pms_type: pmsType,
+          first_name: practitioner.first_name || null,
+          last_name: practitioner.last_name || null,
+          username: practitioner.username || null,
+          display_name:
+            practitioner.display_name ||
+            `${practitioner.first_name || ''} ${practitioner.last_name || ''}`.trim(),
+          email: practitioner.email || null,
+          is_active: practitioner.is_active !== false,
+          updated_at: new Date().toISOString(),
+        };
+
+        // Upsert practitioner (insert or update if exists)
+        console.log(`[PRACTITIONERS] 🔍 Attempting to upsert practitioner:`, practitionerData);
+
+        const { error: upsertError } = await supabase
+          .from('practitioners')
+          .upsert(practitionerData, {
+            onConflict: 'user_id,pms_practitioner_id,pms_type',
+          });
+
+        if (upsertError) {
+          console.error(
+            `[PRACTITIONERS] Error upserting practitioner ${practitioner.id}:`,
+            upsertError
+          );
+          errorCount++;
+        } else {
+          syncedCount++;
+          console.log(
+            `[PRACTITIONERS] ✅ Synced: ${practitionerData.display_name} (ID: ${practitioner.id})`
+          );
+        }
+      } catch (error) {
+        console.error(`[PRACTITIONERS] Error processing practitioner ${practitioner.id}:`, error);
+        errorCount++;
+      }
+    }
+
+    console.log(`[PRACTITIONERS] Sync completed: ${syncedCount} synced, ${errorCount} errors`);
+  } catch (error) {
+    console.error('[PRACTITIONERS] Error during practitioner sync:', error);
+    throw error;
   }
 }

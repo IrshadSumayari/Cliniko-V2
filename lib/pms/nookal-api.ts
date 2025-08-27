@@ -1,4 +1,10 @@
-import type { PMSApiInterface, PMSPatient, PMSAppointment, PMSApiCredentials } from './types';
+import type {
+  PMSApiInterface,
+  PMSPatient,
+  PMSAppointment,
+  PMSApiCredentials,
+  PMSPractitioner,
+} from './types';
 
 export class NookalAPI implements PMSApiInterface {
   private credentials: PMSApiCredentials;
@@ -796,8 +802,11 @@ export class NookalAPI implements PMSApiInterface {
                 ? `${apt.Date} ${apt.StartTime || apt.start_time || ''}`.trim()
                 : apt.date,
           type: apt.appointmentType || apt.AppointmentType || apt.appointment_type,
+          appointment_type_id:
+            apt.appointmentTypeID || apt.AppointmentTypeID || apt.appointment_type_id,
           status: this.mapAppointmentStatus(apt.status || apt.Status, apt),
           physioName: apt.Practitioner || apt.practitioner,
+          practitioner_id: apt.practitionerID || apt.PractitionerID || apt.practitioner_id,
           durationMinutes:
             this.calculateDuration(apt.appointmentStartTime, apt.appointmentEndTime) ||
             Number.parseInt(apt.Duration || apt.duration) ||
@@ -889,6 +898,52 @@ export class NookalAPI implements PMSApiInterface {
       return Math.round(diffMs / (1000 * 60)); // Convert to minutes
     } catch {
       return 0;
+    }
+  }
+
+  async getPractitioners(): Promise<PMSPractitioner[]> {
+    try {
+      console.log('[NOOKAL] Fetching practitioners...');
+      const response = await this.makeRequest('/getPractitioners');
+
+      if (!response || response.status !== 'success') {
+        throw new Error(`Failed to fetch practitioners: ${response?.details || 'Unknown error'}`);
+      }
+
+      // Check for correct Nookal response structure
+      if (
+        !response.data?.results?.practitioners ||
+        !Array.isArray(response.data.results.practitioners)
+      ) {
+        console.warn('[NOOKAL] No practitioners data found in response');
+        return [];
+      }
+
+      const practitioners = response.data.results.practitioners;
+      console.log(`✅ [NOOKAL] Found ${practitioners.length} practitioners`);
+
+      // Map practitioners to our standardized format based on actual Nookal response
+      const mappedPractitioners = practitioners.map((practitioner: any) => ({
+        id: practitioner.ID,
+        first_name: practitioner.FirstName,
+        last_name: practitioner.LastName,
+        username: null, // Nookal doesn't provide username in this API
+        display_name:
+          `${practitioner.Title || ''} ${practitioner.FirstName || ''} ${practitioner.LastName || ''}`.trim(),
+        email: practitioner.Email,
+        is_active: practitioner.status === '1' && practitioner.ShowInDiary === '1', // Active if status=1 and shown in diary
+        title: practitioner.Title,
+        speciality: practitioner.Speciality,
+        locations: practitioner.locations,
+      }));
+
+      console.log(
+        `✅ [NOOKAL] Practitioners mapping completed: ${mappedPractitioners.length} practitioners`
+      );
+      return mappedPractitioners;
+    } catch (error) {
+      console.error('[NOOKAL] ❌ Error fetching practitioners:', error);
+      throw error;
     }
   }
 

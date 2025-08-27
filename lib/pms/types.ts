@@ -26,6 +26,7 @@ export interface PMSAppointment {
   type?: string;
   status: 'completed' | 'cancelled' | 'dna' | 'scheduled';
   physioName?: string;
+  practitioner_id?: string | number; // Add practitioner ID for proper linking
   durationMinutes?: number;
   notes?: string;
   lastModified: string;
@@ -57,6 +58,21 @@ export interface SyncResult {
   lastModified?: string;
 }
 
+export interface PMSPractitioner {
+  id: string;
+  first_name?: string;
+  last_name?: string;
+  username?: string | null;
+  display_name: string;
+  email?: string | null;
+  is_active: boolean;
+  title?: string;
+  designation?: string;
+  speciality?: string;
+  locations?: string[];
+  show_in_online_bookings?: boolean;
+}
+
 export interface PMSApiInterface {
   testConnection(): Promise<boolean>;
   getPatients(lastModified?: string, appointmentTypeIds?: string[]): Promise<PMSPatient[]>;
@@ -73,6 +89,7 @@ export interface PMSApiInterface {
   getPatientAppointments(patientId: string, lastModified?: Date): Promise<PMSAppointment[]>;
   getAppointmentTypes(): Promise<any[]>;
   processAppointmentTypes(appointmentTypes: any[]): AppointmentType[];
+  getPractitioners(): Promise<PMSPractitioner[]>;
 }
 
 export type PMSType = 'cliniko' | 'halaxy' | 'nookal';

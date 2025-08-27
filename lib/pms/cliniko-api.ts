@@ -1,4 +1,10 @@
-import type { PMSApiInterface, PMSPatient, PMSAppointment, PMSApiCredentials } from './types';
+import type {
+  PMSApiInterface,
+  PMSPatient,
+  PMSAppointment,
+  PMSApiCredentials,
+  PMSPractitioner,
+} from './types';
 
 export class ClinikoAPI implements PMSApiInterface {
   private credentials: PMSApiCredentials;
@@ -436,7 +442,7 @@ export class ClinikoAPI implements PMSApiInterface {
   }
 
   private mapBookingToAppointment(booking: any): PMSAppointment | null {
-    console.log(booking.appointment_type?.links?.self?.split('/').pop(), 'bookings ID');
+
     if (!booking) {
       return null;
     }
@@ -457,20 +463,44 @@ export class ClinikoAPI implements PMSApiInterface {
 
     const appointmentTypeId = booking.appointment_type?.links?.self?.split('/').pop() || '';
 
-    if (Math.random() < 0.1) {
-      // Log only ~10% of successful mappings
-      console.log(
-        `🔍 Mapping booking ${booking.id} for patient ${patientId}, type: ${appointmentTypeId}`
-      );
+    // Extract practitioner name and ID from Cliniko API
+    let practitionerName = 'Unknown Practitioner';
+    let practitionerId = null;
+    
+    // Extract practitioner ID
+    if (booking.practitioner?.id) {
+      practitionerId = booking.practitioner.id.toString();
+    } else if (booking.practitioner?.links?.self) {
+      practitionerId = booking.practitioner.links.self.split('/').pop();
+    } else if (booking.practitioner_id) {
+      practitionerId = booking.practitioner_id.toString();
+    }
+    
+    // Extract practitioner name
+    if (booking.practitioner?.display_name) {
+      practitionerName = booking.practitioner.display_name;
+    } else if (booking.practitioner?.name) {
+      practitionerName = booking.practitioner.name;
+    } else if (booking.practitioner_name) {
+      practitionerName = booking.practitioner_name;
+    } else if (booking.user?.display_name) {
+      practitionerName = booking.user.display_name;
+    } else if (booking.user?.name) {
+      practitionerName = booking.user.name;
+    } else if (booking.therapist?.name) {
+      practitionerName = booking.therapist.name;
     }
 
-    return {
+
+
+    const appointmentData = {
       id: parseInt(booking.id),
       patientId: patientId,
       date: booking.starts_at,
       type: appointmentTypeId,
       status: 'completed',
-      physioName: booking.patient_name,
+      physioName: practitionerName, // Now correctly extracted from practitioner fields
+      practitioner_id: practitionerId, // Add practitioner ID for proper linking
       durationMinutes: this.calculateDuration(booking.starts_at, booking.ends_at),
       notes: booking.notes,
       lastModified: booking.updated_at,
@@ -480,12 +510,93 @@ export class ClinikoAPI implements PMSApiInterface {
       appointment_date: booking.starts_at,
       appointment_type_id: appointmentTypeId,
     };
+    
+    // Log the final appointment data for debugging
+    console.log(`🔍 [CLINIKO DEBUG] Final appointment data for booking ${booking.id}:`, {
+      id: appointmentData.id,
+      patientId: appointmentData.patientId,
+      practitioner_id: appointmentData.practitioner_id,
+      physioName: appointmentData.physioName,
+      practitionerName: practitionerName,
+      practitionerId: practitionerId
+    });
+    
+    return appointmentData;
   }
 
   private calculateDuration(startTime: string, endTime: string): number {
     const start = new Date(startTime);
     const end = new Date(endTime);
     return Math.round((end.getTime() - start.getTime()) / (1000 * 60));
+  }
+
+  async getPractitioners(): Promise<PMSPractitioner[]> {
+    try {
+      console.log('🔍 Fetching practitioners from Cliniko...');
+
+      const allPractitioners: any[] = [];
+      let page = 1;
+      let hasMore = true;
+
+      while (hasMore) {
+        console.log(`📄 Fetching practitioners page ${page}...`);
+
+        const response = await this.makeRequest('/practitioners', {
+          page: page.toString(),
+          per_page: '50',
+        });
+
+        if (!response || !response.practitioners) {
+          console.warn(`⚠️ No practitioners found on page ${page}`);
+          break;
+        }
+
+        const practitioners = response.practitioners;
+        console.log(`✅ Page ${page}: Found ${practitioners.length} practitioners`);
+
+        // Map practitioners to our standardized format based on actual Cliniko response
+        const mappedPractitioners = practitioners.map((practitioner: any) => ({
+          id: practitioner.id,
+          first_name: practitioner.first_name,
+          last_name: practitioner.last_name,
+          username: null, // Cliniko doesn't provide username in practitioners API
+          display_name:
+            practitioner.display_name ||
+            practitioner.label ||
+            `${practitioner.first_name || ''} ${practitioner.last_name || ''}`.trim(),
+          email: null, // Email not provided in practitioners API
+          is_active: practitioner.active === true,
+          title: practitioner.title,
+          designation: practitioner.designation,
+          show_in_online_bookings: practitioner.show_in_online_bookings,
+        }));
+
+        allPractitioners.push(...mappedPractitioners);
+
+        // Check for more pages
+        hasMore = response.links?.next !== undefined;
+        if (!hasMore) {
+          console.log(`📄 No more practitioner pages available`);
+          break;
+        }
+
+        page++;
+
+        // Safety check
+        if (page > 20) {
+          console.warn(`⚠️ Safety limit reached for practitioners (20 pages), stopping`);
+          break;
+        }
+      }
+
+      console.log(
+        `✅ Cliniko practitioners fetch completed: ${allPractitioners.length} total practitioners`
+      );
+      return allPractitioners;
+    } catch (error) {
+      console.error('❌ Error fetching practitioners from Cliniko:', error);
+      throw error;
+    }
   }
 
   async getAppointmentTypes(): Promise<any[]> {

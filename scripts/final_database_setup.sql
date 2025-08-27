@@ -44,6 +44,7 @@ DROP TABLE IF EXISTS sync_controls CASCADE;
 DROP TABLE IF EXISTS cases CASCADE;
 DROP TABLE IF EXISTS appointments CASCADE;
 DROP TABLE IF EXISTS patients CASCADE;
+DROP TABLE IF EXISTS practitioners CASCADE;
 DROP TABLE IF EXISTS pms_api_keys CASCADE;
 DROP TABLE IF EXISTS pms_credentials CASCADE;
 DROP TABLE IF EXISTS profiles CASCADE;
@@ -78,6 +79,29 @@ CREATE TABLE profiles (
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
+
+-- Create practitioners table for storing PMS practitioner data
+CREATE TABLE practitioners (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    pms_practitioner_id TEXT NOT NULL, -- External practitioner ID from PMS
+    pms_type TEXT NOT NULL CHECK (pms_type IN ('cliniko', 'nookal', 'halaxy')),
+    first_name TEXT,
+    last_name TEXT,
+    username TEXT,
+    display_name TEXT, -- Full name for display purposes
+    email TEXT,
+    is_active BOOLEAN DEFAULT TRUE,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    -- Prevent duplicate practitioners per user and PMS
+    UNIQUE(user_id, pms_practitioner_id, pms_type)
+);
+
+-- Create indexes for practitioners
+CREATE INDEX IF NOT EXISTS idx_practitioners_user_id ON practitioners(user_id);
+CREATE INDEX IF NOT EXISTS idx_practitioners_pms ON practitioners(pms_practitioner_id, pms_type);
+CREATE INDEX IF NOT EXISTS idx_practitioners_active ON practitioners(user_id, is_active);
 
 -- Create PMS credentials table for storing API keys securely
 CREATE TABLE pms_credentials (
@@ -165,6 +189,7 @@ CREATE TABLE appointments (
     appointment_type_id TEXT, -- NEW: Stores the appointmentTypeID from PMS
     status TEXT NOT NULL,
     appointment_date TIMESTAMP WITH TIME ZONE NOT NULL,
+    practitioner_id TEXT, -- NEW: Store PMS practitioner ID for proper linking
     practitioner_name TEXT,
     location_name TEXT, -- Clinic location where appointment takes place
     notes TEXT,
@@ -215,8 +240,8 @@ CREATE TABLE cases (
     location_name TEXT NOT NULL, -- e.g., "Main Clinic", "North Branch", "South Clinic"
     
     -- Practitioner/Physio information
-    physio_id UUID, -- Reference to practitioners table if you have one
-    physio_name TEXT, -- e.g., "Dr. Smith", "Dr. Jones", "Dr. Brown" (nullable as requested)
+    practitioner_id UUID REFERENCES practitioners(id), -- Reference to practitioners table
+    physio_name TEXT, -- Kept for backward compatibility, will be populated from practitioner display_name
     
     -- Program/Appointment type
     appointment_type_id TEXT, -- Store the PMS appointment type ID as text (not UUID reference)
@@ -332,7 +357,7 @@ CREATE INDEX idx_appointment_types_name ON appointment_types(appointment_name, p
 CREATE INDEX IF NOT EXISTS idx_cases_user_status ON cases(user_id, status);
 CREATE INDEX IF NOT EXISTS idx_cases_user_program ON cases(user_id, program_type);
 CREATE INDEX IF NOT EXISTS idx_cases_user_location ON cases(user_id, location_id);
-CREATE INDEX IF NOT EXISTS idx_cases_user_physio ON cases(user_id, physio_id);
+CREATE INDEX IF NOT EXISTS idx_cases_user_practitioner ON cases(user_id, practitioner_id);
 CREATE INDEX IF NOT EXISTS idx_cases_quota_sessions ON cases(quota, sessions_used);
 CREATE INDEX IF NOT EXISTS idx_cases_next_visit ON cases(next_visit_date);
 CREATE INDEX IF NOT EXISTS idx_cases_alert_active ON cases(is_alert_active);
@@ -528,8 +553,10 @@ BEGIN
             UPDATE appointments SET
                 patient_id = COALESCE(NEW.patient_id, patient_id),
                 appointment_type = COALESCE(NEW.appointment_type, appointment_type),
+                appointment_type_id = COALESCE(NEW.appointment_type_id, appointment_type_id),
                 status = NEW.status,
                 appointment_date = NEW.appointment_date,
+                practitioner_id = COALESCE(NEW.practitioner_id, practitioner_id),
                 practitioner_name = COALESCE(NEW.practitioner_name, practitioner_name),
                 location_name = COALESCE(NEW.location_name, location_name),
                 notes = COALESCE(NEW.notes, notes),
@@ -1027,7 +1054,8 @@ BEGIN
             apt.practitioner_name,
             apt.appointment_type,
             apt.appointment_type_id,
-            apt.location_name
+            apt.location_name,
+            apt.practitioner_id
         INTO v_appointment
         FROM appointments apt
         WHERE apt.patient_id = v_patient.patient_id
@@ -1036,8 +1064,8 @@ BEGIN
         
         -- Set default values if no appointment found
         v_location_name := COALESCE(v_appointment.location_name, 'Main Clinic');
-        -- For now, set physio to NULL as requested - we'll decide what to do with it later
-        v_physio_name := NULL;
+        -- Get physio name from the most recent appointment's practitioner_name
+        v_physio_name := COALESCE(v_appointment.practitioner_name, 'Unknown Practitioner');
         v_appointment_type_name := COALESCE(v_appointment.appointment_type, v_patient.patient_type);
         v_next_visit_date := COALESCE(v_appointment.appointment_date, CURRENT_DATE + INTERVAL '7 days');
         v_last_visit_date := v_appointment.appointment_date;
@@ -1056,6 +1084,7 @@ BEGIN
             patient_date_of_birth,
             location_name,
             physio_name,
+            pms_practitioner_id,
             appointment_type_id,
             appointment_type_name,
             program_type,
@@ -1080,6 +1109,7 @@ BEGIN
             v_patient.date_of_birth,
             v_location_name,
             v_physio_name,
+            v_appointment.practitioner_id,
             v_appointment.appointment_type_id,
             v_appointment_type_name,
             v_patient.patient_type,
@@ -1197,7 +1227,8 @@ BEGIN
             apt.practitioner_name, 
             apt.appointment_type, 
             apt.appointment_type_id, 
-            apt.location_name
+            apt.location_name,
+            apt.practitioner_id
         INTO v_appointment
         FROM appointments apt
         WHERE apt.patient_id = v_patient.patient_id
@@ -1206,8 +1237,8 @@ BEGIN
 
         -- Set default values if no appointment found
         v_location_name := COALESCE(v_appointment.location_name, 'Main Clinic');
-        -- For now, set physio to NULL as requested - we'll decide what to do with it later
-        v_physio_name := NULL;
+        -- Get physio name from the most recent appointment's practitioner_name
+        v_physio_name := COALESCE(v_appointment.practitioner_name, 'Unknown Practitioner');
         v_appointment_type_name := COALESCE(v_appointment.appointment_type, v_patient.patient_type);
         v_next_visit_date := COALESCE(v_appointment.appointment_date, CURRENT_DATE + INTERVAL '7 days');
         v_last_visit_date := v_appointment.appointment_date;
@@ -1311,3 +1342,152 @@ $$ LANGUAGE plpgsql;
 -- 2. populate_cases_from_sync_data() function to populate from sync data
 -- 3. No duplication when syncing again
 -- 4. Support for user-defined WC and EPC tags
+
+-- ============================================================================
+-- PRACTITIONER NAME MIGRATION
+-- ============================================================================
+-- This section handles adding the pms_practitioner_id column and updating existing cases
+
+-- Add pms_practitioner_id column if it doesn't exist
+DO $$
+BEGIN
+    IF NOT EXISTS (
+        SELECT 1 FROM information_schema.columns 
+        WHERE table_name = 'cases' AND column_name = 'pms_practitioner_id'
+    ) THEN
+        ALTER TABLE cases ADD COLUMN pms_practitioner_id TEXT;
+        RAISE NOTICE '✅ Added pms_practitioner_id column to cases table';
+    ELSE
+        RAISE NOTICE '✅ pms_practitioner_id column already exists';
+    END IF;
+END $$;
+
+-- Update existing cases with practitioner names from appointments (simplified)
+UPDATE cases 
+SET 
+    physio_name = appointment_data.practitioner_name,
+    pms_practitioner_id = appointment_data.practitioner_id,
+    updated_at = NOW()
+FROM (
+    SELECT DISTINCT ON (apt.patient_id)
+        apt.patient_id,
+        apt.practitioner_name,
+        apt.practitioner_id
+    FROM appointments apt
+    WHERE apt.practitioner_name IS NOT NULL 
+    AND apt.practitioner_name != 'Unknown Practitioner'
+    ORDER BY apt.patient_id, apt.appointment_date DESC
+) AS appointment_data
+WHERE cases.patient_id = appointment_data.patient_id
+AND (cases.physio_name IS NULL OR cases.physio_name = 'Unknown Practitioner');
+
+-- Create index for better performance on practitioner lookups
+CREATE INDEX IF NOT EXISTS idx_cases_pms_practitioner_id ON cases(pms_practitioner_id);
+
+
+
+-- ============================================================================
+-- MANUAL SYNC PRACTITIONER NAME PRESERVATION FIX
+-- ============================================================================
+-- This section ensures that manual syncs preserve practitioner names
+
+-- Recreate the duplicate handling trigger with proper practitioner field handling
+CREATE OR REPLACE FUNCTION handle_sync_duplicates()
+RETURNS TRIGGER AS $$
+BEGIN
+    -- If this is an update operation, just return the new record
+    IF TG_OP = 'UPDATE' THEN
+        RETURN NEW;
+    END IF;
+    
+    -- For insert operations, check if record already exists
+    IF TG_TABLE_NAME = 'patients' THEN
+        -- Check if patient already exists
+        IF EXISTS (
+            SELECT 1 FROM patients 
+            WHERE user_id = NEW.user_id 
+            AND pms_patient_id = NEW.pms_patient_id 
+            AND pms_type = NEW.pms_type
+        ) THEN
+            -- Update existing record instead of inserting
+            UPDATE patients SET
+                first_name = NEW.first_name,
+                last_name = NEW.last_name,
+                email = COALESCE(NEW.email, email),
+                phone = COALESCE(NEW.phone, phone),
+                date_of_birth = COALESCE(NEW.date_of_birth, date_of_birth),
+                patient_type = NEW.patient_type,
+                physio_name = COALESCE(NEW.physio_name, physio_name),
+                pms_last_modified = NEW.pms_last_modified,
+                updated_at = NOW()
+            WHERE user_id = NEW.user_id 
+            AND pms_patient_id = NEW.pms_patient_id 
+            AND pms_type = NEW.pms_type;
+            
+            RETURN NULL; -- Prevent insert
+        END IF;
+    ELSIF TG_TABLE_NAME = 'appointments' THEN
+        -- Check if appointment already exists
+        IF EXISTS (
+            SELECT 1 FROM appointments 
+            WHERE user_id = NEW.user_id 
+            AND pms_appointment_id = NEW.pms_appointment_id 
+            AND pms_type = NEW.pms_type
+        ) THEN
+            -- Update existing record instead of inserting
+            -- CRITICAL: Preserve practitioner_id and practitioner_name if they exist
+            UPDATE appointments SET
+                patient_id = COALESCE(NEW.patient_id, patient_id),
+                appointment_type = COALESCE(NEW.appointment_type, appointment_type),
+                appointment_type_id = COALESCE(NEW.appointment_type_id, appointment_type_id),
+                status = NEW.status,
+                appointment_date = NEW.appointment_date,
+                practitioner_id = COALESCE(NEW.practitioner_id, practitioner_id),
+                practitioner_name = COALESCE(NEW.practitioner_name, practitioner_name),
+                location_name = COALESCE(NEW.location_name, location_name),
+                notes = COALESCE(NEW.notes, notes),
+                duration_minutes = COALESCE(NEW.duration_minutes, duration_minutes),
+                is_completed = NEW.is_completed,
+                updated_at = NOW()
+            WHERE user_id = NEW.user_id 
+            AND pms_appointment_id = NEW.pms_appointment_id 
+            AND pms_type = NEW.pms_type;
+            
+            RETURN NULL; -- Prevent insert
+        END IF;
+    ELSIF TG_TABLE_NAME = 'appointment_types' THEN
+        -- Check if appointment type already exists
+        IF EXISTS (
+            SELECT 1 FROM appointment_types 
+            WHERE user_id = NEW.user_id 
+            AND appointment_id = NEW.appointment_id 
+            AND pms_type = NEW.pms_type
+        ) THEN
+            -- Update existing record instead of inserting
+            UPDATE appointment_types SET
+                appointment_name = NEW.appointment_name,
+                code = NEW.code,
+                updated_at = NOW()
+            WHERE user_id = NEW.user_id 
+            AND appointment_id = NEW.appointment_id 
+            AND pms_type = NEW.pms_type;
+            
+            RETURN NULL; -- Prevent insert
+        END IF;
+    END IF;
+    
+    -- If no duplicate found, allow the insert
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+
+
+-- ============================================================================
+-- SETUP COMPLETE
+-- ============================================================================
+-- Database configured with:
+-- • Cases table with practitioner names support
+-- • Practitioner filtering in dashboard
+-- • Manual sync practitioner name preservation
+-- • Support for Cliniko and Nookal PMS systems

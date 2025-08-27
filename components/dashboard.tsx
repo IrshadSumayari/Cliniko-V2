@@ -53,6 +53,8 @@ const Dashboard = ({ onNavigate }: DashboardProps) => {
   const [selectedFilter, setSelectedFilter] = useState('all');
   const [selectedPhysio, setSelectedPhysio] = useState('all');
   const [selectedLocation, setSelectedLocation] = useState('all');
+  const [selectedPractitioner, setSelectedPractitioner] = useState('all');
+  const [practitionerOptions, setPractitionerOptions] = useState([]);
   const [activeTab, setActiveTab] = useState('all-patients');
   const [showAlertSettings, setShowAlertSettings] = useState(false);
   const [selectedClients, setSelectedClients] = useState<number[]>([]);
@@ -300,7 +302,13 @@ const Dashboard = ({ onNavigate }: DashboardProps) => {
         return;
       }
 
-      const response = await fetch('/api/dashboard-data', {
+      // Build URL with practitioner filter
+      const url = new URL('/api/dashboard-data', window.location.origin);
+      if (selectedPractitioner && selectedPractitioner !== 'all') {
+        url.searchParams.set('practitioner', selectedPractitioner);
+      }
+
+      const response = await fetch(url.toString(), {
         headers: {
           Authorization: `Bearer ${accessToken}`,
         },
@@ -323,6 +331,11 @@ const Dashboard = ({ onNavigate }: DashboardProps) => {
 
         setClientsData(activePatients);
         setArchivedClients(archivedPatients);
+
+        // Set practitioner options from API response
+        if (data.practitionerOptions) {
+          setPractitionerOptions(data.practitionerOptions);
+        }
 
         // Update KPI data
         setKpiData([
@@ -376,6 +389,11 @@ const Dashboard = ({ onNavigate }: DashboardProps) => {
   useEffect(() => {
     fetchDashboardData();
   }, []);
+
+  // Refresh data when practitioner filter changes
+  useEffect(() => {
+    fetchDashboardData();
+  }, [selectedPractitioner]);
 
   const handleSync = async () => {
     setIsSync(true);
@@ -957,6 +975,7 @@ const Dashboard = ({ onNavigate }: DashboardProps) => {
                 setSelectedFilter('all');
                 setSelectedPhysio('all');
                 setSelectedLocation('all');
+                setSelectedPractitioner('all');
               }}
               className="gap-2 mt-4"
             >
@@ -1161,38 +1180,28 @@ const Dashboard = ({ onNavigate }: DashboardProps) => {
 
                   <div className="h-8 w-px bg-border/60" />
 
-                  {/* Physio Filter - Only show if there are physio names */}
-                  {getUniquePhysios().length > 0 && (
+                  {/* Practitioner Filter - Show if there are practitioner options */}
+                  {practitionerOptions.length > 1 && (
                     <div className="flex items-center gap-3">
                       <span className="text-sm font-medium text-muted-foreground">Physio:</span>
-                      <div className="flex gap-2">
-                        <Button
-                          variant={selectedPhysio === 'all' ? 'default' : 'outline'}
-                          size="sm"
-                          onClick={() => setSelectedPhysio('all')}
-                          className="h-10 px-4"
-                        >
-                          All
-                        </Button>
-                        {getUniquePhysios().map((physio) => (
+                      <div className="flex gap-2 max-w-md overflow-x-auto scrollbar-thin scrollbar-thumb-border scrollbar-track-transparent">
+                        {practitionerOptions.map((option: any) => (
                           <Button
-                            key={physio}
-                            variant={selectedPhysio === physio ? 'default' : 'outline'}
+                            key={option.value}
+                            variant={selectedPractitioner === option.value ? 'default' : 'outline'}
                             size="sm"
-                            onClick={() => setSelectedPhysio(physio)}
-                            className="h-10 px-4"
+                            onClick={() => setSelectedPractitioner(option.value)}
+                            className="h-10 px-4 flex-shrink-0"
                           >
-                            {physio}
+                            {option.label}
                           </Button>
                         ))}
                       </div>
                     </div>
                   )}
 
-                  <div className="h-8 w-px bg-border/60" />
-
                   {/* Location Filter */}
-                  <div className="flex items-center gap-3">
+                  {/* <div className="flex items-center gap-3">
                     <span className="text-sm font-medium text-muted-foreground">Location:</span>
                     <div className="flex gap-2">
                       <Button
@@ -1215,7 +1224,7 @@ const Dashboard = ({ onNavigate }: DashboardProps) => {
                         </Button>
                       ))}
                     </div>
-                  </div>
+                  </div> */}
                 </div>
               </div>
             </div>

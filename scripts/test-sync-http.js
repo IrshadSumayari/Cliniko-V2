@@ -73,6 +73,15 @@ async function testSync() {
 
     const result = await response.json();
     console.log('✅ Sync completed successfully!');
+
+    if (result.summary) {
+      console.log('📊 Sync Summary:');
+      console.log(`   Patients: ${result.summary.totalPatients}`);
+      console.log(`   Appointments: ${result.summary.totalAppointments}`);
+      console.log(`   Cases Created: ${result.summary.totalCasesCreated}`);
+      console.log(`   Cases Updated: ${result.summary.totalCasesUpdated}`);
+    }
+
     console.log('📊 Results:', JSON.stringify(result, null, 2));
   } catch (error) {
     console.error('❌ Test failed:', error.message);
