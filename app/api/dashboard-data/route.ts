@@ -14,15 +14,15 @@ export async function GET(req: NextRequest) {
     }
 
     const token = authHeader.replace('Bearer ', '');
-    
+
     // Get user from token
-    const { data: { user }, error: authError } = await createAdminClient().auth.getUser(token);
-    
+    const {
+      data: { user },
+      error: authError,
+    } = await createAdminClient().auth.getUser(token);
+
     if (authError || !user) {
-      return NextResponse.json(
-        { error: 'Invalid or expired token.' },
-        { status: 401 }
-      );
+      return NextResponse.json({ error: 'Invalid or expired token.' }, { status: 401 });
     }
 
     // Get filter parameters from URL
@@ -37,33 +37,25 @@ export async function GET(req: NextRequest) {
       .single();
 
     if (userError) {
-      return NextResponse.json(
-        { error: 'Failed to fetch user data.' },
-        { status: 500 }
-      );
+      return NextResponse.json({ error: 'Failed to fetch user data.' }, { status: 500 });
     }
 
     const userId = userData.id;
-    
+
     // Get user's custom WC and EPC tags from users table
     const { data: userTags, error: tagsError } = await createAdminClient()
       .from('users')
       .select('wc, epc')
       .eq('id', userId)
       .single();
-    
+
     if (tagsError) {
       console.error('Failed to fetch user tags:', tagsError);
-      return NextResponse.json(
-        { error: 'Failed to fetch user configuration.' },
-        { status: 500 }
-      );
+      return NextResponse.json({ error: 'Failed to fetch user configuration.' }, { status: 500 });
     }
-    
+
     const wcTag = userTags.wc || 'WC'; // Use user's custom tag or fallback to default
     const epcTag = userTags.epc || 'EPC'; // Use user's custom tag or fallback to default
-
-
 
     // Fetch practitioners for filter dropdown
     const { data: practitioners, error: practitionersError } = await createAdminClient()
@@ -84,7 +76,8 @@ export async function GET(req: NextRequest) {
     // Build practitioner filter query
     let casesQuery = createAdminClient()
       .from('cases')
-      .select(`
+      .select(
+        `
         id,
         case_number,
         case_title,
@@ -109,7 +102,8 @@ export async function GET(req: NextRequest) {
         location_name,
         created_at,
         updated_at
-      `)
+      `
+      )
       .eq('user_id', userId);
 
     // Apply practitioner filter if specified
@@ -121,23 +115,16 @@ export async function GET(req: NextRequest) {
     let { data: cases, error: casesError } = await casesQuery;
 
     if (casesError) {
-      return NextResponse.json(
-        { error: 'Failed to fetch cases.' },
-        { status: 500 }
-      );
+      return NextResponse.json({ error: 'Failed to fetch cases.' }, { status: 500 });
     }
 
     // Ensure cases is an array
     if (!cases || !Array.isArray(cases)) {
-
       cases = [];
     }
 
-    
-
     // Process data to create dashboard view from cases
-    
-    
+
     // Check if we have any cases first
     if (!cases || cases.length === 0) {
       // No cases exist yet - return empty dashboard
@@ -148,29 +135,31 @@ export async function GET(req: NextRequest) {
           totalPatients: 0,
           totalSessionsRemaining: 0,
           actionNeededPatients: 0,
-          pendingPatients: 0
+          pendingPatients: 0,
         },
         filters: {
           physios: [],
-          locations: []
+          locations: [],
         },
         lastSync: new Date().toISOString(),
-        message: 'No cases found. Please run the populate_cases_from_existing_data() function first.'
+        message:
+          'No cases found. Please run the populate_cases_from_existing_data() function first.',
       });
     }
 
-    const dashboardData = cases.map(caseItem => {
+    const dashboardData = cases.map((caseItem) => {
       // Use the case data directly - no need to fetch appointments separately
       let patientType = caseItem.program_type;
       let sessionsUsed = caseItem.sessions_used || 0;
       let totalSessions = caseItem.quota || 5;
-      let remainingSessions = caseItem.sessions_remaining || Math.max(0, totalSessions - sessionsUsed);
-      
+      let remainingSessions =
+        caseItem.sessions_remaining || Math.max(0, totalSessions - sessionsUsed);
+
       // Determine status based on sessions and case status
       let status = caseItem.status || 'active';
       let alert = caseItem.alert_message;
       let urgency = caseItem.priority || 'low';
-      
+
       // Override status logic based on sessions remaining
       if (remainingSessions <= 0) {
         status = 'critical';
@@ -185,7 +174,7 @@ export async function GET(req: NextRequest) {
         alert = `${patientType} sessions running low - ${remainingSessions} sessions left`;
         urgency = 'medium';
       }
-      
+
       // If case is pending or archived, override the status
       if (caseItem.status === 'pending') {
         status = 'pending';
@@ -213,7 +202,7 @@ export async function GET(req: NextRequest) {
       }
 
       // Use case data for next appointment and other details
-      const nextAppointment = caseItem.next_visit_date 
+      const nextAppointment = caseItem.next_visit_date
         ? new Date(caseItem.next_visit_date).toISOString().split('T')[0]
         : null;
 
@@ -243,23 +232,26 @@ export async function GET(req: NextRequest) {
         appointmentType: caseItem.appointment_type_name,
         priority: caseItem.priority,
         caseStartDate: caseItem.case_start_date,
-        lastVisitDate: caseItem.last_visit_date
+        lastVisitDate: caseItem.last_visit_date,
       };
     });
 
-
-
     // Calculate KPI data
     const totalPatients = dashboardData.length;
-    const actionNeededPatients = dashboardData.filter((p: any) => p.status === 'warning' || p.status === 'critical').length;
+    const actionNeededPatients = dashboardData.filter(
+      (p: any) => p.status === 'warning' && p.remainingSessions > 0
+    ).length;
     const pendingPatients = dashboardData.filter((p: any) => p.status === 'pending').length;
-    const totalSessionsRemaining = dashboardData.reduce((sum: number, p: any) => sum + p.remainingSessions, 0);
-    
+    const totalSessionsRemaining = dashboardData.reduce(
+      (sum: number, p: any) => sum + p.remainingSessions,
+      0
+    );
+
     // Calculate WC and EPC counts for display
     // Use the program_type from cases table to match exactly what's stored
     const wcPatients = dashboardData.filter((p: any) => p.program === wcTag).length;
     const epcPatients = dashboardData.filter((p: any) => p.program === epcTag).length;
-    
+
     // Debug: Log what program types are actually in the data
     const uniquePrograms = Array.from(new Set(dashboardData.map((p: any) => p.program)));
 
@@ -276,11 +268,11 @@ export async function GET(req: NextRequest) {
         actionNeededPatients,
         pendingPatients,
         wcPatients,
-        epcPatients
+        epcPatients,
       },
       filters: {
         physios: uniquePhysios,
-        locations: uniqueLocations
+        locations: uniqueLocations,
       },
       practitionerOptions: [
         { value: 'all', label: 'All' },
@@ -289,20 +281,20 @@ export async function GET(req: NextRequest) {
           value: p.display_name,
           label: p.display_name,
           id: p.id,
-          pms_id: p.pms_practitioner_id
+          pms_id: p.pms_practitioner_id,
         })),
         // Add unique physio names from cases that aren't in practitioners table
         ...(casePhysioNames || [])
           .filter((c: any) => {
             // Only include if not already in practitioners list
-            return !(practitioners || []).some((p: any) => 
-              p.display_name === c.physio_name || 
-              p.pms_practitioner_id === c.pms_practitioner_id
+            return !(practitioners || []).some(
+              (p: any) =>
+                p.display_name === c.physio_name || p.pms_practitioner_id === c.pms_practitioner_id
             );
           })
           .reduce((unique: any[], current: any) => {
             // Remove duplicates from cases
-            if (!unique.some(u => u.physio_name === current.physio_name)) {
+            if (!unique.some((u) => u.physio_name === current.physio_name)) {
               unique.push(current);
             }
             return unique;
@@ -311,8 +303,8 @@ export async function GET(req: NextRequest) {
             value: c.physio_name,
             label: c.physio_name,
             id: null,
-            pms_id: c.pms_practitioner_id
-          }))
+            pms_id: c.pms_practitioner_id,
+          })),
       ].sort((a, b) => {
         if (a.value === 'all') return -1;
         if (b.value === 'all') return 1;
@@ -322,15 +314,11 @@ export async function GET(req: NextRequest) {
       lastSync: new Date().toISOString(),
       userTags: {
         wcTag,
-        epcTag
-      }
+        epcTag,
+      },
     });
-
   } catch (error) {
     console.error('Dashboard data fetch error:', error);
-    return NextResponse.json(
-      { error: 'Failed to fetch dashboard data.' },
-      { status: 500 }
-    );
+    return NextResponse.json({ error: 'Failed to fetch dashboard data.' }, { status: 500 });
   }
 }
