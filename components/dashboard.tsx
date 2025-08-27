@@ -56,6 +56,11 @@ const Dashboard = ({ onNavigate }: DashboardProps) => {
   const [selectedPractitioner, setSelectedPractitioner] = useState('all');
   const [practitionerOptions, setPractitionerOptions] = useState([]);
   const [activeTab, setActiveTab] = useState('all-patients');
+  const [userSubscription, setUserSubscription] = useState<{
+    subscription_status: string;
+    trial_ends_at: string;
+    daysRemaining: number;
+  } | null>(null);
   const [showAlertSettings, setShowAlertSettings] = useState(false);
   const [selectedClients, setSelectedClients] = useState<number[]>([]);
   const [showApiHelp, setShowApiHelp] = useState(false);
@@ -289,6 +294,38 @@ const Dashboard = ({ onNavigate }: DashboardProps) => {
     }
   };
 
+  // Fetch user subscription data
+  const fetchUserSubscription = async () => {
+    try {
+      const accessToken = localStorage.getItem('auth-token');
+      if (!accessToken) return;
+
+      const response = await fetch('/api/user/profile', {
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+        },
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        if (data.success && data.user) {
+          const trialEndDate = new Date(data.user.trial_ends_at);
+          const currentDate = new Date();
+          const timeDiff = trialEndDate.getTime() - currentDate.getTime();
+          const daysRemaining = Math.ceil(timeDiff / (1000 * 3600 * 24));
+
+          setUserSubscription({
+            subscription_status: data.user.subscription_status,
+            trial_ends_at: data.user.trial_ends_at,
+            daysRemaining: Math.max(0, daysRemaining), // Don't show negative days
+          });
+        }
+      }
+    } catch (error) {
+      console.error('Error fetching user subscription:', error);
+    }
+  };
+
   // Fetch dashboard data
   const fetchDashboardData = async () => {
     try {
@@ -388,6 +425,7 @@ const Dashboard = ({ onNavigate }: DashboardProps) => {
   // Load data on component mount
   useEffect(() => {
     fetchDashboardData();
+    fetchUserSubscription();
   }, []);
 
   // Refresh data when practitioner filter changes
@@ -1039,30 +1077,64 @@ const Dashboard = ({ onNavigate }: DashboardProps) => {
         </div>
 
         <div className="container mx-auto px-8 py-10">
-          {/* Trial Banner */}
-          <div className="p-6 mb-10 bg-gradient-to-r from-warning/5 to-warning/10 border border-warning/20 rounded-2xl shadow-sm">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-4">
-                <div className="p-2 bg-warning/10 rounded-xl">
-                  <AlertTriangle className="h-5 w-5 text-warning" />
+          {/* Trial Banner - Only show for trial users */}
+          {userSubscription && userSubscription.subscription_status === 'trial' && (
+            <div className={`p-6 mb-10 rounded-2xl shadow-sm ${
+              userSubscription.daysRemaining <= 1 
+                ? 'bg-gradient-to-r from-red-50 to-red-100 border border-red-200 dark:from-red-950/20 dark:to-red-900/20 dark:border-red-800/30'
+                : userSubscription.daysRemaining <= 3
+                  ? 'bg-gradient-to-r from-orange-50 to-orange-100 border border-orange-200 dark:from-orange-950/20 dark:to-orange-900/20 dark:border-orange-800/30'
+                  : 'bg-gradient-to-r from-warning/5 to-warning/10 border border-warning/20'
+            }`}>
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-4">
+                  <div className={`p-2 rounded-xl ${
+                    userSubscription.daysRemaining <= 1 
+                      ? 'bg-red-100 dark:bg-red-900/30'
+                      : userSubscription.daysRemaining <= 3
+                        ? 'bg-orange-100 dark:bg-orange-900/30'
+                        : 'bg-warning/10'
+                  }`}>
+                    <AlertTriangle className={`h-5 w-5 ${
+                      userSubscription.daysRemaining <= 1 
+                        ? 'text-red-600 dark:text-red-400'
+                        : userSubscription.daysRemaining <= 3
+                          ? 'text-orange-600 dark:text-orange-400'
+                          : 'text-warning'
+                    }`} />
+                  </div>
+                  <div>
+                    <span className="font-semibold text-foreground">
+                      {userSubscription.daysRemaining === 0 
+                        ? 'Your free trial expires today'
+                        : userSubscription.daysRemaining === 1
+                          ? '1 day left in your free trial'
+                          : `${userSubscription.daysRemaining} days left in your free trial`
+                      }
+                    </span>
+                    <p className="text-sm text-muted-foreground">
+                      {userSubscription.daysRemaining <= 1 
+                        ? 'Upgrade now to avoid service interruption'
+                        : 'Unlock unlimited features and advanced analytics'
+                      }
+                    </p>
+                  </div>
                 </div>
-                <div>
-                  <span className="font-semibold text-foreground">
-                    4 days left in your free trial
-                  </span>
-                  <p className="text-sm text-muted-foreground">
-                    Unlock unlimited features and advanced analytics
-                  </p>
-                </div>
+                <Button
+                  className={`transition-transform hover:scale-105 ${
+                    userSubscription.daysRemaining <= 1
+                      ? 'bg-gradient-to-r from-red-600 to-red-700 text-white hover:from-red-700 hover:to-red-800'
+                      : userSubscription.daysRemaining <= 3
+                        ? 'bg-gradient-to-r from-orange-600 to-orange-700 text-white hover:from-orange-700 hover:to-orange-800'
+                        : 'bg-gradient-to-r from-warning to-warning/90 text-warning-foreground'
+                  }`}
+                  onClick={() => onNavigate?.('settings')}
+                >
+                  {userSubscription.daysRemaining <= 1 ? 'Upgrade Now!' : 'Upgrade Now'}
+                </Button>
               </div>
-              <Button
-                className="bg-gradient-to-r from-warning to-warning/90 text-warning-foreground hover:scale-105 transition-transform"
-                onClick={() => onNavigate?.('settings')}
-              >
-                Upgrade Now
-              </Button>
             </div>
-          </div>
+          )}
 
           {/* KPI Summary */}
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8 mb-12">
