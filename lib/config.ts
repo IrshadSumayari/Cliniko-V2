@@ -1,20 +1,18 @@
 // Configuration file with environment variables
 export const config = {
-  // //Production DB
+  //Production DB
   // supabase: {
-  //   url: 'https://ddsbasqzslznczvqwjph.supabase.co',
-  //   anonKey:
-  //     'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRkc2Jhc3F6c2x6bmN6dnF3anBoIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTU0MjcxMTQsImV4cCI6MjA3MTAwMzExNH0.XaVYKxo7_IAJvfU6psA9cGTuK_XtilV-aB7DDQVQGy8',
-  //   serviceRoleKey:
-  //     'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRkc2Jhc3F6c2x6bmN6dnF3anBoIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc1NTQyNzExNCwiZXhwIjoyMDcxMDAzMTE0fQ.FyF2hv3XAaIU6syZ_FxIRrH1LlpPLPvCtl3N_Uc0ENY',
+  //   url: "https://kbsneyhvuhkkshlmnloa.supabase.co",
+  //   anonKey: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imtic25leWh2dWhra3NobG1ubG9hIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTQzMTU1OTIsImV4cCI6MjA2OTg5MTU5Mn0.PBU7DGi_ystiqCGveVT1vXDoxhNOi7FlMieLbg_NlE4",
+  //   serviceRoleKey: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imtic25leWh2dWhra3NobG1ubG9hIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc1NDMxNTU5MiwiZXhwIjoyMDY5ODkxNTkyfQ.YgngnBUB43vtkI44BdXtx5hefyCgUzSGOHxsIOgtQyw",
   // },
   //Local DB
   supabase: {
-    url: 'https://qolninjhutvsxjbvlhzl.supabase.co',
+    url: 'https://ddsbasqzslznczvqwjph.supabase.co',
     anonKey:
-      'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFvbG5pbmpodXR2c3hqYnZsaHpsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTU0MjU1ODcsImV4cCI6MjA3MTAwMTU4N30.kaDkVeckfu4zJi83iyFoaJJfw9PwVg517Sxguej6stc',
+      'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRkc2Jhc3F6c2x6bmN6dnF3anBoIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTU0MjcxMTQsImV4cCI6MjA3MTAwMzExNH0.XaVYKxo7_IAJvfU6psA9cGTuK_XtilV-aB7DDQVQGy8',
     serviceRoleKey:
-      'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFvbG5pbmpodXR2c3hqYnZsaHpsIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc1NTQyNTU4NywiZXhwIjoyMDcxMDAxNTg3fQ.FbL9xNZhGvqX4x_Vaq7FwwtOnyzLq_l27nGOwJqm_Bg',
+      'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRkc2Jhc3F6c2x6bmN6dnF3anBoIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc1NTQyNzExNCwiZXhwIjoyMDcxMDAzMTE0fQ.FyF2hv3XAaIU6syZ_FxIRrH1LlpPLPvCtl3N_Uc0ENY',
   },
   encryption: {
     secret: '83a22bb4478e7b82a17e27e7ec59c664453ecd630d3cb890cb7e79679b1c5749',
