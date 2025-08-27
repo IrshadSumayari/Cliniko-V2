@@ -1323,7 +1323,7 @@ const Dashboard = ({ onNavigate }: DashboardProps) => {
                     Action Needed
                     <Badge variant="destructive" className="ml-2 animate-pulse">
                       {
-                        clientsData.filter((c) => c.status === 'warning' || c.status === 'critical')
+                        clientsData.filter((c) => c.status === 'warning' || c.remainingSessions > 0)
                           .length
                       }
                     </Badge>

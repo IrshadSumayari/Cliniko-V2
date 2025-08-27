@@ -37,15 +37,17 @@ export async function GET(request: NextRequest) {
     if (userError && userError.code === 'PGRST116') {
       // User doesn't exist in users table, create them first
       console.log('Creating new user in users table for auth user:', user.id);
-      
+
       const { data: newUser, error: createUserError } = await supabase
         .from('users')
         .insert({
           auth_user_id: user.id,
           email: user.email || '',
-          full_name: user.user_metadata?.full_name || 
-                    `${user.user_metadata?.first_name || ''} ${user.user_metadata?.last_name || ''}`.trim() || 
-                    user.email?.split('@')[0] || 'User',
+          full_name:
+            user.user_metadata?.full_name ||
+            `${user.user_metadata?.first_name || ''} ${user.user_metadata?.last_name || ''}`.trim() ||
+            user.email?.split('@')[0] ||
+            'User',
           is_onboarded: false,
           subscription_status: 'trial',
           trial_ends_at: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(), // 7 days from now
@@ -134,14 +136,14 @@ export async function GET(request: NextRequest) {
       console.log('Successfully created profile:', newProfile);
       return NextResponse.json({
         ...newProfile,
-        userTags: userTags || { wc: 'WC', epc: 'EPC' } // Default values if tags not found
+        userTags: userTags || { wc: 'WC', epc: 'EPC' },
       });
     }
 
     // Return profile with user tags
     return NextResponse.json({
       ...profile,
-      userTags: userTags || { wc: 'WC', epc: 'EPC' } // Default values if tags not found
+      userTags: userTags || { wc: 'WC', epc: 'EPC' },
     });
   } catch (error) {
     console.error('Profile GET error:', error);
