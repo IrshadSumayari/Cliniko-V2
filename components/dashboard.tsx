@@ -53,7 +53,14 @@ const Dashboard = ({ onNavigate }: DashboardProps) => {
   const [selectedFilter, setSelectedFilter] = useState('all');
   const [selectedPhysio, setSelectedPhysio] = useState('all');
   const [selectedLocation, setSelectedLocation] = useState('all');
+  const [selectedPractitioner, setSelectedPractitioner] = useState('all');
+  const [practitionerOptions, setPractitionerOptions] = useState([]);
   const [activeTab, setActiveTab] = useState('all-patients');
+  const [userSubscription, setUserSubscription] = useState<{
+    subscription_status: string;
+    trial_ends_at: string;
+    daysRemaining: number;
+  } | null>(null);
   const [showAlertSettings, setShowAlertSettings] = useState(false);
   const [selectedClients, setSelectedClients] = useState<number[]>([]);
   const [showApiHelp, setShowApiHelp] = useState(false);
@@ -287,6 +294,38 @@ const Dashboard = ({ onNavigate }: DashboardProps) => {
     }
   };
 
+  // Fetch user subscription data
+  const fetchUserSubscription = async () => {
+    try {
+      const accessToken = localStorage.getItem('auth-token');
+      if (!accessToken) return;
+
+      const response = await fetch('/api/user/profile', {
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+        },
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        if (data.success && data.user) {
+          const trialEndDate = new Date(data.user.trial_ends_at);
+          const currentDate = new Date();
+          const timeDiff = trialEndDate.getTime() - currentDate.getTime();
+          const daysRemaining = Math.ceil(timeDiff / (1000 * 3600 * 24));
+
+          setUserSubscription({
+            subscription_status: data.user.subscription_status,
+            trial_ends_at: data.user.trial_ends_at,
+            daysRemaining: Math.max(0, daysRemaining), // Don't show negative days
+          });
+        }
+      }
+    } catch (error) {
+      console.error('Error fetching user subscription:', error);
+    }
+  };
+
   // Fetch dashboard data
   const fetchDashboardData = async () => {
     try {
@@ -300,7 +339,13 @@ const Dashboard = ({ onNavigate }: DashboardProps) => {
         return;
       }
 
-      const response = await fetch('/api/dashboard-data', {
+      // Build URL with practitioner filter
+      const url = new URL('/api/dashboard-data', window.location.origin);
+      if (selectedPractitioner && selectedPractitioner !== 'all') {
+        url.searchParams.set('practitioner', selectedPractitioner);
+      }
+
+      const response = await fetch(url.toString(), {
         headers: {
           Authorization: `Bearer ${accessToken}`,
         },
@@ -323,6 +368,11 @@ const Dashboard = ({ onNavigate }: DashboardProps) => {
 
         setClientsData(activePatients);
         setArchivedClients(archivedPatients);
+
+        // Set practitioner options from API response
+        if (data.practitionerOptions) {
+          setPractitionerOptions(data.practitionerOptions);
+        }
 
         // Update KPI data
         setKpiData([
@@ -375,7 +425,13 @@ const Dashboard = ({ onNavigate }: DashboardProps) => {
   // Load data on component mount
   useEffect(() => {
     fetchDashboardData();
+    fetchUserSubscription();
   }, []);
+
+  // Refresh data when practitioner filter changes
+  useEffect(() => {
+    fetchDashboardData();
+  }, [selectedPractitioner]);
 
   const handleSync = async () => {
     setIsSync(true);
@@ -536,6 +592,14 @@ const Dashboard = ({ onNavigate }: DashboardProps) => {
         break;
       case 'pending':
         baseClients = clientsData.filter((client) => client.status === 'pending');
+        break;
+      case 'overdue':
+        baseClients = clientsData.filter((client) => {
+          // Check if patient has exceeded their quota
+          const sessionsUsed = parseInt(client.sessionsUsed) || 0;
+          const quota = parseInt(client.quota) || 0;
+          return sessionsUsed > quota;
+        });
         break;
       case 'archived':
         baseClients = archivedClients;
@@ -816,7 +880,9 @@ const Dashboard = ({ onNavigate }: DashboardProps) => {
 
                   {/* Next Appointment */}
                   <div className="col-span-2">
-                    <p className="text-xs font-medium text-muted-foreground mb-2">Next Visit</p>
+                    <p className="text-xs font-medium text-muted-foreground mb-2">
+                      Last Appointment
+                    </p>
                     <div className="flex items-center gap-2 p-3 bg-gradient-to-r from-accent/40 to-secondary/30 rounded-xl border border-border/40 backdrop-blur-sm">
                       <Calendar className="h-4 w-4 text-primary flex-shrink-0" />
                       <span className="text-sm font-bold text-foreground">
@@ -947,6 +1013,7 @@ const Dashboard = ({ onNavigate }: DashboardProps) => {
                 setSelectedFilter('all');
                 setSelectedPhysio('all');
                 setSelectedLocation('all');
+                setSelectedPractitioner('all');
               }}
               className="gap-2 mt-4"
             >
@@ -1010,30 +1077,64 @@ const Dashboard = ({ onNavigate }: DashboardProps) => {
         </div>
 
         <div className="container mx-auto px-8 py-10">
-          {/* Trial Banner */}
-          <div className="p-6 mb-10 bg-gradient-to-r from-warning/5 to-warning/10 border border-warning/20 rounded-2xl shadow-sm">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-4">
-                <div className="p-2 bg-warning/10 rounded-xl">
-                  <AlertTriangle className="h-5 w-5 text-warning" />
+          {/* Trial Banner - Only show for trial users */}
+          {userSubscription && userSubscription.subscription_status === 'trial' && (
+            <div className={`p-6 mb-10 rounded-2xl shadow-sm ${
+              userSubscription.daysRemaining <= 1 
+                ? 'bg-gradient-to-r from-red-50 to-red-100 border border-red-200 dark:from-red-950/20 dark:to-red-900/20 dark:border-red-800/30'
+                : userSubscription.daysRemaining <= 3
+                  ? 'bg-gradient-to-r from-orange-50 to-orange-100 border border-orange-200 dark:from-orange-950/20 dark:to-orange-900/20 dark:border-orange-800/30'
+                  : 'bg-gradient-to-r from-warning/5 to-warning/10 border border-warning/20'
+            }`}>
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-4">
+                  <div className={`p-2 rounded-xl ${
+                    userSubscription.daysRemaining <= 1 
+                      ? 'bg-red-100 dark:bg-red-900/30'
+                      : userSubscription.daysRemaining <= 3
+                        ? 'bg-orange-100 dark:bg-orange-900/30'
+                        : 'bg-warning/10'
+                  }`}>
+                    <AlertTriangle className={`h-5 w-5 ${
+                      userSubscription.daysRemaining <= 1 
+                        ? 'text-red-600 dark:text-red-400'
+                        : userSubscription.daysRemaining <= 3
+                          ? 'text-orange-600 dark:text-orange-400'
+                          : 'text-warning'
+                    }`} />
+                  </div>
+                  <div>
+                    <span className="font-semibold text-foreground">
+                      {userSubscription.daysRemaining === 0 
+                        ? 'Your free trial expires today'
+                        : userSubscription.daysRemaining === 1
+                          ? '1 day left in your free trial'
+                          : `${userSubscription.daysRemaining} days left in your free trial`
+                      }
+                    </span>
+                    <p className="text-sm text-muted-foreground">
+                      {userSubscription.daysRemaining <= 1 
+                        ? 'Upgrade now to avoid service interruption'
+                        : 'Unlock unlimited features and advanced analytics'
+                      }
+                    </p>
+                  </div>
                 </div>
-                <div>
-                  <span className="font-semibold text-foreground">
-                    4 days left in your free trial
-                  </span>
-                  <p className="text-sm text-muted-foreground">
-                    Unlock unlimited features and advanced analytics
-                  </p>
-                </div>
+                <Button
+                  className={`transition-transform hover:scale-105 ${
+                    userSubscription.daysRemaining <= 1
+                      ? 'bg-gradient-to-r from-red-600 to-red-700 text-white hover:from-red-700 hover:to-red-800'
+                      : userSubscription.daysRemaining <= 3
+                        ? 'bg-gradient-to-r from-orange-600 to-orange-700 text-white hover:from-orange-700 hover:to-orange-800'
+                        : 'bg-gradient-to-r from-warning to-warning/90 text-warning-foreground'
+                  }`}
+                  onClick={() => onNavigate?.('settings')}
+                >
+                  {userSubscription.daysRemaining <= 1 ? 'Upgrade Now!' : 'Upgrade Now'}
+                </Button>
               </div>
-              <Button
-                className="bg-gradient-to-r from-warning to-warning/90 text-warning-foreground hover:scale-105 transition-transform"
-                onClick={() => onNavigate?.('settings')}
-              >
-                Upgrade Now
-              </Button>
             </div>
-          </div>
+          )}
 
           {/* KPI Summary */}
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8 mb-12">
@@ -1151,38 +1252,28 @@ const Dashboard = ({ onNavigate }: DashboardProps) => {
 
                   <div className="h-8 w-px bg-border/60" />
 
-                  {/* Physio Filter - Only show if there are physio names */}
-                  {getUniquePhysios().length > 0 && (
+                  {/* Practitioner Filter - Show if there are practitioner options */}
+                  {practitionerOptions.length > 1 && (
                     <div className="flex items-center gap-3">
                       <span className="text-sm font-medium text-muted-foreground">Physio:</span>
-                      <div className="flex gap-2">
-                        <Button
-                          variant={selectedPhysio === 'all' ? 'default' : 'outline'}
-                          size="sm"
-                          onClick={() => setSelectedPhysio('all')}
-                          className="h-10 px-4"
-                        >
-                          All
-                        </Button>
-                        {getUniquePhysios().map((physio) => (
+                      <div className="flex gap-2 max-w-md overflow-x-auto scrollbar-thin scrollbar-thumb-border scrollbar-track-transparent">
+                        {practitionerOptions.map((option: any) => (
                           <Button
-                            key={physio}
-                            variant={selectedPhysio === physio ? 'default' : 'outline'}
+                            key={option.value}
+                            variant={selectedPractitioner === option.value ? 'default' : 'outline'}
                             size="sm"
-                            onClick={() => setSelectedPhysio(physio)}
-                            className="h-10 px-4"
+                            onClick={() => setSelectedPractitioner(option.value)}
+                            className="h-10 px-4 flex-shrink-0"
                           >
-                            {physio}
+                            {option.label}
                           </Button>
                         ))}
                       </div>
                     </div>
                   )}
 
-                  <div className="h-8 w-px bg-border/60" />
-
                   {/* Location Filter */}
-                  <div className="flex items-center gap-3">
+                  {/* <div className="flex items-center gap-3">
                     <span className="text-sm font-medium text-muted-foreground">Location:</span>
                     <div className="flex gap-2">
                       <Button
@@ -1205,7 +1296,7 @@ const Dashboard = ({ onNavigate }: DashboardProps) => {
                         </Button>
                       ))}
                     </div>
-                  </div>
+                  </div> */}
                 </div>
               </div>
             </div>
@@ -1213,7 +1304,7 @@ const Dashboard = ({ onNavigate }: DashboardProps) => {
             {/* Modern Tabs Interface */}
             <div className="container mx-auto px-8 py-8">
               <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-                <TabsList className="grid w-full grid-cols-4 mb-8 h-14 bg-muted/30 rounded-2xl p-2">
+                <TabsList className="grid w-full grid-cols-5 mb-8 h-14 bg-muted/30 rounded-2xl p-2">
                   <TabsTrigger
                     value="all-patients"
                     className="text-base font-semibold h-10 rounded-xl data-[state=active]:bg-background data-[state=active]:shadow-sm"
@@ -1248,6 +1339,23 @@ const Dashboard = ({ onNavigate }: DashboardProps) => {
                     </Badge>
                   </TabsTrigger>
                   <TabsTrigger
+                    value="overdue"
+                    className="text-base font-semibold h-10 rounded-xl data-[state=active]:bg-background data-[state=active]:shadow-sm"
+                  >
+                    <AlertTriangle className="h-5 w-5 mr-2" />
+                    Overdue
+                    <Badge variant="destructive" className="ml-2">
+                      {
+                        clientsData.filter((c) => {
+                          // Check if patient has exceeded their quota
+                          const sessionsUsed = parseInt(c.sessionsUsed) || 0;
+                          const quota = parseInt(c.quota) || 0;
+                          return sessionsUsed > quota;
+                        }).length
+                      }
+                    </Badge>
+                  </TabsTrigger>
+                  <TabsTrigger
                     value="archived"
                     className="text-base font-semibold h-10 rounded-xl data-[state=active]:bg-background data-[state=active]:shadow-sm"
                   >
@@ -1270,6 +1378,10 @@ const Dashboard = ({ onNavigate }: DashboardProps) => {
 
                 <TabsContent value="pending" className="mt-0">
                   {renderClientList('pending')}
+                </TabsContent>
+
+                <TabsContent value="overdue" className="mt-0">
+                  {renderClientList('overdue')}
                 </TabsContent>
 
                 <TabsContent value="archived" className="mt-0">

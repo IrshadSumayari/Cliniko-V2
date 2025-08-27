@@ -25,6 +25,10 @@ export async function GET(req: NextRequest) {
       );
     }
 
+    // Get filter parameters from URL
+    const { searchParams } = new URL(req.url);
+    const practitionerFilter = searchParams.get('practitioner'); // Get practitioner filter
+
     // Get user's custom tags and PMS type
     const { data: userData, error: userError } = await createAdminClient()
       .from('users')
@@ -61,9 +65,24 @@ export async function GET(req: NextRequest) {
 
 
 
-    // Fetch cases with all necessary data for dashboard
-    // The cases table now only stores cases matching user's custom WC/EPC tags
-    let { data: cases, error: casesError } = await createAdminClient()
+    // Fetch practitioners for filter dropdown
+    const { data: practitioners, error: practitionersError } = await createAdminClient()
+      .from('practitioners')
+      .select('id, display_name, pms_practitioner_id')
+      .eq('user_id', userId)
+      .eq('is_active', true)
+      .order('display_name');
+
+    // Also get unique physio names from cases for practitioners not in practitioners table
+    const { data: casePhysioNames, error: physioError } = await createAdminClient()
+      .from('cases')
+      .select('physio_name, pms_practitioner_id')
+      .eq('user_id', userId)
+      .not('physio_name', 'is', null)
+      .not('physio_name', 'eq', 'Unknown Practitioner');
+
+    // Build practitioner filter query
+    let casesQuery = createAdminClient()
       .from('cases')
       .select(`
         id,
@@ -91,7 +110,15 @@ export async function GET(req: NextRequest) {
         created_at,
         updated_at
       `)
-      .eq('user_id', userId); // No need to filter - cases table already contains only matching cases
+      .eq('user_id', userId);
+
+    // Apply practitioner filter if specified
+    if (practitionerFilter && practitionerFilter !== 'all') {
+      casesQuery = casesQuery.eq('physio_name', practitionerFilter);
+    }
+
+    // Fetch cases with filtering applied
+    let { data: cases, error: casesError } = await casesQuery;
 
     if (casesError) {
       return NextResponse.json(
@@ -255,6 +282,43 @@ export async function GET(req: NextRequest) {
         physios: uniquePhysios,
         locations: uniqueLocations
       },
+      practitionerOptions: [
+        { value: 'all', label: 'All' },
+        // Add practitioners from practitioners table
+        ...(practitioners || []).map((p: any) => ({
+          value: p.display_name,
+          label: p.display_name,
+          id: p.id,
+          pms_id: p.pms_practitioner_id
+        })),
+        // Add unique physio names from cases that aren't in practitioners table
+        ...(casePhysioNames || [])
+          .filter((c: any) => {
+            // Only include if not already in practitioners list
+            return !(practitioners || []).some((p: any) => 
+              p.display_name === c.physio_name || 
+              p.pms_practitioner_id === c.pms_practitioner_id
+            );
+          })
+          .reduce((unique: any[], current: any) => {
+            // Remove duplicates from cases
+            if (!unique.some(u => u.physio_name === current.physio_name)) {
+              unique.push(current);
+            }
+            return unique;
+          }, [])
+          .map((c: any) => ({
+            value: c.physio_name,
+            label: c.physio_name,
+            id: null,
+            pms_id: c.pms_practitioner_id
+          }))
+      ].sort((a, b) => {
+        if (a.value === 'all') return -1;
+        if (b.value === 'all') return 1;
+        return a.label.localeCompare(b.label);
+      }),
+      currentFilter: practitionerFilter || 'all',
       lastSync: new Date().toISOString(),
       userTags: {
         wcTag,

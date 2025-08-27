@@ -73,6 +73,30 @@ export async function GET(request: NextRequest) {
           );
         }
 
+        // Sync practitioners after main sync completes successfully
+        if (result?.success) {
+          console.log(`[CRON] Syncing practitioners for user ${credential.user_id}...`);
+          try {
+            await syncPractitioners(supabase, credential.user_id, pmsClient, credential.pms_type);
+            console.log('[CRON] Practitioner sync completed successfully');
+            
+            // Populate cases with practitioner data after sync
+            console.log(`[CRON] Populating cases with practitioner data for user ${credential.user_id}...`);
+            const { error: casesError } = await supabase.rpc('populate_cases_from_existing_data', {
+              p_user_id: credential.user_id,
+            });
+            
+            if (casesError) {
+              console.error('[CRON] Error populating cases:', casesError);
+            } else {
+              console.log('[CRON] Cases population completed successfully');
+            }
+          } catch (practitionerError) {
+            console.error('[CRON] Error syncing practitioners:', practitionerError);
+            // Don't fail the whole sync if practitioners fail
+          }
+        }
+
         syncResults.push({
           userId: credential.user_id,
           pmsType: credential.pms_type,
@@ -204,6 +228,8 @@ async function performIncrementalSync(
               pms_type: pmsType,
               appointment_date: appointment.appointment_start,
               appointment_type: appointment.appointment_type?.name,
+              appointment_type_id: appointment.appointment_type?.id || null,
+              practitioner_id: appointment.practitioner?.id || null,
               practitioner_name: appointment.practitioner?.name,
               status: appointment.status,
               duration_minutes: appointment.duration,
@@ -424,7 +450,8 @@ async function performNookalBatchSync(
                   pms_type: 'nookal',
                   appointment_date: appointment.appointment_date || appointment.date,
                   appointment_type: appointment.appointment_type?.name || appointment.type,
-                  appointment_type_id: appointment.appointmentTypeID || null,
+                  appointment_type_id: appointment.appointmentTypeID || appointment.appointment_type_id || null,
+                  practitioner_id: appointment.practitionerID || appointment.practitioner_id || null,
                   practitioner_name: appointment.practitioner?.name || appointment.physioName,
                   status: appointment.status,
                   duration_minutes: appointment.duration || appointment.durationMinutes,
@@ -497,5 +524,67 @@ async function performNookalBatchSync(
       syncType: 'batch',
       error: error instanceof Error ? error.message : 'Unknown error',
     };
+  }
+}
+
+// Sync practitioners from PMS and store in database
+async function syncPractitioners(supabase: any, userId: string, pmsApi: any, pmsType: string) {
+  try {
+    console.log(`[PRACTITIONERS] Starting practitioner sync for user ${userId} (${pmsType})...`);
+    
+    // Fetch practitioners from PMS API
+    const practitioners = await pmsApi.getPractitioners();
+    console.log(`[PRACTITIONERS] Found ${practitioners.length} practitioners from ${pmsType}`);
+    
+    if (practitioners.length === 0) {
+      console.log('[PRACTITIONERS] No practitioners found, skipping sync');
+      return;
+    }
+    
+    let syncedCount = 0;
+    let errorCount = 0;
+    
+    for (const practitioner of practitioners) {
+      try {
+        // Prepare practitioner data for database
+        const practitionerData = {
+          user_id: userId,
+          pms_practitioner_id: practitioner.id.toString(),
+          pms_type: pmsType,
+          first_name: practitioner.first_name || null,
+          last_name: practitioner.last_name || null,
+          username: practitioner.username || null,
+          display_name: practitioner.display_name || `${practitioner.first_name || ''} ${practitioner.last_name || ''}`.trim(),
+          email: practitioner.email || null,
+          is_active: practitioner.is_active !== false,
+          updated_at: new Date().toISOString()
+        };
+        
+        // Upsert practitioner (insert or update if exists)
+        const { error: upsertError } = await supabase
+          .from('practitioners')
+          .upsert(practitionerData, {
+            onConflict: 'user_id,pms_practitioner_id,pms_type'
+          });
+          
+        if (upsertError) {
+          console.error(`[PRACTITIONERS] Error upserting practitioner ${practitioner.id}:`, upsertError);
+          errorCount++;
+        } else {
+          syncedCount++;
+          console.log(`[PRACTITIONERS] Synced: ${practitionerData.display_name} (ID: ${practitioner.id})`);
+        }
+        
+      } catch (error) {
+        console.error(`[PRACTITIONERS] Error processing practitioner ${practitioner.id}:`, error);
+        errorCount++;
+      }
+    }
+    
+    console.log(`[PRACTITIONERS] Sync completed: ${syncedCount} synced, ${errorCount} errors`);
+    
+  } catch (error) {
+    console.error('[PRACTITIONERS] Error during practitioner sync:', error);
+    throw error;
   }
 }

@@ -45,60 +45,95 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const fetchUserData = async (authUser: User): Promise<AuthUser> => {
     try {
       console.log('Fetching user data for:', authUser.id);
-      
-      // Add timeout protection for database queries
-      const queryPromise = supabase
-        .from('users')
-        .select('is_onboarded')
-        .eq('auth_user_id', authUser.id)
-        .single();
-      
-      const timeoutPromise = new Promise<never>((_, reject) => {
-        setTimeout(() => reject(new Error('Database query timeout')), 8000); // 8 second timeout
-      });
 
-      const { data: userData, error } = await Promise.race([queryPromise, timeoutPromise]);
+      // First, try to get onboarding status from localStorage as a fast fallback
+      let cachedOnboardingStatus: boolean | null = null;
+      try {
+        const storedStatus = localStorage.getItem('user_onboarding_status');
+        if (storedStatus) {
+          cachedOnboardingStatus = storedStatus === 'true';
+          console.log('Found cached onboarding status in localStorage:', cachedOnboardingStatus);
+        }
+      } catch (localStorageError) {
+        console.warn('Failed to read from localStorage:', localStorageError);
+      }
+
+      let userData: any = null;
+      let error: any = null;
+      let retryCount = 0;
+      const maxRetries = 2;
+
+      while (retryCount <= maxRetries) {
+        try {
+          const queryPromise = supabase
+            .from('users')
+            .select('is_onboarded')
+            .eq('auth_user_id', authUser.id)
+            .single();
+
+          const timeoutPromise = new Promise<never>((_, reject) => {
+            setTimeout(() => reject(new Error('Database query timeout')), 30000); // Increased to 30 seconds for heavy operations
+          });
+
+          const result = await Promise.race([queryPromise, timeoutPromise]);
+          userData = result.data;
+          error = result.error;
+          break;
+        } catch (retryError) {
+          retryCount++;
+          if (retryCount > maxRetries) {
+            error = retryError;
+            break;
+          }
+          console.log(
+            `Database query attempt ${retryCount} failed, retrying... (${retryError instanceof Error ? retryError.message : 'Unknown error'})`
+          );
+          await new Promise((resolve) => setTimeout(resolve, 1000 * retryCount));
+        }
+      }
 
       if (error) {
         console.error('Error fetching user data:', error);
-        
+
         // If user doesn't exist in database, default to not onboarded
         // Don't sign them out - they are still authenticated
         if (error.code === 'PGRST116') {
           console.log('User not found in database, defaulting to not onboarded');
           return { ...authUser, isOnboarded: false };
         }
-        
+
         // For other database errors, also default to not onboarded but keep them authenticated
         console.log('Database error, defaulting to not onboarded. Error:', error.message);
-        
-        // Try to get onboarding status from localStorage as fallback
-        try {
-          const storedStatus = localStorage.getItem('user_onboarding_status');
-          if (storedStatus) {
-            const isOnboarded = storedStatus === 'true';
-            console.log('Using localStorage fallback for onboarding status:', isOnboarded);
-            return { ...authUser, isOnboarded };
-          }
-        } catch (localStorageError) {
-          console.warn('Failed to read from localStorage:', localStorageError);
+
+        // Use cached status if available, otherwise default to not onboarded
+        if (cachedOnboardingStatus !== null) {
+          console.log('Using cached onboarding status from localStorage:', cachedOnboardingStatus);
+          return { ...authUser, isOnboarded: cachedOnboardingStatus };
         }
-        
+
         return { ...authUser, isOnboarded: false };
       }
 
       console.log('User data fetched successfully:', userData);
+
+      // Store the onboarding status in localStorage for future fallback
+      try {
+        localStorage.setItem('user_onboarding_status', String(userData?.is_onboarded || false));
+      } catch (localStorageError) {
+        console.warn('Failed to store onboarding status in localStorage:', localStorageError);
+      }
+
       return {
         ...authUser,
         isOnboarded: userData?.is_onboarded || false,
       };
     } catch (error) {
       console.error('Error in fetchUserData:', error);
-      
+
       // If it's a timeout or connection error, default to not onboarded
       if (error instanceof Error && error.message.includes('timeout')) {
         console.log('Database query timed out, defaulting to not onboarded');
-        
+
         // Try to get onboarding status from localStorage as fallback
         try {
           const storedStatus = localStorage.getItem('user_onboarding_status');
@@ -110,10 +145,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         } catch (localStorageError) {
           console.warn('Failed to read from localStorage:', localStorageError);
         }
-        
+
         return { ...authUser, isOnboarded: false };
       }
-      
+
       // For any other errors, default to not onboarded but keep them authenticated
       console.log('Unexpected error in fetchUserData, defaulting to not onboarded');
       return { ...authUser, isOnboarded: false };
@@ -178,7 +213,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const initializeAuth = async () => {
       try {
         console.log('Initializing token-based auth...');
-        
+
         // Add timeout protection for auth initialization
         const authPromise = validateTokenAndGetUser();
         const timeoutPromise = new Promise<never>((_, reject) => {
@@ -189,13 +224,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
         if (authUser && mounted) {
           console.log('Valid token found, fetching user data...');
-          
+
           // Store the token in localStorage for consistency
           const token = getAccessToken();
           if (token) {
             localStorage.setItem('auth-token', token);
           }
-          
+
           try {
             const userWithData = await fetchUserData(authUser);
             if (mounted) {
@@ -244,13 +279,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             if (session.access_token) {
               localStorage.setItem('auth-token', session.access_token);
             }
-            
+
             const userWithData = await fetchUserData(session.user);
             if (mounted) {
               setUser(userWithData);
             }
           } catch (dbError) {
-            console.error('Database query failed during sign in, but user is authenticated:', dbError);
+            console.error(
+              'Database query failed during sign in, but user is authenticated:',
+              dbError
+            );
             // Even if database fails, we know the user is authenticated
             if (mounted) {
               setUser({ ...session.user, isOnboarded: false });
@@ -259,7 +297,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         } else if (event === 'SIGNED_OUT') {
           // Remove the auth token from localStorage
           localStorage.removeItem('auth-token');
-          
+
           if (mounted) {
             setUser(null);
           }
@@ -269,13 +307,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             if (session.access_token) {
               localStorage.setItem('auth-token', session.access_token);
             }
-            
+
             const userWithData = await fetchUserData(session.user);
             if (mounted) {
               setUser(userWithData);
             }
           } catch (dbError) {
-            console.error('Database query failed during token refresh, but user is authenticated:', dbError);
+            console.error(
+              'Database query failed during token refresh, but user is authenticated:',
+              dbError
+            );
             // Even if database fails, we know the user is authenticated
             if (mounted) {
               setUser({ ...session.user, isOnboarded: false });
@@ -319,33 +360,40 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       return false;
     }
 
-    console.log('updateUserOnboardingStatus called with:', { isOnboarded, userId: user.id, userEmail: user.email });
+    console.log('updateUserOnboardingStatus called with:', {
+      isOnboarded,
+      userId: user.id,
+      userEmail: user.email,
+    });
     setIsLoading(true);
-    
+
     try {
       console.log('Updating onboarding status to:', isOnboarded, 'for user:', user.id);
 
       // Add timeout protection for database operations
       const dbTimeout = 10000; // 10 seconds
-      
+
       // First, let's check if the user exists in the database
       const checkPromise = supabase
         .from('users')
         .select('id, auth_user_id, is_onboarded')
         .eq('auth_user_id', user.id)
         .single();
-      
+
       const timeoutPromise = new Promise<never>((_, reject) => {
         setTimeout(() => reject(new Error('Database operation timeout')), dbTimeout);
       });
 
-      const { data: existingUser, error: checkError } = await Promise.race([checkPromise, timeoutPromise]);
+      const { data: existingUser, error: checkError } = await Promise.race([
+        checkPromise,
+        timeoutPromise,
+      ]);
 
       if (checkError) {
         console.error('Error checking existing user:', checkError);
         if (checkError.code === 'PGRST116') {
           console.log('User not found in database, creating new user record...');
-          
+
           // Create a new user record with timeout
           const createPromise = supabase
             .from('users')
@@ -359,7 +407,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             .select('id, is_onboarded')
             .single();
 
-          const { data: newUser, error: createError } = await Promise.race([createPromise, timeoutPromise]);
+          const { data: newUser, error: createError } = await Promise.race([
+            createPromise,
+            timeoutPromise,
+          ]);
 
           if (createError) {
             console.error('Error creating new user record:', createError);
@@ -372,13 +423,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         }
       } else {
         console.log('Existing user found:', existingUser);
-        
+
         // Update existing user with timeout
         const updatePromise = supabase
           .from('users')
-          .update({ 
+          .update({
             is_onboarded: isOnboarded,
-            updated_at: new Date().toISOString()
+            updated_at: new Date().toISOString(),
           })
           .eq('auth_user_id', user.id)
           .select('is_onboarded');
@@ -396,7 +447,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       // Update local state directly without calling refreshUserData to prevent loops
       setUser((prev) => (prev ? { ...prev, isOnboarded } : null));
       console.log('Local user state updated successfully');
-      
+
       // Also store in localStorage as a fallback
       try {
         localStorage.setItem('user_onboarding_status', isOnboarded.toString());
@@ -534,7 +585,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     try {
       // Remove the auth token from localStorage
       localStorage.removeItem('auth-token');
-      
+
       await supabase.auth.signOut();
       setUser(null);
       // Don't set loading to true during signout to prevent infinite loops

@@ -386,27 +386,6 @@ async function calculateAndUpdatePatientSessions(
 ) {
   try {
     console.log(`[SESSIONS] Starting session calculation for user ${userId}`);
-    
-    // Determine the active year based on user's latest appointment
-    const { data: latestAppointment } = await supabase
-      .from('appointments')
-      .select('appointment_date')
-      .eq('user_id', userId)
-      .in('status', ['completed', 'attended', 'finished'])
-      .order('appointment_date', { ascending: false })
-      .limit(1)
-      .single();
-
-    const activeYear = latestAppointment 
-      ? new Date(latestAppointment.appointment_date).getFullYear()
-      : new Date().getFullYear();
-
-    console.log(`[SESSIONS] Using active year: ${activeYear} for user ${userId}`);
-    if (latestAppointment) {
-      console.log(`[SESSIONS] Latest appointment date: ${latestAppointment.appointment_date}`);
-    } else {
-      console.log(`[SESSIONS] No appointments found, using current year: ${activeYear}`);
-    }
 
     // Get appointment type IDs that match the user's tags
     const { data: wcAppointmentTypes } = await supabase
@@ -472,7 +451,6 @@ async function calculateAndUpdatePatientSessions(
           patient,
           wcTag,
           epcTag,
-          activeYear,
           wcTypeIds,
           epcTypeIds
         );
@@ -513,7 +491,6 @@ async function calculatePatientSessionsOptimized(
   patient: any,
   wcTag: string,
   epcTag: string,
-  activeYear: number,
   wcTypeIds: string[],
   epcTypeIds: string[]
 ) {
@@ -537,62 +514,32 @@ async function calculatePatientSessionsOptimized(
       quota = 8; // Default WC quota
       
     } else if (patient.patient_type === 'EPC') {
-      // EPC: STRICTLY count only current active year sessions
+      // EPC: Count sessions from the patient's most recent appointment year
       if (epcTypeIds.length > 0) {
-        // DEBUG: Show all EPC appointments for this patient
         const allEpcAppointments = patientAppointments.filter((apt: any) => 
-          epcTypeIds.includes(apt.appointment_type_id)
+          epcTypeIds.includes(apt.appointment_type_id) && 
+          ['completed', 'attended', 'finished'].includes(apt.status)
         );
         
-        console.log(`[SESSIONS] EPC Patient ${patient.id}: Found ${allEpcAppointments.length} total EPC appointments`);
-        
-        // Show breakdown by year for debugging
-        const appointmentsByYear = new Map();
-        allEpcAppointments.forEach((apt: any) => {
-          const year = new Date(apt.appointment_date).getFullYear();
-          const status = apt.status;
-          if (!appointmentsByYear.has(year)) {
-            appointmentsByYear.set(year, { total: 0, completed: 0, other: 0 });
-          }
-          const yearData = appointmentsByYear.get(year);
-          yearData.total++;
-          if (['completed', 'attended', 'finished'].includes(status)) {
-            yearData.completed++;
-          } else {
-            yearData.other++;
-          }
-        });
-        
-        console.log(`[SESSIONS] EPC Patient ${patient.id}: Appointments by year:`, Object.fromEntries(appointmentsByYear));
-        console.log(`[SESSIONS] EPC Patient ${patient.id}: Active year for counting: ${activeYear}`);
-        
-        // CRITICAL FIX: Only count appointments from the active year
-        sessionsUsed = patientAppointments.filter((apt: any) => {
-          // Must match EPC appointment type
-          if (!epcTypeIds.includes(apt.appointment_type_id)) return false;
+        if (allEpcAppointments.length > 0) {
+          // Find the most recent EPC appointment year for THIS patient
+          const latestEpcAppointment = allEpcAppointments.sort((a, b) => 
+            new Date(b.appointment_date).getTime() - new Date(a.appointment_date).getTime()
+          )[0];
           
-          // Must be completed/attended/finished
-          if (!['completed', 'attended', 'finished'].includes(apt.status)) return false;
+          const patientActiveYear = new Date(latestEpcAppointment.appointment_date).getFullYear();
           
-          // CRITICAL: Must be from the active year only
-          const appointmentYear = new Date(apt.appointment_date).getFullYear();
-          const isFromActiveYear = appointmentYear === activeYear;
+          // Count sessions from the patient's most recent appointment year
+          sessionsUsed = allEpcAppointments.filter((apt: any) => {
+            const appointmentYear = new Date(apt.appointment_date).getFullYear();
+            return appointmentYear === patientActiveYear;
+          }).length;
           
-          if (!isFromActiveYear) {
-            console.log(`[SESSIONS] EPC Patient ${patient.id}: Skipping appointment from ${appointmentYear} (not from active year ${activeYear})`);
-            return false;
-          }
-          
-          return true;
-        }).length;
-        
-        console.log(`[SESSIONS] EPC Patient ${patient.id}: Found ${sessionsUsed} completed ${epcTag} sessions ONLY from ${activeYear} (strictly filtered)`);
-         
-         // REMOVED: Safety cap - let users see actual session count and modify quota as needed
-         // if (sessionsUsed > quota) {
-         //   console.warn(`[SESSIONS] WARNING: EPC Patient ${patient.id} has ${sessionsUsed} sessions but quota is ${quota}. Capping at quota.`);
-         //   sessionsUsed = quota; // Cap at quota to prevent overflow
-         // }
+          console.log(`[SESSIONS] EPC Patient ${patient.id}: Using patient's active year ${patientActiveYear}, found ${sessionsUsed} completed sessions`);
+        } else {
+          sessionsUsed = 0;
+          console.log(`[SESSIONS] EPC Patient ${patient.id}: No completed EPC appointments found`);
+        }
       }
       quota = 5; // EPC quota per calendar year
     }

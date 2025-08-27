@@ -40,21 +40,18 @@ export async function POST(req: NextRequest) {
     // Get the authorization header
     const authHeader = req.headers.get('authorization');
     if (!authHeader || !authHeader.startsWith('Bearer ')) {
-      return NextResponse.json(
-        { error: 'Authentication required.' },
-        { status: 401 }
-      );
+      return NextResponse.json({ error: 'Authentication required.' }, { status: 401 });
     }
 
     const token = authHeader.replace('Bearer ', '');
-    
+
     // Get user from token
-    const { data: { user }, error: authError } = await createAdminClient().auth.getUser(token);
+    const {
+      data: { user },
+      error: authError,
+    } = await createAdminClient().auth.getUser(token);
     if (authError || !user) {
-      return NextResponse.json(
-        { error: 'Invalid or expired token.' },
-        { status: 500 }
-      );
+      return NextResponse.json({ error: 'Invalid or expired token.' }, { status: 500 });
     }
 
     // Check subscription status
@@ -65,10 +62,7 @@ export async function POST(req: NextRequest) {
       .single();
 
     if (userError) {
-      return NextResponse.json(
-        { error: 'Failed to fetch user data.' },
-        { status: 500 }
-      );
+      return NextResponse.json({ error: 'Failed to fetch user data.' }, { status: 500 });
     }
 
     // Check if trial expired and no subscription
@@ -77,11 +71,14 @@ export async function POST(req: NextRequest) {
     const isTrialExpired = now > trialEndsAt && userData.subscription_status === 'trial';
 
     if (isTrialExpired) {
-      return NextResponse.json({
-        success: false,
-        error: 'Trial expired. Please upgrade to continue syncing data.',
-        dashboardLocked: true
-      }, { status: 402 });
+      return NextResponse.json(
+        {
+          success: false,
+          error: 'Trial expired. Please upgrade to continue syncing data.',
+          dashboardLocked: true,
+        },
+        { status: 402 }
+      );
     }
 
     const userId = userData.id;
@@ -109,22 +106,19 @@ export async function POST(req: NextRequest) {
         pms_type: pmsType,
         sync_type: 'manual',
         status: 'running',
-        started_at: new Date().toISOString()
+        started_at: new Date().toISOString(),
       })
       .select()
       .single();
 
     if (syncLogError) {
-      return NextResponse.json(
-        { error: 'Failed to create sync log.' },
-        { status: 500 }
-      );
+      return NextResponse.json({ error: 'Failed to create sync log.' }, { status: 500 });
     }
 
     try {
       // Step 1: Fetch PMS data (incremental)
       const pmsData = await fetchPMSData(pmsType, lastSyncTime, token);
-      
+
       if (!pmsData.success) {
         throw new Error(pmsData.error);
       }
@@ -139,14 +133,29 @@ export async function POST(req: NextRequest) {
       );
 
       // Step 3: Update database
-      const dbResult = await updateDatabase(
-        processedData,
-        userId,
-        pmsType
-      );
+      const dbResult = await updateDatabase(processedData, userId, pmsType);
 
       // Step 4: Create cases from synced data
       console.log(`Creating cases for user ${userId}...`);
+      // Step 3.5: Sync practitioners from PMS
+      console.log('[SYNC ENGINE] Syncing practitioners from PMS...');
+      try {
+        // We'll need to get the PMS API instance here
+        // For now, we'll make a call to the PMS sync-data endpoint to handle practitioners
+        const practitionerResponse = await fetch(`/api/pms/sync-practitioners?pmsType=${pmsType}`, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+
+        if (practitionerResponse.ok) {
+          console.log('[SYNC ENGINE] Practitioner sync completed successfully');
+        } else {
+          console.warn('[SYNC ENGINE] Practitioner sync failed, continuing with case creation');
+        }
+      } catch (practitionerError) {
+        console.error('[SYNC ENGINE] Error syncing practitioners:', practitionerError);
+        // Don't fail the whole sync if practitioners fail
+      }
+
       const casesResult = await createCasesFromSyncedData(
         processedData,
         userId,
@@ -171,7 +180,7 @@ export async function POST(req: NextRequest) {
           cases_created: casesResult.casesCreated || 0,
           cases_updated: casesResult.casesUpdated || 0,
           completed_at: new Date().toISOString(),
-          last_modified_sync: new Date().toISOString()
+          last_modified_sync: new Date().toISOString(),
         })
         .eq('id', syncLog.id);
 
@@ -190,9 +199,8 @@ export async function POST(req: NextRequest) {
         errors: [],
         lastSyncTime: new Date().toISOString(),
         nextSyncTime,
-        message: 'Sync completed successfully'
+        message: 'Sync completed successfully',
       });
-
     } catch (error) {
       // Update sync log with error
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
@@ -202,27 +210,29 @@ export async function POST(req: NextRequest) {
           status: 'failed',
           errors_count: 1,
           error_details: { error: errorMessage },
-          completed_at: new Date().toISOString()
+          completed_at: new Date().toISOString(),
         })
         .eq('id', syncLog.id);
 
       throw error;
     }
-
   } catch (error) {
     console.error('Sync engine error:', error);
     const errorMessage = error instanceof Error ? error.message : 'Sync failed';
-    return NextResponse.json({
-      success: false,
-      error: errorMessage,
-      patientsProcessed: 0,
-      patientsAdded: 0,
-      patientsUpdated: 0,
-      appointmentsSynced: 0,
-      errors: [errorMessage],
-      lastSyncTime: new Date().toISOString(),
-      nextSyncTime: new Date(Date.now() + 4 * 60 * 60 * 1000).toISOString()
-    }, { status: 500 });
+    return NextResponse.json(
+      {
+        success: false,
+        error: errorMessage,
+        patientsProcessed: 0,
+        patientsAdded: 0,
+        patientsUpdated: 0,
+        appointmentsSynced: 0,
+        errors: [errorMessage],
+        lastSyncTime: new Date().toISOString(),
+        nextSyncTime: new Date(Date.now() + 4 * 60 * 60 * 1000).toISOString(),
+      },
+      { status: 500 }
+    );
   }
 }
 
@@ -231,14 +241,14 @@ async function fetchPMSData(pmsType: string, lastSyncTime: string, token: string
   try {
     // This would integrate with your existing PMS API endpoints
     // For now, we'll simulate the data structure
-    
+
     // In production, you would:
     // 1. Use the stored API key for the specific PMS
     // 2. Make API calls to fetch incremental data
     // 3. Handle rate limiting and pagination
-    
+
     const response = await fetch(`/api/pms/sync-data?pmsType=${pmsType}&lastSync=${lastSyncTime}`, {
-      headers: { 'Authorization': `Bearer ${token}` }
+      headers: { Authorization: `Bearer ${token}` },
     });
 
     if (!response.ok) {
@@ -260,42 +270,44 @@ async function processPMSData(
   userId: string
 ) {
   // Filter only completed appointments using status field
-  const completedAppointments = appointments.filter(apt => 
-    apt.status === 'completed' || apt.status === 'attended' || apt.status === 'finished'
+  const completedAppointments = appointments.filter(
+    (apt) => apt.status === 'completed' || apt.status === 'attended' || apt.status === 'finished'
   );
-  
+
   console.log(`[SYNC ENGINE] Total appointments: ${appointments.length}`);
   console.log(`[SYNC ENGINE] Completed appointments: ${completedAppointments.length}`);
-  
+
   // Filter appointments by funding scheme
-  const relevantAppointments = completedAppointments.filter(apt => 
-    apt.appointment_type === wcTag || apt.appointment_type === epcTag
+  const relevantAppointments = completedAppointments.filter(
+    (apt) => apt.appointment_type === wcTag || apt.appointment_type === epcTag
   );
-  
-  console.log(`[SYNC ENGINE] Relevant appointments (${wcTag}/${epcTag}): ${relevantAppointments.length}`);
+
+  console.log(
+    `[SYNC ENGINE] Relevant appointments (${wcTag}/${epcTag}): ${relevantAppointments.length}`
+  );
 
   // Determine the active year based on user's latest appointment
   const activeYear = await determineActiveYear(userId);
   console.log(`[SYNC ENGINE] Using active year: ${activeYear} for user ${userId}`);
 
   // Process patients with their appointments
-  const processedPatients = patients.map(patient => {
-    const patientAppointments = relevantAppointments.filter(apt => apt.patient_id === patient.id);
-    
+  const processedPatients = patients.map((patient) => {
+    const patientAppointments = relevantAppointments.filter((apt) => apt.patient_id === patient.id);
+
     // Count sessions by type using smart counting logic
     const wcSessions = countWCSessions(patientAppointments, wcTag);
     const epcSessions = countEPCSessions(patientAppointments, epcTag, activeYear);
-    
+
     // Determine patient type and calculate quota
     let patientType = patient.patient_type;
     let sessionsUsed = 0;
     let totalSessions = 5; // Default EPC quota
-    
+
     if (wcSessions > 0) {
       patientType = 'WC';
       sessionsUsed = wcSessions;
       totalSessions = 8; // Default WC quota
-      
+
       // TODO: Add injury_date field to patients table for proper old injury logic
       // For now, we'll use the default 8 sessions
       // if (patient.injury_date && isOlderThan3Months(patient.injury_date)) {
@@ -307,20 +319,22 @@ async function processPMSData(
       totalSessions = 5; // EPC quota per calendar year
     }
 
-    console.log(`[SYNC ENGINE] Patient ${patient.id} (${patientType}): ${sessionsUsed}/${totalSessions} sessions`);
+    console.log(
+      `[SYNC ENGINE] Patient ${patient.id} (${patientType}): ${sessionsUsed}/${totalSessions} sessions`
+    );
 
     return {
       ...patient,
       patient_type: patientType,
       sessions_used: sessionsUsed,
       total_sessions: totalSessions,
-      remaining_sessions: Math.max(0, totalSessions - sessionsUsed)
+      remaining_sessions: Math.max(0, totalSessions - sessionsUsed),
     };
   });
 
   return {
     patients: processedPatients,
-    appointments: relevantAppointments
+    appointments: relevantAppointments,
   };
 }
 
@@ -339,15 +353,18 @@ async function determineActiveYear(userId: string): Promise<number> {
 
     if (latestAppointment) {
       const activeYear = new Date(latestAppointment.appointment_date).getFullYear();
-      console.log(`[SYNC ENGINE] Latest appointment date: ${latestAppointment.appointment_date}, using year: ${activeYear}`);
+      console.log(
+        `[SYNC ENGINE] Latest appointment date: ${latestAppointment.appointment_date}, using year: ${activeYear}`
+      );
       return activeYear;
     }
 
     // If no appointments in database, use current year
     const currentYear = new Date().getFullYear();
-    console.log(`[SYNC ENGINE] No appointments found in database, using current year: ${currentYear}`);
+    console.log(
+      `[SYNC ENGINE] No appointments found in database, using current year: ${currentYear}`
+    );
     return currentYear;
-
   } catch (error) {
     console.error(`[SYNC ENGINE] Error determining active year:`, error);
     const currentYear = new Date().getFullYear();
@@ -358,21 +375,27 @@ async function determineActiveYear(userId: string): Promise<number> {
 
 // Function to count WorkCover sessions (injury-based, no year limit)
 function countWCSessions(appointments: AppointmentData[], wcTag: string): number {
-  const wcCount = appointments.filter(apt => apt.appointment_type === wcTag).length;
+  const wcCount = appointments.filter((apt) => apt.appointment_type === wcTag).length;
   console.log(`[SYNC ENGINE] Found ${wcCount} WC sessions for tag: ${wcTag}`);
   return wcCount;
 }
 
 // Function to count EPC sessions (calendar year based)
-function countEPCSessions(appointments: AppointmentData[], epcTag: string, activeYear: number): number {
-  const epcCount = appointments.filter(apt => {
+function countEPCSessions(
+  appointments: AppointmentData[],
+  epcTag: string,
+  activeYear: number
+): number {
+  const epcCount = appointments.filter((apt) => {
     if (apt.appointment_type !== epcTag) return false;
-    
+
     const appointmentYear = new Date(apt.appointment_date).getFullYear();
     return appointmentYear === activeYear;
   }).length;
-  
-  console.log(`[SYNC ENGINE] Found ${epcCount} EPC sessions for tag: ${epcTag} in year: ${activeYear}`);
+
+  console.log(
+    `[SYNC ENGINE] Found ${epcCount} EPC sessions for tag: ${epcTag} in year: ${activeYear}`
+  );
   return epcCount;
 }
 
@@ -414,32 +437,30 @@ async function updateDatabase(processedData: any, userId: string, pmsType: strin
             pms_last_modified: patient.pms_last_modified,
             sessions_used: patient.sessions_used,
             total_sessions: patient.total_sessions,
-            updated_at: new Date().toISOString()
+            updated_at: new Date().toISOString(),
           })
           .eq('id', existingPatient.id);
-        
+
         patientsUpdated++;
       } else {
         // Insert new patient
-        await createAdminClient()
-          .from('patients')
-          .insert({
-            user_id: userId,
-            pms_patient_id: patient.id,
-            pms_type: pmsType,
-            first_name: patient.first_name,
-            last_name: patient.last_name,
-            email: patient.email,
-            phone: patient.phone,
-            date_of_birth: patient.date_of_birth,
-            patient_type: patient.patient_type,
-            physio_name: patient.physio_name,
-            pms_last_modified: patient.pms_last_modified,
-            sessions_used: patient.sessions_used,
-            total_sessions: patient.total_sessions,
-            is_active: true
-          });
-        
+        await createAdminClient().from('patients').insert({
+          user_id: userId,
+          pms_patient_id: patient.id,
+          pms_type: pmsType,
+          first_name: patient.first_name,
+          last_name: patient.last_name,
+          email: patient.email,
+          phone: patient.phone,
+          date_of_birth: patient.date_of_birth,
+          patient_type: patient.patient_type,
+          physio_name: patient.physio_name,
+          pms_last_modified: patient.pms_last_modified,
+          sessions_used: patient.sessions_used,
+          total_sessions: patient.total_sessions,
+          is_active: true,
+        });
+
         patientsAdded++;
       }
     } catch (error) {
@@ -459,18 +480,16 @@ async function updateDatabase(processedData: any, userId: string, pmsType: strin
         .single();
 
       if (!existingAppointment) {
-        await createAdminClient()
-          .from('appointments')
-          .insert({
-            user_id: userId,
-            patient_id: userId,
-            pms_appointment_id: appointment.id,
-            pms_type: pmsType,
-            appointment_type: appointment.appointment_type,
-            status: appointment.status,
-            appointment_date: appointment.appointment_date,
-            practitioner_name: appointment.practitioner_name
-          });
+        await createAdminClient().from('appointments').insert({
+          user_id: userId,
+          patient_id: userId,
+          pms_appointment_id: appointment.id,
+          pms_type: pmsType,
+          appointment_type: appointment.appointment_type,
+          status: appointment.status,
+          appointment_date: appointment.appointment_date,
+          practitioner_name: appointment.practitioner_name,
+        });
       }
     } catch (error) {
       console.error(`Error updating appointment ${appointment.id}:`, error);
@@ -490,7 +509,7 @@ async function checkActionNeededPatients(userId: string) {
 
   if (!patients) return [];
 
-  return patients.filter(patient => {
+  return patients.filter((patient) => {
     const remainingSessions = patient.total_sessions - patient.sessions_used;
     return remainingSessions <= 2; // Warning threshold
   });
@@ -500,12 +519,14 @@ async function checkActionNeededPatients(userId: string) {
 async function sendActionNeededNotifications(patients: any[], userData: any) {
   // This would integrate with your email service
   // For now, we'll log the notifications
-  
+
   for (const patient of patients) {
     const remainingSessions = patient.total_sessions - patient.sessions_used;
-    
-    console.log(`NOTIFICATION: ${remainingSessions} ${patient.patient_type} session(s) left for ${patient.first_name} ${patient.last_name}`);
-    
+
+    console.log(
+      `NOTIFICATION: ${remainingSessions} ${patient.patient_type} session(s) left for ${patient.first_name} ${patient.last_name}`
+    );
+
     // In production, you would:
     // 1. Send email to clinic
     // 2. Use a queue system for reliability
@@ -524,7 +545,7 @@ async function createCasesFromSyncedData(
 ) {
   try {
     console.log(`[CASES] Starting case creation for user ${userId} (${pmsType})`);
-    
+
     let casesCreated = 0;
     let casesUpdated = 0;
     const issues: string[] = [];
@@ -544,16 +565,109 @@ async function createCasesFromSyncedData(
           (apt: any) => apt.patient_id === patient.id
         );
 
-        const latestPatientAppointment = patientAppointments.length > 0 
-          ? patientAppointments.reduce((latest: any, current: any) => 
-              new Date(current.appointment_date) > new Date(latest.appointment_date) ? current : latest
-            )
-          : null;
+        const latestPatientAppointment =
+          patientAppointments.length > 0
+            ? patientAppointments.reduce((latest: any, current: any) =>
+                new Date(current.appointment_date) > new Date(latest.appointment_date)
+                  ? current
+                  : latest
+              )
+            : null;
 
         // Set default values
         const locationName = latestPatientAppointment?.location_name || 'Main Clinic';
-        const physioName = latestPatientAppointment?.practitioner_name || patient.physio_name || null;
-        const appointmentTypeName = latestPatientAppointment?.appointment_type || patient.patient_type;
+        const appointmentTypeName =
+          latestPatientAppointment?.appointment_type || patient.patient_type;
+        console.log('bero', latestPatientAppointment);
+        // Get practitioner ID and name from appointment data
+        let practitionerId = null;
+        let physioName = null;
+        console.log('bero', latestPatientAppointment);
+        // Priority 1: Use practitioner name from appointment if available
+        if (latestPatientAppointment?.practitioner_name) {
+          physioName = latestPatientAppointment.practitioner_name;
+          console.log(`[CASES] Using practitioner name from appointment: ${physioName}`);
+
+          // Try to find practitioner by name for ID
+          const { data: practitioner } = await createAdminClient()
+            .from('practitioners')
+            .select('id, display_name, first_name, last_name')
+            .eq('user_id', userId)
+            .eq('pms_type', pmsType)
+            .or(
+              `display_name.eq.${physioName},first_name.eq.${physioName},last_name.eq.${physioName}`
+            )
+            .single();
+
+          if (practitioner) {
+            practitionerId = practitioner.id;
+            console.log(
+              `[CASES] Found practitioner by name: ${physioName} (ID: ${practitionerId})`
+            );
+          }
+        }
+
+        // Priority 2: If no practitioner name, try to find by practitioner ID from appointment
+        if (!physioName && latestPatientAppointment?.practitioner_id) {
+          console.log(
+            `[CASES] Looking for practitioner by ID: ${latestPatientAppointment.practitioner_id}`
+          );
+          const { data: practitioner } = await createAdminClient()
+            .from('practitioners')
+            .select('id, display_name, first_name, last_name')
+            .eq('user_id', userId)
+            .eq('pms_type', pmsType)
+            .eq('pms_practitioner_id', latestPatientAppointment.practitioner_id.toString())
+            .single();
+
+          if (practitioner) {
+            practitionerId = practitioner.id;
+            physioName =
+              practitioner.display_name ||
+              `${practitioner.first_name} ${practitioner.last_name}`.trim();
+            console.log(`[CASES] Found practitioner by ID: ${physioName} (ID: ${practitionerId})`);
+          } else {
+            console.log(
+              `[CASES] No practitioner found by ID: ${latestPatientAppointment.practitioner_id}`
+            );
+          }
+        }
+
+        // Priority 3: If still no practitioner found, use patient's physio_name as fallback
+        if (!physioName && patient.physio_name) {
+          physioName = patient.physio_name;
+          console.log(`[CASES] Using patient's physio_name as fallback: ${physioName}`);
+        }
+
+        // Priority 4: Use the first available practitioner as final fallback
+        if (!physioName) {
+          const { data: fallbackPractitioner } = await createAdminClient()
+            .from('practitioners')
+            .select('id, display_name, first_name, last_name')
+            .eq('user_id', userId)
+            .eq('pms_type', pmsType)
+            .limit(1)
+            .single();
+
+          if (fallbackPractitioner) {
+            practitionerId = fallbackPractitioner.id;
+            physioName =
+              fallbackPractitioner.display_name ||
+              `${fallbackPractitioner.first_name} ${fallbackPractitioner.last_name}`.trim();
+            console.log(
+              `[CASES] Using first available practitioner as fallback: ${physioName} for patient ${patient.id}`
+            );
+          }
+        }
+
+        // Final fallback: Use a default name if nothing else works
+        if (!physioName) {
+          physioName = 'Unknown Practitioner';
+          console.log(`[CASES] No practitioner found, using default: ${physioName}`);
+        }
+
+        console.log(`[CASES] Final physio_name for patient ${patient.id}: ${physioName}`);
+
         const nextVisitDate = latestPatientAppointment?.appointment_date
           ? new Date(latestPatientAppointment.appointment_date)
           : new Date(Date.now() + 7 * 24 * 60 * 60 * 1000); // 7 days from now
@@ -609,6 +723,7 @@ async function createCasesFromSyncedData(
           patient_phone: patient.phone,
           patient_date_of_birth: patient.date_of_birth,
           location_name: locationName,
+          practitioner_id: practitionerId,
           physio_name: physioName,
           appointment_type_name: appointmentTypeName,
           program_type: programType,
@@ -639,24 +754,29 @@ async function createCasesFromSyncedData(
             issues.push(`Failed to update case for patient ${patient.id}`);
           } else {
             casesUpdated++;
-            console.log(`[CASES] ✅ Updated case for patient ${patient.id} - Sessions: ${sessionsUsed}/${quota} (${sessionsRemaining} remaining)`);
+            console.log(
+              `[CASES] ✅ Updated case for patient ${patient.id} - Sessions: ${sessionsUsed}/${quota} (${sessionsRemaining} remaining)`
+            );
           }
         } else {
           // Create new case
-          const { error: insertError } = await createAdminClient().from('cases').insert({
-            ...caseData,
-            created_at: new Date().toISOString(),
-          });
+          const { error: insertError } = await createAdminClient()
+            .from('cases')
+            .insert({
+              ...caseData,
+              created_at: new Date().toISOString(),
+            });
 
           if (insertError) {
             console.error(`[CASES] Error creating case for patient ${patient.id}:`, insertError);
             issues.push(`Failed to create case for patient ${patient.id}`);
           } else {
             casesCreated++;
-            console.log(`[CASES] ✅ Created case for patient ${patient.id} - Sessions: ${sessionsUsed}/${quota} (${sessionsRemaining} remaining)`);
+            console.log(
+              `[CASES] ✅ Created case for patient ${patient.id} - Sessions: ${sessionsUsed}/${quota} (${sessionsRemaining} remaining)`
+            );
           }
         }
-
       } catch (error) {
         console.error(`[CASES] Error processing patient ${patient.id} for case creation:`, error);
         const errorMessage = error instanceof Error ? error.message : 'Unknown error';
@@ -674,9 +794,8 @@ async function createCasesFromSyncedData(
     return {
       casesCreated,
       casesUpdated,
-      issues: issues.length > 0 ? issues : undefined
+      issues: issues.length > 0 ? issues : undefined,
     };
-
   } catch (error) {
     console.error(`[CASES] Case creation failed for user ${userId}:`, error);
     const errorMessage = error instanceof Error ? error.message : 'Case creation failed';

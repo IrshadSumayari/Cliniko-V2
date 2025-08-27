@@ -6,10 +6,7 @@ export async function POST(request: NextRequest) {
     const { caseId, action, newData } = await request.json();
 
     if (!caseId || !action) {
-      return NextResponse.json(
-        { error: 'Case ID and action are required.' },
-        { status: 400 }
-      );
+      return NextResponse.json({ error: 'Case ID and action are required.' }, { status: 400 });
     }
 
     // Get the authorization header
@@ -56,10 +53,7 @@ export async function POST(request: NextRequest) {
       .single();
 
     if (caseError || !caseRecord) {
-      return NextResponse.json(
-        { error: 'Case not found or access denied.' },
-        { status: 404 }
-      );
+      return NextResponse.json({ error: 'Case not found or access denied.' }, { status: 404 });
     }
 
     // Update case status based on action
@@ -117,10 +111,7 @@ export async function POST(request: NextRequest) {
         break;
 
       default:
-        return NextResponse.json(
-          { error: 'Invalid action specified.' },
-          { status: 400 }
-        );
+        return NextResponse.json({ error: 'Invalid action specified.' }, { status: 400 });
     }
 
     // Update the case
@@ -134,41 +125,32 @@ export async function POST(request: NextRequest) {
 
     if (updateError) {
       console.error('Error updating case:', updateError);
-      return NextResponse.json(
-        { error: 'Failed to update case.' },
-        { status: 500 }
-      );
+      return NextResponse.json({ error: 'Failed to update case.' }, { status: 500 });
     }
 
     // Log the status change
-    await supabase
-      .from('sync_logs')
-      .insert({
-        user_id: userId,
-        pms_type: 'manual',
-        sync_type: 'case_status_change',
-        status: 'completed',
-        patients_processed: 1,
-        error_details: {
-          action,
-          case_id: caseId,
-          patient_id: caseRecord.patient_id,
-          reason: updateData.status_change_reason,
-          timestamp: new Date().toISOString()
-        }
-      });
+    await supabase.from('sync_logs').insert({
+      user_id: userId,
+      pms_type: 'manual',
+      sync_type: 'case_status_change',
+      status: 'completed',
+      patients_processed: 1,
+      error_details: {
+        action,
+        case_id: caseId,
+        patient_id: caseRecord.patient_id,
+        reason: updateData.status_change_reason,
+        timestamp: new Date().toISOString(),
+      },
+    });
 
     return NextResponse.json({
       success: true,
       case: updatedCase,
-      message: `Case ${action.replace(/_/g, ' ')} successfully`
+      message: `Case ${action.replace(/_/g, ' ')} successfully`,
     });
-
   } catch (error) {
     console.error('Case status update error:', error);
-    return NextResponse.json(
-      { error: 'Failed to update case status.' },
-      { status: 500 }
-    );
+    return NextResponse.json({ error: 'Failed to update case status.' }, { status: 500 });
   }
 }
