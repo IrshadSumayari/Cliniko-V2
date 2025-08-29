@@ -39,6 +39,7 @@ import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/contexts/auth-context';
 import { useRouter } from 'next/navigation';
 import { QuotaEditModal } from './quota-edit-modal';
+import AlertSettings from './alert-settings';
 
 interface DashboardProps {
   onNavigate?: (view: 'settings' | 'onboarding') => void;
@@ -62,6 +63,7 @@ const Dashboard = ({ onNavigate }: DashboardProps) => {
     daysRemaining: number;
   } | null>(null);
   const [showAlertSettings, setShowAlertSettings] = useState(false);
+  const [showSettingsModal, setShowSettingsModal] = useState(false);
   const [selectedClients, setSelectedClients] = useState<number[]>([]);
   const [showApiHelp, setShowApiHelp] = useState(false);
   const [showPendingReason, setShowPendingReason] = useState<number | null>(null);
@@ -1192,7 +1194,7 @@ const Dashboard = ({ onNavigate }: DashboardProps) => {
                     variant="outline"
                     size="lg"
                     className="gap-2 h-12 px-6 border-border/60 hover:border-secondary/60 hover:bg-secondary/5"
-                    onClick={() => setShowAlertSettings(true)}
+                    onClick={() => setShowSettingsModal(true)}
                   >
                     <Settings className="h-5 w-5" />
                     Settings
@@ -1406,6 +1408,11 @@ const Dashboard = ({ onNavigate }: DashboardProps) => {
             onSave={handleQuotaUpdate}
           />
         </>
+      )}
+
+      {/* Alert Settings Modal */}
+      {showSettingsModal && (
+        <AlertSettings onClose={() => setShowSettingsModal(false)} />
       )}
     </TooltipProvider>
   );
