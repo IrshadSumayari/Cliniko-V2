@@ -25,156 +25,184 @@ interface NotificationData {
 export async function POST(req: NextRequest) {
   try {
     const { patientIds, clinicId, triggerOnboarding, userId } = await req.json();
-
+    console.log('HIT');
     // Handle onboarding trigger case
     if (triggerOnboarding && userId) {
       console.log(`🚀 Onboarding trigger: Sending Action Needed notifications for user ${userId}`);
 
-      // Get user information - check for custom email first, then default email
-      const supabase = createAdminClient();
-      const { data: user, error: userError } = await supabase
-        .from('users')
-        .select(
+      try {
+        // Get user information - check for custom email first, then default email
+        const supabase = createAdminClient();
+        console.log('✅ Supabase admin client created successfully');
+
+        const { data: user, error: userError } = await supabase
+          .from('users')
+          .select(
+            `
+            id,
+            email,
+            full_name,
+            custom_email
           `
-          id,
-          email,
-          full_name,
-          custom_email
-        `
-        )
-        .eq('auth_user_id', userId)
-        .single();
+          )
+          .eq('auth_user_id', userId)
+          .single();
 
-      if (userError || !user) {
-        return NextResponse.json({ error: 'User not found' }, { status: 404 });
-      }
+        if (userError || !user) {
+          console.error('❌ User fetch error:', userError);
+          return NextResponse.json({ error: 'User not found' }, { status: 404 });
+        }
 
-      // Use custom email if available, otherwise use default email
-      const userEmail = user.custom_email || user.email;
-      const userName = user.full_name || 'Clinic';
+        console.log('✅ User data fetched successfully:', {
+          userId: user.id,
+          email: user.email,
+          customEmail: user.custom_email,
+          fullName: user.full_name,
+        });
 
-      console.log(
-        `📧 Sending notifications to: ${userEmail} (${user.custom_email ? 'custom' : 'default'} email)`
-      );
+        // Use custom email if available, otherwise use default email
+        const userEmail = user.custom_email || user.email;
+        const userName = user.full_name || 'Clinic';
 
-      // Get ALL patients for this user that need action (1-2 sessions remaining)
-      const { data: allPatients, error: allPatientsError } = await supabase
-        .from('patients')
-        .select(
+        console.log(
+          `📧 Sending notifications to: ${userEmail} (${user.custom_email ? 'custom' : 'default'} email)`
+        );
+
+        // Get ALL patients for this user that need action (1-2 sessions remaining)
+        console.log('🔍 Fetching patients for user...');
+        const { data: allPatients, error: allPatientsError } = await supabase
+          .from('patients')
+          .select(
+            `
+            id,
+            first_name,
+            last_name,
+            patient_type,
+            quota,
+            sessions_used
           `
-          id,
-          first_name,
-          last_name,
-          patient_type,
-          quota,
-          sessions_used
-        `
-        )
-        .eq('user_id', user.id)
-        .eq('is_active', true)
-        .eq('status', 'active');
+          )
+          .eq('user_id', user.id)
+          .eq('is_active', true)
+          .eq('status', 'active');
 
-      if (allPatientsError) {
-        return NextResponse.json({ error: 'Failed to fetch patients' }, { status: 500 });
-      }
+        if (allPatientsError) {
+          console.error('❌ Patients fetch error:', allPatientsError);
+          return NextResponse.json({ error: 'Failed to fetch patients' }, { status: 500 });
+        }
 
-      if (!allPatients || allPatients.length === 0) {
-        return NextResponse.json({
-          success: true,
-          message: 'No patients found for this user',
-          summary: { total: 0, successful: 0, failed: 0 },
-        });
-      }
+        console.log(`✅ Found ${allPatients?.length || 0} total patients for user`);
 
-      // Filter patients that meet the action needed criteria
-      const actionNeededPatients = allPatients.filter((patient) => {
-        const remainingSessions = patient.quota - patient.sessions_used;
-        return remainingSessions <= 2 && remainingSessions > 0;
-      });
+        if (!allPatients || allPatients.length === 0) {
+          console.log('ℹ️ No patients found for this user');
+          return NextResponse.json({
+            success: true,
+            message: 'No patients found for this user',
+            summary: { total: 0, successful: 0, failed: 0 },
+          });
+        }
 
-      if (actionNeededPatients.length === 0) {
-        return NextResponse.json({
-          success: true,
-          message: 'No patients currently meet Action Needed criteria',
-          summary: { total: 0, successful: 0, failed: 0 },
-        });
-      }
-
-      console.log(`Found ${actionNeededPatients.length} patients needing immediate action`);
-
-      // Process notifications for all Action Needed patients
-      const notificationResults = [];
-      let successCount = 0;
-      let failureCount = 0;
-
-      for (const patient of actionNeededPatients) {
-        try {
+        // Filter patients that meet the action needed criteria
+        const actionNeededPatients = allPatients.filter((patient) => {
           const remainingSessions = patient.quota - patient.sessions_used;
+          return remainingSessions <= 2 && remainingSessions > 0;
+        });
 
-          const notificationData: NotificationData = {
-            patientId: patient.id,
-            patientName: `${patient.first_name} ${patient.last_name}`,
-            patientType: patient.patient_type,
-            remainingSessions,
-            clinicEmail: userEmail,
-            clinicName: userName,
-            clinicId: user.id,
-          };
+        console.log(`🔍 Found ${actionNeededPatients.length} patients needing immediate action`);
 
-          // Send notification with retry logic
-          const notificationResult = await sendNotificationWithRetry(notificationData);
+        if (actionNeededPatients.length === 0) {
+          console.log('ℹ️ No patients currently meet Action Needed criteria');
+          return NextResponse.json({
+            success: true,
+            message: 'No patients currently meet Action Needed criteria',
+            summary: { total: 0, successful: 0, failed: 0 },
+          });
+        }
 
-          if (notificationResult.success) {
-            successCount++;
+        // Process notifications for all Action Needed patients
+        const notificationResults = [];
+        let successCount = 0;
+        let failureCount = 0;
 
-            // Log successful notification
-            await logNotification(patient.id, user.id, 'sent', notificationData);
+        for (const patient of actionNeededPatients) {
+          try {
+            const remainingSessions = patient.quota - patient.sessions_used;
 
-            notificationResults.push({
+            const notificationData: NotificationData = {
               patientId: patient.id,
-              success: true,
-              message: 'Notification sent successfully',
-            });
-          } else {
-            failureCount++;
+              patientName: `${patient.first_name} ${patient.last_name}`,
+              patientType: patient.patient_type,
+              remainingSessions,
+              clinicEmail: userEmail,
+              clinicName: userName,
+              clinicId: user.id,
+            };
 
-            // Log failed notification
-            await logNotification(
-              patient.id,
-              user.id,
-              'failed',
-              notificationData,
-              notificationResult.error
-            );
+            // Send notification with retry logic
+            const notificationResult = await sendNotificationWithRetry(notificationData);
+
+            if (notificationResult.success) {
+              successCount++;
+
+              // Log successful notification
+              await logNotification(patient.id, user.id, 'sent', notificationData);
+
+              notificationResults.push({
+                patientId: patient.id,
+                success: true,
+                message: 'Notification sent successfully',
+              });
+            } else {
+              failureCount++;
+
+              // Log failed notification
+              await logNotification(
+                patient.id,
+                user.id,
+                'failed',
+                notificationData,
+                notificationResult.error
+              );
+
+              notificationResults.push({
+                patientId: patient.id,
+                success: false,
+                error: notificationResult.error,
+              });
+            }
+          } catch (error) {
+            failureCount++;
+            console.error(`Error processing notification for patient ${patient.id}:`, error);
 
             notificationResults.push({
               patientId: patient.id,
               success: false,
-              error: notificationResult.error,
+              error: error instanceof Error ? error.message : 'Unknown error',
             });
           }
-        } catch (error) {
-          failureCount++;
-          console.error(`Error processing notification for patient ${patient.id}:`, error);
-
-          notificationResults.push({
-            patientId: patient.id,
-            success: false,
-            error: error instanceof Error ? error.message : 'Unknown error',
-          });
         }
-      }
 
-      return NextResponse.json({
-        success: true,
-        message: `Onboarding notifications processed: ${successCount} sent, ${failureCount} failed`,
-        summary: {
-          total: actionNeededPatients.length,
-          successful: successCount,
-          failed: failureCount,
-        },
-        results: notificationResults,
-      });
+        return NextResponse.json({
+          success: true,
+          message: `Onboarding notifications processed: ${successCount} sent, ${failureCount} failed`,
+          summary: {
+            total: actionNeededPatients.length,
+            successful: successCount,
+            failed: failureCount,
+          },
+          results: notificationResults,
+        });
+      } catch (error) {
+        console.error('Onboarding trigger error:', error);
+        return NextResponse.json(
+          {
+            success: false,
+            error:
+              error instanceof Error ? error.message : 'Failed to send onboarding notifications',
+          },
+          { status: 500 }
+        );
+      }
     }
 
     // Original logic for manual patient selection
