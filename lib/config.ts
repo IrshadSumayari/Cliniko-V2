@@ -1,41 +1,31 @@
-// Configuration file with environment variables
 export const config = {
-  //Production DB
-  // supabase: {
-  //   url: "https://kbsneyhvuhkkshlmnloa.supabase.co",
-  //   anonKey: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imtic25leWh2dWhra3NobG1ubG9hIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTQzMTU1OTIsImV4cCI6MjA2OTg5MTU5Mn0.PBU7DGi_ystiqCGveVT1vXDoxhNOi7FlMieLbg_NlE4",
-  //   serviceRoleKey: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imtic25leWh2dWhra3NobG1ubG9hIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc1NDMxNTU5MiwiZXhwIjoyMDY5ODkxNTkyfQ.YgngnBUB43vtkI44BdXtx5hefyCgUzSGOHxsIOgtQyw",
-  // },
-  //Local DB
   supabase: {
-    url: 'https://ddsbasqzslznczvqwjph.supabase.co',
-    anonKey:
-      'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRkc2Jhc3F6c2x6bmN6dnF3anBoIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTU0MjcxMTQsImV4cCI6MjA3MTAwMzExNH0.XaVYKxo7_IAJvfU6psA9cGTuK_XtilV-aB7DDQVQGy8',
-    serviceRoleKey:
-      'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRkc2Jhc3F6c2x6bmN6dnF3anBoIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc1NTQyNzExNCwiZXhwIjoyMDcxMDAzMTE0fQ.FyF2hv3XAaIU6syZ_FxIRrH1LlpPLPvCtl3N_Uc0ENY',
+    url: process.env.NEXT_PUBLIC_SUPABASE_URL || '',
+    anonKey: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '',
+    serviceRoleKey: process.env.SUPABASE_SERVICE_ROLE_KEY || '', // server-only
   },
   encryption: {
-    secret: '83a22bb4478e7b82a17e27e7ec59c664453ecd630d3cb890cb7e79679b1c5749',
+    secret: process.env.ENCRYPTION_SECRET || '', // server-only
   },
   stripe: {
-    secretKey:
-      'sk_test_51RspFyIJX4ete5hNwaya2kRd4JsaNrkuYHsmUPcHtXeYmRmdh0BpnUNjENGKmwdwm1p7i4CdD1Wzik0LesrCUtMX00gYC6E19o',
-    webhookSecret: 'whsec_31rrAnvH5pPgbxpll6VwayHYEuSL69bu',
-    publishableKey:
-      'pk_test_51RspFyIJX4ete5hNhPe3qg7GKeRog8cYskEgBIrcbfl1YsvC54ZmxSXXBCXJZ2c2kh9HNv2GttOfFdOJJz2qR50R007gjDdOhW',
+    secretKey: process.env.STRIPE_SECRET_KEY || '', // server-only
+    webhookSecret: process.env.STRIPE_WEBHOOK_SECRET || '', // server-only
+    publishableKey: process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY || '',
     priceIds: {
-      basic: 'price_1Rt6YfIJX4ete5hNsKN3AMf3',
-      professional: 'price_1Rt5hgIJX4ete5hNG48LhVPM',
-      enterprise: 'price_1Rt5i4IJX4ete5hNIUKmyZXA',
+      basic: process.env.NEXT_PUBLIC_STRIPE_BASIC_PRICE_ID || '',
+      professional: process.env.NEXT_PUBLIC_STRIPE_PROFESSIONAL_PRICE_ID || '',
+      enterprise: process.env.NEXT_PUBLIC_STRIPE_ENTERPRISE_PRICE_ID || '',
     },
   },
   app: {
-    url:
-      process.env.NODE_ENV === 'development'
-        ? 'http://localhost:3000'
-        : 'https://cliniko-v2.vercel.app',
+    url: process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000',
   },
   cron: {
-    secret: 'your-cron-secret-key-here',
+    secret: process.env.CRON_SECRET || '',
+  },
+  sendgrid: {
+    apiKey: process.env.SENDGRID_API_KEY || '',
+    fromEmail: process.env.FROM_EMAIL || '',
+    adminEmail: process.env.ADMIN_EMAIL || '',
   },
 };

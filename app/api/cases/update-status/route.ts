@@ -1,5 +1,6 @@
 import { type NextRequest, NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/supabase/server-admin';
+import { NotificationService } from '@/lib/notification-service';
 
 export async function POST(request: NextRequest) {
   try {
@@ -126,6 +127,75 @@ export async function POST(request: NextRequest) {
     if (updateError) {
       console.error('Error updating case:', updateError);
       return NextResponse.json({ error: 'Failed to update case.' }, { status: 500 });
+    }
+
+    // TRIGGER NOTIFICATIONS for status changes
+    try {
+      const notificationService = NotificationService.getInstance();
+
+      if (action === 'move_to_pending') {
+        // Get case details for notification
+        const { data: caseDetails } = await supabase
+          .from('cases')
+          .select('patient_first_name, patient_last_name, patient_email, physio_name, program_type')
+          .eq('id', caseId)
+          .single();
+
+        if (caseDetails) {
+          // Create patient data object for notification
+          const patient = {
+            name: `${caseDetails.patient_first_name} ${caseDetails.patient_last_name}`,
+            epc_number: caseId,
+            sessionsRemaining: 0,
+            totalSessions: 0,
+            physio: caseDetails.physio_name || 'Unknown',
+            lastAppointment: new Date().toISOString().split('T')[0],
+            nextAppointment: undefined,
+          };
+
+          // Send pending status notification
+          await notificationService.sendPendingStatusAlert(
+            patient,
+            userId.toString(),
+            updateData.status_change_reason
+          );
+
+          console.log(`✅ Pending status notification sent for case: ${patient.name}`);
+        }
+      } else if (action === 'update_quota') {
+        // Check if quota threshold is reached and send alert
+        const sessionsRemaining = (updatedCase.quota || 0) - (updatedCase.sessions_used || 0);
+
+        if (sessionsRemaining <= 2) {
+          // Get case details for quota alert
+          const { data: caseDetails } = await supabase
+            .from('cases')
+            .select(
+              'patient_first_name, patient_last_name, patient_email, physio_name, program_type'
+            )
+            .eq('id', caseId)
+            .single();
+
+          if (caseDetails) {
+            const patient = {
+              name: `${caseDetails.patient_first_name} ${caseDetails.patient_last_name}`,
+              epc_number: caseId,
+              sessionsRemaining: sessionsRemaining,
+              totalSessions: updatedCase.quota || 0,
+              physio: caseDetails.physio_name || 'Unknown',
+              lastAppointment: new Date().toISOString().split('T')[0],
+              nextAppointment: undefined,
+            };
+
+            // Send quota alert
+            await notificationService.checkAndSendQuotaAlerts(userId.toString());
+            console.log(`✅ Quota alert check triggered for case: ${patient.name}`);
+          }
+        }
+      }
+    } catch (notificationError) {
+      console.error('Notification service error:', notificationError);
+      // Don't fail the main operation if notifications fail
     }
 
     // Log the status change

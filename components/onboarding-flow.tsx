@@ -281,6 +281,33 @@ export default function OnboardingFlow() {
     try {
       const success = await updateUserOnboardingStatus(true);
       if (success) {
+        // Trigger Action Needed notifications for all patients
+        try {
+          const token = getAccessToken();
+          if (token) {
+            const response = await fetch('/api/notifications/send-action-needed', {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${token}`
+              },
+              body: JSON.stringify({
+                triggerOnboarding: true,
+                userId: user?.id
+              })
+            });
+            
+            if (response.ok) {
+              const result = await response.json();
+              console.log('✅ Action Needed notifications triggered on onboarding completion:', result);
+            } else {
+              console.error('❌ Failed to trigger Action Needed notifications:', response.statusText);
+            }
+          }
+        } catch (notificationError) {
+          console.error('Error triggering notifications:', notificationError);
+        }
+
         toast.success('Setup complete! Welcome to your dashboard.');
         // Force a page reload to update the auth context
         // setTimeout(() => {

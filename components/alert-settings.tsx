@@ -16,11 +16,9 @@ const AlertSettings = ({ onClose }: AlertSettingsProps) => {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [settings, setSettings] = useState({
-    emailNotifications: true,
-    quotaThreshold: 2,
+    enableEmailAlerts: false,
+    sessionQuotaThreshold: 2,
     customEmail: "",
-    notifyOnPending: true,
-    notifyOnQuota: true,
   });
 
   // Load settings on mount
@@ -36,7 +34,7 @@ const AlertSettings = ({ onClose }: AlertSettingsProps) => {
         throw new Error('No auth token found');
       }
 
-      const response = await fetch('/api/notifications/settings', {
+      const response = await fetch('/api/user/email-preferences', {
         headers: {
           'Authorization': `Bearer ${token}`,
         },
@@ -48,7 +46,11 @@ const AlertSettings = ({ onClose }: AlertSettingsProps) => {
 
       const result = await response.json();
       if (result.success) {
-        setSettings(result.data);
+        setSettings({
+          enableEmailAlerts: result.data.enableEmailAlerts,
+          sessionQuotaThreshold: result.data.sessionQuotaThreshold,
+          customEmail: result.data.customEmail || "",
+        });
       }
     } catch (error) {
       console.error('Error loading settings:', error);
@@ -70,8 +72,8 @@ const AlertSettings = ({ onClose }: AlertSettingsProps) => {
         throw new Error('No auth token found');
       }
 
-      const response = await fetch('/api/notifications/settings', {
-        method: 'POST',
+      const response = await fetch('/api/user/email-preferences', {
+        method: 'PUT',
         headers: {
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json',
@@ -166,14 +168,14 @@ const AlertSettings = ({ onClose }: AlertSettingsProps) => {
                     </p>
                   </div>
                   <Switch
-                    checked={settings.emailNotifications}
+                    checked={settings.enableEmailAlerts}
                     onCheckedChange={(checked) =>
-                      handleSettingChange("emailNotifications", checked)
+                      handleSettingChange("enableEmailAlerts", checked)
                     }
                   />
                 </div>
 
-                {settings.emailNotifications && (
+                {settings.enableEmailAlerts && (
                   <div className="space-y-4">
                     <div className="flex items-center justify-between">
                       <div>
@@ -189,10 +191,10 @@ const AlertSettings = ({ onClose }: AlertSettingsProps) => {
                           type="number"
                           min="1"
                           max="5"
-                          value={settings.quotaThreshold}
+                          value={settings.sessionQuotaThreshold}
                           onChange={(e) =>
                             handleSettingChange(
-                              "quotaThreshold",
+                              "sessionQuotaThreshold",
                               parseInt(e.target.value),
                             )
                           }
@@ -215,10 +217,10 @@ const AlertSettings = ({ onClose }: AlertSettingsProps) => {
                             </p>
                             <p className="mt-1">
                               <strong>Action Required:</strong> Sarah Johnson
-                              (EPC #12345) has {settings.quotaThreshold} session
-                              {settings.quotaThreshold !== 1 ? "s" : ""}{" "}
+                              (EPC #12345) has {settings.sessionQuotaThreshold} session
+                              {settings.sessionQuotaThreshold !== 1 ? "s" : ""}{" "}
                               remaining.
-                              {settings.quotaThreshold <= 2 &&
+                              {settings.sessionQuotaThreshold <= 2 &&
                                 " Referral may need renewal soon."}
                             </p>
                           </div>

@@ -589,7 +589,7 @@ const Dashboard = ({ onNavigate }: DashboardProps) => {
         break;
       case 'action-needed':
         baseClients = clientsData.filter(
-          (client) => client.status === 'warning' || client.status === 'critical'
+          (client) => client.status === 'warning' && client.remainingSessions <= 2
         );
         break;
       case 'pending':
@@ -1081,44 +1081,48 @@ const Dashboard = ({ onNavigate }: DashboardProps) => {
         <div className="container mx-auto px-8 py-10">
           {/* Trial Banner - Only show for trial users */}
           {userSubscription && userSubscription.subscription_status === 'trial' && (
-            <div className={`p-6 mb-10 rounded-2xl shadow-sm ${
-              userSubscription.daysRemaining <= 1 
-                ? 'bg-gradient-to-r from-red-50 to-red-100 border border-red-200 dark:from-red-950/20 dark:to-red-900/20 dark:border-red-800/30'
-                : userSubscription.daysRemaining <= 3
-                  ? 'bg-gradient-to-r from-orange-50 to-orange-100 border border-orange-200 dark:from-orange-950/20 dark:to-orange-900/20 dark:border-orange-800/30'
-                  : 'bg-gradient-to-r from-warning/5 to-warning/10 border border-warning/20'
-            }`}>
+            <div
+              className={`p-6 mb-10 rounded-2xl shadow-sm ${
+                userSubscription.daysRemaining <= 1
+                  ? 'bg-gradient-to-r from-red-50 to-red-100 border border-red-200 dark:from-red-950/20 dark:to-red-900/20 dark:border-red-800/30'
+                  : userSubscription.daysRemaining <= 3
+                    ? 'bg-gradient-to-r from-orange-50 to-orange-100 border border-orange-200 dark:from-orange-950/20 dark:to-orange-900/20 dark:border-orange-800/30'
+                    : 'bg-gradient-to-r from-warning/5 to-warning/10 border border-warning/20'
+              }`}
+            >
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-4">
-                  <div className={`p-2 rounded-xl ${
-                    userSubscription.daysRemaining <= 1 
-                      ? 'bg-red-100 dark:bg-red-900/30'
-                      : userSubscription.daysRemaining <= 3
-                        ? 'bg-orange-100 dark:bg-orange-900/30'
-                        : 'bg-warning/10'
-                  }`}>
-                    <AlertTriangle className={`h-5 w-5 ${
-                      userSubscription.daysRemaining <= 1 
-                        ? 'text-red-600 dark:text-red-400'
+                  <div
+                    className={`p-2 rounded-xl ${
+                      userSubscription.daysRemaining <= 1
+                        ? 'bg-red-100 dark:bg-red-900/30'
                         : userSubscription.daysRemaining <= 3
-                          ? 'text-orange-600 dark:text-orange-400'
-                          : 'text-warning'
-                    }`} />
+                          ? 'bg-orange-100 dark:bg-orange-900/30'
+                          : 'bg-warning/10'
+                    }`}
+                  >
+                    <AlertTriangle
+                      className={`h-5 w-5 ${
+                        userSubscription.daysRemaining <= 1
+                          ? 'text-red-600 dark:text-red-400'
+                          : userSubscription.daysRemaining <= 3
+                            ? 'text-orange-600 dark:text-orange-400'
+                            : 'text-warning'
+                      }`}
+                    />
                   </div>
                   <div>
                     <span className="font-semibold text-foreground">
-                      {userSubscription.daysRemaining === 0 
+                      {userSubscription.daysRemaining === 0
                         ? 'Your free trial expires today'
                         : userSubscription.daysRemaining === 1
                           ? '1 day left in your free trial'
-                          : `${userSubscription.daysRemaining} days left in your free trial`
-                      }
+                          : `${userSubscription.daysRemaining} days left in your free trial`}
                     </span>
                     <p className="text-sm text-muted-foreground">
-                      {userSubscription.daysRemaining <= 1 
+                      {userSubscription.daysRemaining <= 1
                         ? 'Upgrade now to avoid service interruption'
-                        : 'Unlock unlimited features and advanced analytics'
-                      }
+                        : 'Unlock unlimited features and advanced analytics'}
                     </p>
                   </div>
                 </div>
@@ -1325,8 +1329,9 @@ const Dashboard = ({ onNavigate }: DashboardProps) => {
                     Action Needed
                     <Badge variant="destructive" className="ml-2 animate-pulse">
                       {
-                        clientsData.filter((c) => c.status === 'warning' || c.remainingSessions > 0)
-                          .length
+                        clientsData.filter(
+                          (c) => c.status === 'warning' && c.remainingSessions <= 2
+                        ).length
                       }
                     </Badge>
                   </TabsTrigger>
@@ -1411,9 +1416,7 @@ const Dashboard = ({ onNavigate }: DashboardProps) => {
       )}
 
       {/* Alert Settings Modal */}
-      {showSettingsModal && (
-        <AlertSettings onClose={() => setShowSettingsModal(false)} />
-      )}
+      {showSettingsModal && <AlertSettings onClose={() => setShowSettingsModal(false)} />}
     </TooltipProvider>
   );
 };
