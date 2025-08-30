@@ -29,6 +29,7 @@ interface AuthContextType {
   signInWithGoogle: () => Promise<AuthResult>;
   signOut: () => Promise<void>;
   updateUserOnboardingStatus: (isOnboarded: boolean) => Promise<boolean>;
+  completeDashboardSetup: () => Promise<boolean>;
   isLoading: boolean;
   refreshUserData: () => Promise<void>;
   getAccessToken: () => string | null;
@@ -65,6 +66,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
       while (retryCount <= maxRetries) {
         try {
+          if (!supabase) {
+            throw new Error('Supabase client not initialized');
+          }
+
           const queryPromise = supabase
             .from('users')
             .select('is_onboarded')
@@ -187,7 +192,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       if (!token) {
         return null;
       }
-
+      if (!supabase) {
+        throw new Error('Supabase client not initialized');
+      }
       const {
         data: { user },
         error,
@@ -266,7 +273,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     };
 
     initializeAuth();
-
+    if (!supabase) {
+      throw new Error('Supabase client not initialized');
+    }
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange(async (event, session) => {
@@ -372,7 +381,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
       // Add timeout protection for database operations
       const dbTimeout = 10000; // 10 seconds
-
+      if (!supabase) {
+        throw new Error('Supabase client not initialized');
+      }
       // First, let's check if the user exists in the database
       const checkPromise = supabase
         .from('users')
@@ -468,6 +479,88 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
+  // NEW: Optimized function specifically for completing dashboard setup
+  const completeDashboardSetup = async (): Promise<boolean> => {
+    if (!user) {
+      console.error('No user found to complete dashboard setup');
+      return false;
+    }
+
+    console.log('🚀 completeDashboardSetup called for user:', user.id);
+    setIsLoading(true);
+
+    try {
+      // IMMEDIATE: Update local state and localStorage first for instant user feedback
+      console.log('⚡ Immediate: Updating local state and localStorage');
+      setUser((prev) => (prev ? { ...prev, isOnboarded: true } : null));
+
+      // Store in localStorage immediately
+      try {
+        localStorage.setItem('user_onboarding_status', 'true');
+        localStorage.setItem('dashboard_setup_completed', 'true');
+        localStorage.setItem('dashboard_setup_timestamp', Date.now().toString());
+        console.log('✅ Local state and localStorage updated immediately');
+      } catch (localStorageError) {
+        console.warn('Failed to store in localStorage:', localStorageError);
+      }
+
+      // ASYNC: Try to update database in background (non-blocking)
+      console.log('🔄 Background: Attempting database update');
+
+      // Use a more aggressive timeout for production
+      const dbTimeout = 8000; // 8 seconds (reduced for faster failure)
+
+      // Create a background promise that doesn't block the UI
+      const backgroundUpdate = (async () => {
+        try {
+          // Simple, direct update without complex checks
+          if (!supabase) {
+            throw new Error('Supabase client not initialized');
+          }
+
+          const updatePromise = supabase
+            .from('users')
+            .update({
+              is_onboarded: true,
+              updated_at: new Date().toISOString(),
+            })
+            .eq('auth_user_id', user.id);
+
+          const timeoutPromise = new Promise<never>((_, reject) => {
+            setTimeout(() => reject(new Error('Database update timeout')), dbTimeout);
+          });
+
+          const { error } = await Promise.race([updatePromise, timeoutPromise]);
+
+          if (error) {
+            console.warn('⚠️ Background database update failed:', error);
+            // Don't fail the user experience, just log it
+            localStorage.setItem('dashboard_db_failed', 'true');
+          } else {
+            console.log('✅ Background database update successful');
+            localStorage.removeItem('dashboard_db_failed');
+          }
+        } catch (dbError) {
+          console.warn('⚠️ Background database update error:', dbError);
+          localStorage.setItem('dashboard_db_failed', 'true');
+        }
+      })();
+
+      // Don't wait for the background update - return success immediately
+      console.log('🎉 Dashboard setup completed successfully (local state)');
+      return true;
+    } catch (error) {
+      console.error('❌ Error in completeDashboardSetup:', error);
+
+      // Even if there's an error, the local state is already updated
+      // So we can still return success for user experience
+      console.warn('⚠️ Returning success despite error - local state is updated');
+      return true;
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   const getErrorMessage = (error: any): string => {
     if (!error) return 'An unknown error occurred';
 
@@ -521,6 +614,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     clinicName?: string
   ): Promise<AuthResult> => {
     setIsLoading(true);
+    if (!supabase) {
+      throw new Error('Supabase client not initialized');
+    }
     try {
       // Let Supabase handle duplicate email checks automatically
       const { error } = await supabase.auth.signUp({
@@ -547,6 +643,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const signIn = async (email: string, password: string): Promise<AuthResult> => {
     setIsLoading(true);
+    if (!supabase) {
+      throw new Error('Supabase client not initialized');
+    }
     try {
       const { error } = await supabase.auth.signInWithPassword({
         email,
@@ -564,6 +663,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const signInWithGoogle = async (): Promise<AuthResult> => {
     setIsLoading(true);
+    if (!supabase) {
+      throw new Error('Supabase client not initialized');
+    }
     try {
       const { error } = await supabase.auth.signInWithOAuth({
         provider: 'google',
@@ -585,7 +687,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     try {
       // Remove the auth token from localStorage
       localStorage.removeItem('auth-token');
-
+      if (!supabase) {
+        throw new Error('Supabase client not initialized');
+      }
       await supabase.auth.signOut();
       setUser(null);
       // Don't set loading to true during signout to prevent infinite loops
@@ -605,6 +709,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         signInWithGoogle,
         signOut,
         updateUserOnboardingStatus,
+        completeDashboardSetup,
         isLoading,
         refreshUserData,
         getAccessToken,

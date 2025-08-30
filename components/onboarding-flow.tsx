@@ -34,7 +34,8 @@ interface SyncResults {
 }
 
 export default function OnboardingFlow() {
-  const { updateUserOnboardingStatus, isLoading, user, getAccessToken } = useAuth();
+  const { updateUserOnboardingStatus, completeDashboardSetup, isLoading, user, getAccessToken } =
+    useAuth();
   const router = useRouter();
   const [currentStep, setCurrentStep] = useState<OnboardingStep>('pms');
   const [isProcessing, setIsProcessing] = useState(false);
@@ -279,7 +280,8 @@ export default function OnboardingFlow() {
 
     setIsCompleting(true);
     try {
-      const success = await updateUserOnboardingStatus(true);
+      // Use the new optimized function for dashboard setup
+      const success = await completeDashboardSetup();
       if (success) {
         // Trigger Action Needed notifications for all patients
         try {
@@ -289,19 +291,25 @@ export default function OnboardingFlow() {
               method: 'POST',
               headers: {
                 'Content-Type': 'application/json',
-                'Authorization': `Bearer ${token}`
+                Authorization: `Bearer ${token}`,
               },
               body: JSON.stringify({
                 triggerOnboarding: true,
-                userId: user?.id
-              })
+                userId: user?.id,
+              }),
             });
-            
+
             if (response.ok) {
               const result = await response.json();
-              console.log('✅ Action Needed notifications triggered on onboarding completion:', result);
+              console.log(
+                '✅ Action Needed notifications triggered on onboarding completion:',
+                result
+              );
             } else {
-              console.error('❌ Failed to trigger Action Needed notifications:', response.statusText);
+              console.error(
+                '❌ Failed to trigger Action Needed notifications:',
+                response.statusText
+              );
             }
           }
         } catch (notificationError) {
@@ -309,16 +317,12 @@ export default function OnboardingFlow() {
         }
 
         toast.success('Setup complete! Welcome to your dashboard.');
-        // Force a page reload to update the auth context
-        // setTimeout(() => {
-        //   window.location.reload();
-        // }, 1000);
       } else {
         toast.error('Failed to complete setup. Please try again.');
       }
     } catch (error) {
-      console.error('Error completing onboarding:', error);
-      toast.error('Failed to complete setup. Please try again.');
+      console.error('Error completing onboarding catch:', error);
+      toast.error('Failed to complete setup. Please try again !');
     } finally {
       setIsCompleting(false);
     }
@@ -420,10 +424,10 @@ export default function OnboardingFlow() {
       // The API returns dynamic property names based on user's custom tags
       const wcKey = `${customTags.wc}Patients`;
       const epcKey = `${customTags.epc}Patients`;
-      
+
       console.log('Looking for count keys:', { wcKey, epcKey });
       console.log('Available keys in newCounts:', Object.keys(result.newCounts || {}));
-      
+
       setSyncResults((prev) => ({
         ...prev,
         wcPatients: result.newCounts[wcKey] || 0,
