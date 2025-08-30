@@ -1,13 +1,15 @@
 import { NextRequest, NextResponse } from 'next/server';
 import EmailService from '@/lib/email-service';
 import { createClient } from '@supabase/supabase-js';
-import dotenv from 'dotenv';
+import { config } from '@/lib/config';
 
-// Load environment variables
-dotenv.config();
-// Initialize Supabase with fallback values for build time
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_SERVICE_ROLE_KEY;
+// Initialize Supabase with environment variables
+const supabaseUrl = config.supabase.url;
+const supabaseKey = config.supabase.serviceRoleKey;
+
+if (!supabaseUrl || !supabaseKey) {
+  throw new Error('Missing Supabase configuration. Please check your environment variables.');
+}
 
 const supabase = createClient(supabaseUrl, supabaseKey);
 
