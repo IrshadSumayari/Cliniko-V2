@@ -62,6 +62,9 @@ CREATE TABLE IF NOT EXISTS users (
     pms_type TEXT,
     WC TEXT DEFAULT 'WC',
     EPC TEXT DEFAULT 'EPC',
+    custom_email TEXT, 
+    enable_email_alerts BOOLEAN DEFAULT TRUE, 
+    session_quota_threshold INTEGER DEFAULT 2, 
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
@@ -1491,3 +1494,182 @@ $$ LANGUAGE plpgsql;
 -- • Practitioner filtering in dashboard
 -- • Manual sync practitioner name preservation
 -- • Support for Cliniko and Nookal PMS systems
+
+-- ============================================================================
+-- EMAIL NOTIFICATION SYSTEM
+-- ============================================================================
+-- This section sets up the database tables for robust email notifications
+-- Note: Email preferences are stored directly in users table
+
+-- Email notifications queue table
+CREATE TABLE IF NOT EXISTS email_notifications (
+    id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+    to_email VARCHAR(255) NOT NULL,
+    subject VARCHAR(500) NOT NULL,
+    html_content TEXT NOT NULL,
+    text_content TEXT NOT NULL,
+    type VARCHAR(50) NOT NULL CHECK (type IN ('quota_alert', 'pending_status', 'general')),
+    patient_id VARCHAR(100),
+    clinic_id VARCHAR(100) NOT NULL,
+    status VARCHAR(20) NOT NULL DEFAULT 'pending' CHECK (status IN ('pending', 'sent', 'failed', 'retrying')),
+    attempts INTEGER DEFAULT 0,
+    max_attempts INTEGER DEFAULT 5,
+    error_message TEXT,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    sent_at TIMESTAMP WITH TIME ZONE,
+    next_retry_at TIMESTAMP WITH TIME ZONE,
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+-- System alerts table for monitoring
+CREATE TABLE IF NOT EXISTS system_alerts (
+    id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+    type VARCHAR(50) NOT NULL,
+    severity VARCHAR(20) NOT NULL CHECK (severity IN ('low', 'medium', 'high', 'critical')),
+    message VARCHAR(500) NOT NULL,
+    details JSONB,
+    resolved BOOLEAN DEFAULT FALSE,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    resolved_at TIMESTAMP WITH TIME ZONE
+);
+
+-- Quota alerts tracking table
+CREATE TABLE IF NOT EXISTS quota_alerts_sent (
+    id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+    patient_id VARCHAR(100) NOT NULL,
+    clinic_id VARCHAR(100) NOT NULL,
+    email_id UUID REFERENCES email_notifications(id),
+    sessions_remaining INTEGER NOT NULL,
+    sent_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+-- Indexes for performance
+CREATE INDEX IF NOT EXISTS idx_email_notifications_status ON email_notifications(status);
+CREATE INDEX IF NOT EXISTS idx_email_notifications_clinic ON email_notifications(clinic_id);
+CREATE INDEX IF NOT EXISTS idx_email_notifications_type ON email_notifications(type);
+CREATE INDEX IF NOT EXISTS idx_email_notifications_retry ON email_notifications(next_retry_at) WHERE status = 'retrying';
+CREATE INDEX IF NOT EXISTS idx_system_alerts_type ON system_alerts(type);
+CREATE INDEX IF NOT EXISTS idx_system_alerts_severity ON system_alerts(severity);
+CREATE INDEX IF NOT EXISTS idx_quota_alerts_patient ON quota_alerts_sent(patient_id);
+CREATE INDEX IF NOT EXISTS idx_quota_alerts_clinic ON quota_alerts_sent(clinic_id);
+
+-- Function to increment email attempts atomically
+CREATE OR REPLACE FUNCTION increment_email_attempts(email_id UUID)
+RETURNS VOID AS $$
+BEGIN
+    UPDATE email_notifications 
+    SET attempts = attempts + 1,
+        updated_at = NOW()
+    WHERE id = email_id;
+END;
+$$ LANGUAGE plpgsql;
+
+-- Function to clean up old successful emails (optional - for maintenance)
+CREATE OR REPLACE FUNCTION cleanup_old_emails(days_to_keep INTEGER DEFAULT 30)
+RETURNS INTEGER AS $$
+DECLARE
+    deleted_count INTEGER;
+BEGIN
+    DELETE FROM email_notifications 
+    WHERE status = 'sent' 
+    AND sent_at < NOW() - INTERVAL '1 day' * days_to_keep;
+    
+    GET DIAGNOSTICS deleted_count = ROW_COUNT;
+    RETURN deleted_count;
+END;
+$$ LANGUAGE plpgsql;
+
+-- Function to get email statistics
+CREATE OR REPLACE FUNCTION get_email_stats(
+    clinic_filter VARCHAR(100) DEFAULT NULL,
+    hours_back INTEGER DEFAULT 24
+)
+RETURNS TABLE(
+    total_emails BIGINT,
+    sent_emails BIGINT,
+    failed_emails BIGINT,
+    pending_emails BIGINT,
+    retrying_emails BIGINT,
+    success_rate NUMERIC
+) AS $$
+BEGIN
+    RETURN QUERY
+    SELECT 
+        COUNT(*) as total_emails,
+        COUNT(*) FILTER (WHERE status = 'sent') as sent_emails,
+        COUNT(*) FILTER (WHERE status = 'failed') as failed_emails,
+        COUNT(*) FILTER (WHERE status = 'pending') as pending_emails,
+        COUNT(*) FILTER (WHERE status = 'retrying') as retrying_emails,
+        CASE 
+            WHEN COUNT(*) = 0 THEN 100.0
+            ELSE ROUND((COUNT(*) FILTER (WHERE status = 'sent')::NUMERIC / COUNT(*)::NUMERIC) * 100, 2)
+        END as success_rate
+    FROM email_notifications
+    WHERE created_at >= NOW() - INTERVAL '1 hour' * hours_back
+    AND (clinic_filter IS NULL OR clinic_id = clinic_filter);
+END;
+$$ LANGUAGE plpgsql;
+
+-- Row Level Security (RLS) policies for notification tables
+ALTER TABLE email_notifications ENABLE ROW LEVEL SECURITY;
+ALTER TABLE system_alerts ENABLE ROW LEVEL SECURITY;
+ALTER TABLE quota_alerts_sent ENABLE ROW LEVEL SECURITY;
+
+-- Policy for email_notifications - users can only see their own emails
+CREATE POLICY email_notifications_user_policy ON email_notifications
+    FOR ALL USING (
+        clinic_id = (
+            SELECT id::text FROM users 
+            WHERE auth_user_id = auth.uid()
+        )
+    );
+
+-- Policy for system_alerts - only admin users can see system alerts
+CREATE POLICY system_alerts_admin_policy ON system_alerts
+    FOR ALL USING (
+        EXISTS (
+            SELECT 1 FROM users 
+            WHERE auth_user_id = auth.uid() 
+            AND subscription_status = 'admin'
+        )
+    );
+
+-- Policy for quota_alerts_sent - users can only see their own alerts
+CREATE POLICY quota_alerts_user_policy ON quota_alerts_sent
+    FOR ALL USING (
+        clinic_id = (
+            SELECT id::text FROM users 
+            WHERE auth_user_id = auth.uid()
+        )
+    );
+
+-- Comments for documentation
+COMMENT ON TABLE email_notifications IS 'Queue for email notifications with retry logic and failure tracking - uses user preferences from users table';
+COMMENT ON TABLE system_alerts IS 'System-wide alerts and errors for admin monitoring';
+COMMENT ON TABLE quota_alerts_sent IS 'Tracking table to prevent duplicate quota alerts';
+COMMENT ON COLUMN users.custom_email IS 'Optional custom email for notifications (falls back to user.email if not set)';
+COMMENT ON COLUMN users.enable_email_alerts IS 'Whether to send email notifications (default: false)';
+COMMENT ON COLUMN users.session_quota_threshold IS 'Send alert when sessions remaining equals this number (default: 2)';
+
+COMMENT ON COLUMN email_notifications.attempts IS 'Number of send attempts made';
+COMMENT ON COLUMN email_notifications.max_attempts IS 'Maximum retry attempts before marking as failed';
+COMMENT ON COLUMN email_notifications.next_retry_at IS 'When to retry sending this email';
+
+-- Grant appropriate permissions
+GRANT ALL ON email_notifications TO authenticated;
+GRANT ALL ON system_alerts TO authenticated;
+GRANT ALL ON quota_alerts_sent TO authenticated;
+
+-- ============================================================================
+-- FINAL SETUP COMPLETE
+-- ============================================================================
+-- Your database is now fully configured with:
+-- 1. Complete PMS integration system
+-- 2. Patient status management
+-- 3. Cases table for dashboard functionality
+-- 4. Email notification system with retry logic
+-- 5. Row Level Security (RLS) policies
+-- 6. Performance indexes and helper functions
+-- 7. Duplicate prevention and sync management
+
+-- All systems are ready for production use!

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createAdminClient } from '../../../../lib/supabase/server-admin';
+import { NotificationService } from '../../../../lib/notification-service';
 
 export async function POST(req: NextRequest) {
   try {
@@ -14,15 +15,15 @@ export async function POST(req: NextRequest) {
     }
 
     const token = authHeader.replace('Bearer ', '');
-    
+
     // Get user from token
-    const { data: { user }, error: authError } = await createAdminClient().auth.getUser(token);
-    
+    const {
+      data: { user },
+      error: authError,
+    } = await createAdminClient().auth.getUser(token);
+
     if (authError || !user) {
-      return NextResponse.json(
-        { error: 'Invalid or expired token.' },
-        { status: 401 }
-      );
+      return NextResponse.json({ error: 'Invalid or expired token.' }, { status: 401 });
     }
 
     // Get user's ID from our users table
@@ -33,20 +34,14 @@ export async function POST(req: NextRequest) {
       .single();
 
     if (userError || !userData) {
-      return NextResponse.json(
-        { error: 'Failed to fetch user data.' },
-        { status: 500 }
-      );
+      return NextResponse.json({ error: 'Failed to fetch user data.' }, { status: 500 });
     }
 
     const userId = userData.id;
     const { patientId, action, newData } = await req.json();
 
     if (!patientId || !action) {
-      return NextResponse.json(
-        { error: 'Patient ID and action are required.' },
-        { status: 400 }
-      );
+      return NextResponse.json({ error: 'Patient ID and action are required.' }, { status: 400 });
     }
 
     const supabase = createAdminClient();
@@ -92,10 +87,7 @@ export async function POST(req: NextRequest) {
         break;
 
       default:
-        return NextResponse.json(
-          { error: 'Invalid action specified.' },
-          { status: 400 }
-        );
+        return NextResponse.json({ error: 'Invalid action specified.' }, { status: 400 });
     }
 
     // Update the case (not the patient directly)
@@ -109,40 +101,100 @@ export async function POST(req: NextRequest) {
 
     if (updateError) {
       console.error('Error updating patient:', updateError);
-      return NextResponse.json(
-        { error: 'Failed to update patient.' },
-        { status: 500 }
-      );
+      return NextResponse.json({ error: 'Failed to update patient.' }, { status: 500 });
+    }
+
+    // TRIGGER NOTIFICATIONS for status changes
+    try {
+      const notificationService = NotificationService.getInstance();
+
+      if (action === 'move_to_pending') {
+        // Get patient details for notification
+        const { data: patientData } = await supabase
+          .from('cases')
+          .select('patient_first_name, patient_last_name, patient_email, physio_name, program_type')
+          .eq('id', patientId)
+          .single();
+
+        if (patientData) {
+          // Create patient data object for notification
+          const patient = {
+            name: `${patientData.patient_first_name} ${patientData.patient_last_name}`,
+            epc_number: patientId,
+            sessionsRemaining: 0,
+            totalSessions: 0,
+            physio: patientData.physio_name || 'Unknown',
+            lastAppointment: new Date().toISOString().split('T')[0],
+            nextAppointment: undefined,
+          };
+
+          // Send pending status notification
+          await notificationService.sendPendingStatusAlert(
+            patient,
+            userId.toString(),
+            updateData.status_change_reason
+          );
+
+          console.log(`✅ Pending status notification sent for patient: ${patient.name}`);
+        }
+      } else if (action === 'update_quota') {
+        // Check if quota threshold is reached and send alert
+        const sessionsRemaining = (updatedCase.quota || 0) - (updatedCase.sessions_used || 0);
+
+        if (sessionsRemaining <= 2) {
+          // Get patient details for quota alert
+          const { data: patientData } = await supabase
+            .from('cases')
+            .select(
+              'patient_first_name, patient_last_name, patient_email, physio_name, program_type'
+            )
+            .eq('id', patientId)
+            .single();
+
+          if (patientData) {
+            const patient = {
+              name: `${patientData.patient_first_name} ${patientData.patient_last_name}`,
+              epc_number: patientId,
+              sessionsRemaining: sessionsRemaining,
+              totalSessions: updatedCase.quota || 0,
+              physio: patientData.physio_name || 'Unknown',
+              lastAppointment: new Date().toISOString().split('T')[0],
+              nextAppointment: undefined,
+            };
+
+            // Send quota alert
+            await notificationService.checkAndSendQuotaAlerts(userId.toString());
+            console.log(`✅ Quota alert check triggered for patient: ${patient.name}`);
+          }
+        }
+      }
+    } catch (notificationError) {
+      console.error('Notification service error:', notificationError);
+      // Don't fail the main operation if notifications fail
     }
 
     // Log the status change
-    await supabase
-      .from('sync_logs')
-      .insert({
-        user_id: userId,
-        pms_type: 'manual',
-        sync_type: 'status_change',
-        status: 'completed',
-        patients_processed: 1,
-        error_details: {
-          action,
-          patient_id: patientId,
-          reason: updateData.status_change_reason,
-          timestamp: new Date().toISOString()
-        }
-      });
+    await supabase.from('sync_logs').insert({
+      user_id: userId,
+      pms_type: 'manual',
+      sync_type: 'status_change',
+      status: 'completed',
+      patients_processed: 1,
+      error_details: {
+        action,
+        patient_id: patientId,
+        reason: updateData.status_change_reason,
+        timestamp: new Date().toISOString(),
+      },
+    });
 
     return NextResponse.json({
       success: true,
       case: updatedCase,
-      message: `Case ${action.replace(/_/g, ' ')} successfully`
+      message: `Case ${action.replace(/_/g, ' ')} successfully`,
     });
-
   } catch (error) {
     console.error('Patient status update error:', error);
-    return NextResponse.json(
-      { error: 'Failed to update patient status.' },
-      { status: 500 }
-    );
+    return NextResponse.json({ error: 'Failed to update patient status.' }, { status: 500 });
   }
 }

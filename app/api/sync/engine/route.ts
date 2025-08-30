@@ -517,21 +517,38 @@ async function checkActionNeededPatients(userId: string) {
 
 // Send notifications for Action Needed patients
 async function sendActionNeededNotifications(patients: any[], userData: any) {
-  // This would integrate with your email service
-  // For now, we'll log the notifications
+  if (patients.length === 0) {
+    console.log('No Action Needed patients to notify');
+    return;
+  }
 
-  for (const patient of patients) {
-    const remainingSessions = patient.total_sessions - patient.sessions_used;
+  console.log(`Sending notifications for ${patients.length} Action Needed patients`);
 
-    console.log(
-      `NOTIFICATION: ${remainingSessions} ${patient.patient_type} session(s) left for ${patient.first_name} ${patient.last_name}`
-    );
+  try {
+    // Get patient IDs for notification
+    const patientIds = patients.map(p => p.id);
+    
+    // Call the notification API to send emails to clinic staff only
+    const notificationResponse = await fetch(`${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/api/notifications/send-action-needed`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        patientIds,
+        clinicId: userData.id
+      })
+    });
 
-    // In production, you would:
-    // 1. Send email to clinic
-    // 2. Use a queue system for reliability
-    // 3. Retry failed emails
-    // 4. Log all notifications
+    if (notificationResponse.ok) {
+      const result = await notificationResponse.json();
+      console.log(`✅ Action Needed notifications sent successfully:`, result.summary);
+    } else {
+      console.error('❌ Failed to send Action Needed notifications:', notificationResponse.statusText);
+    }
+
+  } catch (error) {
+    console.error('Error sending Action Needed notifications:', error);
   }
 }
 

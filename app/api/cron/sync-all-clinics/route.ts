@@ -1,5 +1,4 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createServerClient } from '@/lib/supabase/server-admin';
 import { supabase } from '@/integrations/supabase/client';
 
 export async function GET(req: NextRequest) {
@@ -7,12 +6,9 @@ export async function GET(req: NextRequest) {
     // Verify this is a legitimate cron job request
     const authHeader = req.headers.get('authorization');
     const cronSecret = process.env.CRON_SECRET;
-    
+
     if (!authHeader || authHeader !== `Bearer ${cronSecret}`) {
-      return NextResponse.json(
-        { error: 'Unauthorized cron job request' },
-        { status: 401 }
-      );
+      return NextResponse.json({ error: 'Unauthorized cron job request' }, { status: 401 });
     }
 
     console.log('🔄 Starting automated sync for all active clinics...');
@@ -20,7 +16,8 @@ export async function GET(req: NextRequest) {
     // Get all active clinics with PMS connections
     const { data: activeClinics, error: clinicsError } = await supabase
       .from('users')
-      .select(`
+      .select(
+        `
         id,
         auth_user_id,
         subscription_status,
@@ -28,7 +25,8 @@ export async function GET(req: NextRequest) {
         pms_type,
         WC,
         EPC
-      `)
+      `
+      )
       .eq('is_onboarded', true)
       .not('pms_type', 'is', null);
 
@@ -41,7 +39,7 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({
         success: true,
         message: 'No active clinics to sync',
-        clinicsProcessed: 0
+        clinicsProcessed: 0,
       });
     }
 
@@ -70,7 +68,7 @@ export async function GET(req: NextRequest) {
             clinicId: clinic.id,
             success: false,
             error: 'Trial expired',
-            dashboardLocked: true
+            dashboardLocked: true,
           });
           continue;
         }
@@ -95,7 +93,7 @@ export async function GET(req: NextRequest) {
             pms_type: clinic.pms_type,
             sync_type: 'automated',
             status: 'running',
-            started_at: new Date().toISOString()
+            started_at: new Date().toISOString(),
           })
           .select()
           .single();
@@ -107,7 +105,7 @@ export async function GET(req: NextRequest) {
         try {
           // Fetch PMS data (incremental)
           const pmsData = await fetchPMSDataForClinic(clinic, lastSyncTime);
-          
+
           if (!pmsData.success) {
             throw new Error(pmsData.error);
           }
@@ -122,19 +120,54 @@ export async function GET(req: NextRequest) {
           );
 
           // Update database
-          const dbResult = await updateDatabaseForClinic(
-            processedData,
-            clinic.id,
-            clinic.pms_type
-          );
+          const dbResult = await updateDatabaseForClinic(processedData, clinic.id, clinic.pms_type);
 
           // Check for Action Needed patients
           const actionNeededPatients = await checkActionNeededPatientsForClinic(clinic.id);
-          
-          // Send notifications (in production, this would be queued)
+
+          // Send notifications to both clinic and patients
           if (actionNeededPatients.length > 0) {
-            console.log(`🔔 Clinic ${clinic.id} has ${actionNeededPatients.length} patients needing action`);
-            // await queueActionNeededNotifications(actionNeededPatients, clinic);
+            console.log(
+              `🔔 Clinic ${clinic.id} has ${actionNeededPatients.length} patients needing action`
+            );
+
+            try {
+              // Get patient IDs for notification
+              const patientIds = actionNeededPatients.map((p) => p.id);
+
+              // Call the notification API to send emails to clinic staff only
+              const notificationResponse = await fetch(
+                `${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/api/notifications/send-action-needed`,
+                {
+                  method: 'POST',
+                  headers: {
+                    'Content-Type': 'application/json',
+                  },
+                  body: JSON.stringify({
+                    patientIds,
+                    clinicId: clinic.id,
+                  }),
+                }
+              );
+
+              if (notificationResponse.ok) {
+                const result = await notificationResponse.json();
+                console.log(
+                  `✅ Action Needed notifications sent for clinic ${clinic.id}:`,
+                  result.summary
+                );
+              } else {
+                console.error(
+                  `❌ Failed to send Action Needed notifications for clinic ${clinic.id}:`,
+                  notificationResponse.statusText
+                );
+              }
+            } catch (error) {
+              console.error(
+                `Error sending Action Needed notifications for clinic ${clinic.id}:`,
+                error
+              );
+            }
           }
 
           // Update sync log
@@ -147,7 +180,7 @@ export async function GET(req: NextRequest) {
               patients_synced: dbResult.patientsUpdated,
               appointments_synced: processedData.appointments.length,
               completed_at: new Date().toISOString(),
-              last_modified_sync: new Date().toISOString()
+              last_modified_sync: new Date().toISOString(),
             })
             .eq('id', syncLog.id);
 
@@ -155,7 +188,7 @@ export async function GET(req: NextRequest) {
           await supabase
             .from('users')
             .update({
-              pms_last_sync: new Date().toISOString()
+              pms_last_sync: new Date().toISOString(),
             })
             .eq('id', clinic.id);
 
@@ -166,19 +199,20 @@ export async function GET(req: NextRequest) {
             patientsAdded: dbResult.patientsAdded,
             patientsUpdated: dbResult.patientsUpdated,
             appointmentsSynced: processedData.appointments.length,
-            actionNeededCount: actionNeededPatients.length
+            actionNeededCount: actionNeededPatients.length,
           };
 
           syncResults.push(result);
-          
+
           // Update totals
           totalPatientsProcessed += result.patientsProcessed;
           totalPatientsAdded += result.patientsAdded;
           totalPatientsUpdated += result.patientsUpdated;
           totalAppointmentsSynced += result.appointmentsSynced;
 
-          console.log(`✅ Clinic ${clinic.id} synced successfully: ${result.patientsProcessed} patients, ${result.appointmentsSynced} appointments`);
-
+          console.log(
+            `✅ Clinic ${clinic.id} synced successfully: ${result.patientsProcessed} patients, ${result.appointmentsSynced} appointments`
+          );
         } catch (error) {
           // Update sync log with error
           await supabase
@@ -187,14 +221,14 @@ export async function GET(req: NextRequest) {
               status: 'failed',
               errors_count: 1,
               error_details: { error: error.message },
-              completed_at: new Date().toISOString()
+              completed_at: new Date().toISOString(),
             })
             .eq('id', syncLog.id);
 
           const errorResult = {
             clinicId: clinic.id,
             success: false,
-            error: error.message
+            error: error.message,
           };
 
           syncResults.push(errorResult);
@@ -202,13 +236,12 @@ export async function GET(req: NextRequest) {
 
           console.error(`❌ Clinic ${clinic.id} sync failed: ${error.message}`);
         }
-
       } catch (error) {
         console.error(`❌ Error processing clinic ${clinic.id}:`, error);
         syncResults.push({
           clinicId: clinic.id,
           success: false,
-          error: error.message
+          error: error.message,
         });
         totalErrors++;
       }
@@ -218,7 +251,7 @@ export async function GET(req: NextRequest) {
     console.log(`
 🔄 Automated sync completed:
 📊 Clinics processed: ${activeClinics.length}
-✅ Successful: ${syncResults.filter(r => r.success).length}
+✅ Successful: ${syncResults.filter((r) => r.success).length}
 ❌ Failed: ${totalErrors}
 👥 Total patients processed: ${totalPatientsProcessed}
 ➕ New patients added: ${totalPatientsAdded}
@@ -231,23 +264,25 @@ export async function GET(req: NextRequest) {
       message: 'Automated sync completed',
       summary: {
         clinicsProcessed: activeClinics.length,
-        successful: syncResults.filter(r => r.success).length,
+        successful: syncResults.filter((r) => r.success).length,
         failed: totalErrors,
         totalPatientsProcessed,
         totalPatientsAdded,
         totalPatientsUpdated,
-        totalAppointmentsSynced
+        totalAppointmentsSynced,
       },
       results: syncResults,
-      nextSyncTime: new Date(Date.now() + 4 * 60 * 60 * 1000).toISOString()
+      nextSyncTime: new Date(Date.now() + 4 * 60 * 60 * 1000).toISOString(),
     });
-
   } catch (error) {
     console.error('❌ Automated sync failed:', error);
-    return NextResponse.json({
-      success: false,
-      error: error.message || 'Automated sync failed'
-    }, { status: 500 });
+    return NextResponse.json(
+      {
+        success: false,
+        error: error.message || 'Automated sync failed',
+      },
+      { status: 500 }
+    );
   }
 }
 
@@ -258,15 +293,21 @@ async function fetchPMSDataForClinic(clinic: any, lastSyncTime: string) {
   return {
     success: true,
     patients: [],
-    appointments: []
+    appointments: [],
   };
 }
 
-async function processPMSDataForClinic(patients: any[], appointments: any[], wcTag: string, epcTag: string, clinicId: string) {
+async function processPMSDataForClinic(
+  patients: any[],
+  appointments: any[],
+  wcTag: string,
+  epcTag: string,
+  clinicId: string
+) {
   // Process data similar to manual sync
   return {
     patients: [],
-    appointments: []
+    appointments: [],
   };
 }
 
@@ -274,7 +315,7 @@ async function updateDatabaseForClinic(processedData: any, clinicId: string, pms
   // Update database similar to manual sync
   return {
     patientsAdded: 0,
-    patientsUpdated: 0
+    patientsUpdated: 0,
   };
 }
 
@@ -287,7 +328,7 @@ async function checkActionNeededPatientsForClinic(clinicId: string) {
 
   if (!patients) return [];
 
-  return patients.filter(patient => {
+  return patients.filter((patient) => {
     const remainingSessions = patient.total_sessions - patient.sessions_used;
     return remainingSessions <= 2;
   });
