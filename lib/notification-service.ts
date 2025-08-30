@@ -38,7 +38,7 @@ export class NotificationService {
   async checkAndSendQuotaAlerts(userId: string): Promise<void> {
     try {
       // Get user notification settings
-      const settings = await this.getUserNotificationSettings(userId);
+      const settings: NotificationSettings = await this.getUserNotificationSettings(userId);
 
       if (!settings.emailNotifications || !settings.notifyOnQuota) {
         console.log('Quota notifications disabled for user:', userId);
@@ -125,7 +125,7 @@ export class NotificationService {
       console.log(`🚀 Sending pending status alert for patient: ${patient.name}`);
 
       // Get user notification settings
-      const settings = await this.getUserNotificationSettings(userId);
+      const settings: NotificationSettings = await this.getUserNotificationSettings(userId);
 
       if (!settings.emailNotifications || !settings.notifyOnPending) {
         console.log('Pending notifications disabled for user:', userId);
@@ -173,42 +173,50 @@ export class NotificationService {
     try {
       // Get user's notification preferences from users table
       const supabase = createAdminClient();
+      type UserSettings = {
+        custom_email?: string;
+        enable_email_alerts?: boolean;
+        session_quota_threshold?: number;
+      };
       const { data: user, error } = await supabase
         .from('users')
         .select('custom_email, enable_email_alerts, session_quota_threshold')
         .eq('id', userId)
-        .single();
+        .single() as { data: UserSettings | null; error: any };
 
       if (error) {
         console.error('Error fetching user settings:', error);
         // Return safe defaults
-        return {
+        const defaultSettings: NotificationSettings = {
           emailNotifications: false,
           quotaThreshold: 2,
           customEmail: undefined,
           notifyOnPending: false,
           notifyOnQuota: false,
         };
+        return defaultSettings;
       }
 
       // Return settings from users table
-      return {
+      const userSettings: NotificationSettings = {
         emailNotifications: user?.enable_email_alerts || false,
         quotaThreshold: user?.session_quota_threshold || 2,
         customEmail: user?.custom_email || undefined,
         notifyOnPending: user?.enable_email_alerts || false,
         notifyOnQuota: user?.enable_email_alerts || false,
       };
+      return userSettings;
     } catch (error) {
       console.error('Error getting user settings:', error);
       // Return safe defaults
-      return {
+      const fallbackSettings: NotificationSettings = {
         emailNotifications: false,
         quotaThreshold: 2,
         customEmail: undefined,
         notifyOnPending: false,
         notifyOnQuota: false,
       };
+      return fallbackSettings;
     }
   }
 
@@ -219,11 +227,16 @@ export class NotificationService {
     try {
       // Get user details from users table
       const supabase = createAdminClient();
+      type UserDetails = {
+        email?: string;
+        full_name?: string;
+        custom_email?: string;
+      };
       const { data: user, error } = await supabase
         .from('users')
         .select('email, full_name, custom_email')
         .eq('id', userId)
-        .single();
+        .single() as { data: UserDetails | null; error: any };
 
       if (error || !user) {
         console.error('User not found:', userId);
@@ -231,7 +244,7 @@ export class NotificationService {
       }
 
       // Use custom_email as the primary recipient, fall back to user's default email if not set
-      const emailToUse = user.custom_email || user.email;
+      const emailToUse = user.custom_email || user.email || '';
 
       return {
         name: user.full_name || 'Your Clinic',

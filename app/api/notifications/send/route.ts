@@ -65,6 +65,7 @@ export async function POST(request: NextRequest) {
         await notificationService.sendQuotaAlert(patient, clinic, {
           emailNotifications: true,
           quotaThreshold: 2,
+          customEmail: undefined,
           notifyOnPending: true,
           notifyOnQuota: true,
         });
