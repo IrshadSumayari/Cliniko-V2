@@ -1,17 +1,15 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { NotificationService } from '@/lib/notification-service';
 import { createClient } from '@supabase/supabase-js';
-import dotenv from 'dotenv';
+import { config } from '@/lib/config';
 
-// Load environment variables
-dotenv.config();
+// Initialize Supabase with environment variables
+const supabaseUrl = config.supabase.url;
+const supabaseKey = config.supabase.serviceRoleKey;
 
-// Initialize Supabase with fallback values for build time
-const supabaseUrl =
-  process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://qolninjhutvsxjbvlhzl.supabase.co';
-const supabaseKey =
-  process.env.SUPABASE_SERVICE_ROLE_KEY ||
-  'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFvbG5pbmpodXR2c3hqYnZsaHpsIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImiYXQiOjE3NTU0MjU1ODcsImV4cCI6MjA3MTAwMTU4N30.FbL9xNZhGvqX4x_Vaq7FwwtOnyzLq_l27nGOwJqm_Bg';
+if (!supabaseUrl || !supabaseKey) {
+  throw new Error('Missing Supabase configuration. Please check your environment variables.');
+}
 
 const supabase = createClient(supabaseUrl, supabaseKey);
 

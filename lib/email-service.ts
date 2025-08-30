@@ -10,10 +10,9 @@ if (sendGridKey) {
   console.error('SENDGRID_API_KEY environment variable is not set');
 }
 
-// Initialize Supabase for logging - use the same config as your app
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || config.supabase.url;
-const supabaseServiceKey =
-  process.env.NEXT_PUBLIC_SUPABASE_SERVICE_ROLE_KEY || config.supabase.serviceRoleKey;
+// Initialize Supabase for logging - use the config
+const supabaseUrl = config.supabase.url;
+const supabaseServiceKey = config.supabase.serviceRoleKey;
 
 if (!supabaseUrl || !supabaseServiceKey) {
   console.error('Supabase configuration missing in email service');
@@ -163,7 +162,7 @@ export class EmailService {
     const msg = {
       to: email.to_email,
       from: {
-        email: process.env.FROM_EMAIL || 'irshad.sumayari@ecoedgeai.com',
+        email: process.env.FROM_EMAIL || config.sendgrid.fromEmail,
         name: 'MyPhysioFlow',
       },
       subject: email.subject,

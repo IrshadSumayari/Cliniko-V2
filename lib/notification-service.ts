@@ -1,5 +1,6 @@
 import { createAdminClient } from './supabase/server-admin';
 import EmailService from './email-service';
+import { config } from './config';
 import {
   generateQuotaAlertEmail,
   generatePendingStatusEmail,
@@ -354,7 +355,7 @@ export class NotificationService {
 
       // Send admin notification
       await this.emailService.queueEmail({
-        to_email: process.env.ADMIN_EMAIL || 'admin@myphysioflow.com',
+        to_email: process.env.ADMIN_EMAIL || config.sendgrid.adminEmail,
         subject: systemAlert.subject,
         html_content: systemAlert.html,
         text_content: systemAlert.text,

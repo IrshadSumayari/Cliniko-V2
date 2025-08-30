@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createServerClient } from '@/lib/supabase/server-admin';
+import { createAdminClient } from '@/lib/supabase/server-admin';
 
 export async function GET(req: NextRequest) {
   try {
@@ -19,17 +19,20 @@ export async function GET(req: NextRequest) {
 
     const token = authHeader.replace('Bearer ', '');
 
+    // Create Supabase admin client
+    const supabase = createAdminClient();
+
     // Get user from token
     const {
       data: { user },
       error: authError,
-    } = await createServerClient().auth.getUser(token);
+    } = await supabase.auth.getUser(token);
     if (authError || !user) {
       return NextResponse.json({ error: 'Invalid or expired token.' }, { status: 401 });
     }
 
     // Get user's PMS credentials
-    const { data: userData, error: userError } = await createServerClient()
+    const { data: userData, error: userError } = await supabase
       .from('users')
       .select('id, pms_type')
       .eq('auth_user_id', user.id)
@@ -40,7 +43,7 @@ export async function GET(req: NextRequest) {
     }
 
     // Get stored API key for the PMS
-    const { data: pmsCredentials, error: credError } = await createServerClient()
+    const { data: pmsCredentials, error: credError } = await supabase
       .from('pms_api_keys')
       .select('api_key_encrypted, api_url, clinic_id')
       .eq('user_id', userData.id)
