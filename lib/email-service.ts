@@ -1,4 +1,4 @@
-import sgMail from '@sendgrid/mail';
+import * as sgMail from '@sendgrid/mail';
 import { createClient } from '@supabase/supabase-js';
 import { config } from './config';
 
@@ -6,8 +6,9 @@ import { config } from './config';
 const sendGridKey = process.env.SENDGRID_API_KEY;
 if (sendGridKey) {
   sgMail.setApiKey(sendGridKey);
+  console.log('✅ SendGrid API key configured');
 } else {
-  console.error('SENDGRID_API_KEY environment variable is not set');
+  console.error('❌ SENDGRID_API_KEY environment variable is not set');
 }
 
 // Initialize Supabase for logging - use the config
@@ -15,7 +16,11 @@ const supabaseUrl = config.supabase.url;
 const supabaseServiceKey = config.supabase.serviceRoleKey;
 
 if (!supabaseUrl || !supabaseServiceKey) {
-  console.error('Supabase configuration missing in email service');
+  console.error('❌ Supabase configuration missing in email service');
+  console.error('URL:', supabaseUrl ? 'SET' : 'MISSING');
+  console.error('Service Key:', supabaseServiceKey ? 'SET' : 'MISSING');
+} else {
+  console.log('✅ Supabase configuration loaded for email service');
 }
 
 const supabase = createClient(supabaseUrl, supabaseServiceKey);
