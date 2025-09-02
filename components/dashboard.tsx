@@ -7,6 +7,15 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import {
+  Command,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList,
+} from '@/components/ui/command';
 import {
   Users,
   Bell,
@@ -34,6 +43,7 @@ import {
   TrendingUp,
   Plus,
   SlidersHorizontal,
+  ChevronDown,
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/contexts/auth-context';
@@ -56,6 +66,7 @@ const Dashboard = ({ onNavigate }: DashboardProps) => {
   const [selectedLocation, setSelectedLocation] = useState('all');
   const [selectedPractitioner, setSelectedPractitioner] = useState('all');
   const [practitionerOptions, setPractitionerOptions] = useState([]);
+  const [physioPopoverOpen, setPhysioPopoverOpen] = useState(false);
   const [activeTab, setActiveTab] = useState('all-patients');
   const [userSubscription, setUserSubscription] = useState<{
     subscription_status: string;
@@ -1047,7 +1058,7 @@ const Dashboard = ({ onNavigate }: DashboardProps) => {
               </div>
 
               <div className="flex items-center gap-4">
-                <Button
+                {/* <Button
                   variant="outline"
                   size="lg"
                   onClick={handleSync}
@@ -1056,7 +1067,7 @@ const Dashboard = ({ onNavigate }: DashboardProps) => {
                 >
                   <RefreshCw className={`h-5 w-5 ${isSync ? 'animate-spin' : ''}`} />
                   {isSync ? 'Syncing...' : 'Sync Data'}
-                </Button>
+                </Button> */}
                 <Button
                   variant="outline"
                   size="lg"
@@ -1263,19 +1274,68 @@ const Dashboard = ({ onNavigate }: DashboardProps) => {
                   {practitionerOptions.length > 1 && (
                     <div className="flex items-center gap-3">
                       <span className="text-sm font-medium text-muted-foreground">Physio:</span>
-                      <div className="flex gap-2 max-w-md overflow-x-auto scrollbar-thin scrollbar-thumb-border scrollbar-track-transparent">
-                        {practitionerOptions.map((option: any) => (
+                      <Popover open={physioPopoverOpen} onOpenChange={setPhysioPopoverOpen}>
+                        <PopoverTrigger asChild>
                           <Button
-                            key={option.value}
-                            variant={selectedPractitioner === option.value ? 'default' : 'outline'}
-                            size="sm"
-                            onClick={() => setSelectedPractitioner(option.value)}
-                            className="h-10 px-4 flex-shrink-0"
+                            variant="outline"
+                            role="combobox"
+                            aria-expanded={physioPopoverOpen}
+                            className="w-[200px] h-10 justify-between"
                           >
-                            {option.label}
+                            {selectedPractitioner === 'all'
+                              ? 'All Physios'
+                              : practitionerOptions.find(
+                                  (option: any) => option.value === selectedPractitioner
+                                )?.label || 'Select Physio'}
+                            <ChevronDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
                           </Button>
-                        ))}
-                      </div>
+                        </PopoverTrigger>
+                        <PopoverContent className="w-[200px] p-0">
+                          <Command>
+                            <CommandInput placeholder="Search physios..." />
+                            <CommandList>
+                              <CommandEmpty>No physio found.</CommandEmpty>
+                              <CommandGroup>
+                                <CommandItem
+                                  value="all"
+                                  onSelect={() => {
+                                    setSelectedPractitioner('all');
+                                    setPhysioPopoverOpen(false);
+                                  }}
+                                >
+                                  <Check
+                                    className={`mr-2 h-4 w-4 ${
+                                      selectedPractitioner === 'all' ? 'opacity-100' : 'opacity-0'
+                                    }`}
+                                  />
+                                  All Physios
+                                </CommandItem>
+                                {practitionerOptions
+                                  .filter((option: any) => option.value !== 'all') // Remove duplicate "All" option
+                                  .map((option: any) => (
+                                    <CommandItem
+                                      key={option.value}
+                                      value={option.value}
+                                      onSelect={() => {
+                                        setSelectedPractitioner(option.value);
+                                        setPhysioPopoverOpen(false);
+                                      }}
+                                    >
+                                      <Check
+                                        className={`mr-2 h-4 w-4 ${
+                                          selectedPractitioner === option.value
+                                            ? 'opacity-100'
+                                            : 'opacity-0'
+                                        }`}
+                                      />
+                                      {option.label}
+                                    </CommandItem>
+                                  ))}
+                              </CommandGroup>
+                            </CommandList>
+                          </Command>
+                        </PopoverContent>
+                      </Popover>
                     </div>
                   )}
 
