@@ -68,9 +68,8 @@ export async function GET(req: NextRequest) {
       case 'cliniko':
         pmsData = await fetchClinikoData(pmsCredentials, lastSync);
         break;
-      case 'halaxy':
-        pmsData = await fetchHalaxyData(pmsCredentials, lastSync);
-        break;
+      case 'other':
+        return NextResponse.json({ error: 'Custom PMS integration requires manual setup. Please contact support.' }, { status: 400 });
       default:
         return NextResponse.json({ error: 'Unsupported PMS type.' }, { status: 400 });
     }
@@ -248,80 +247,4 @@ async function fetchClinikoData(credentials: any, lastSync: string | null) {
   }
 }
 
-// Fetch data from Halaxy
-async function fetchHalaxyData(credentials: any, lastSync: string | null) {
-  try {
-    const apiKey = credentials.api_key_encrypted;
 
-    // Build query parameters for incremental sync
-    const queryParams = new URLSearchParams();
-    if (lastSync) {
-      queryParams.append('modified_since', lastSync);
-    }
-
-    // Fetch patients
-    const patientsResponse = await fetch(`${credentials.api_url}/patients?${queryParams}`, {
-      headers: {
-        Authorization: `Bearer ${apiKey}`,
-        'Content-Type': 'application/json',
-      },
-    });
-
-    if (!patientsResponse.ok) {
-      throw new Error(`Halaxy patients API failed: ${patientsResponse.statusText}`);
-    }
-
-    const patientsData = await patientsResponse.json();
-
-    // Fetch appointments
-    const appointmentsResponse = await fetch(`${credentials.api_url}/appointments?${queryParams}`, {
-      headers: {
-        Authorization: `Bearer ${apiKey}`,
-        'Content-Type': 'application/json',
-      },
-    });
-
-    if (!appointmentsResponse.ok) {
-      throw new Error(`Halaxy appointments API failed: ${appointmentsResponse.statusText}`);
-    }
-
-    const appointmentsData = await appointmentsResponse.json();
-
-    // Transform Halaxy data to our format
-    const patients =
-      patientsData.data?.map((patient: any) => ({
-        id: patient.id,
-        first_name: patient.first_name,
-        last_name: patient.last_name,
-        email: patient.email,
-        phone: patient.phone,
-        date_of_birth: patient.date_of_birth,
-        patient_type: patient.patient_type,
-        physio_name: patient.practitioner_name,
-        pms_last_modified: patient.modified_at || patient.created_at,
-      })) || [];
-
-    const appointments =
-      appointmentsData.data?.map((apt: any) => ({
-        id: apt.id,
-        patient_id: apt.patient_id,
-        appointment_type: apt.appointment_type,
-        status: apt.status,
-        appointment_date: apt.start_time,
-        practitioner_name: apt.practitioner_name,
-        is_completed: apt.status === 'completed',
-        pms_last_modified: apt.modified_at || apt.created_at,
-      })) || [];
-
-    return {
-      success: true,
-      patients,
-      appointments,
-    };
-  } catch (error) {
-    return {
-      success: false,
-      error: `Halaxy sync failed: ${error.message}`,
-    };
-  }
-}

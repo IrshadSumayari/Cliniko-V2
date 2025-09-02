@@ -1,6 +1,5 @@
 import type { PMSApiInterface, PMSApiCredentials, PMSType } from './types';
 import { ClinikoAPI } from './cliniko-api';
-import { HalaxyAPI } from './halaxy-api';
 import { NookalAPI } from './nookal-api';
 
 export class PMSFactory {
@@ -10,19 +9,21 @@ export class PMSFactory {
     switch (pmsType) {
       case 'cliniko':
         return new ClinikoAPI(credentials);
-      case 'halaxy':
-        return new HalaxyAPI(credentials);
       case 'nookal':
         return new NookalAPI(credentials, {
           fetchPatientDetails: options?.fetchPatientDetails ?? false,
         });
+      case 'other':
+        // For "other" PMS types, we'll use a generic approach or throw an error
+        // This should be handled by the manual setup process
+        throw new Error('Custom PMS integration requires manual setup. Please contact support.');
       default:
         throw new Error(`Unsupported PMS type: ${pmsType}`);
     }
   }
 
   static getSupportedPMSTypes(): PMSType[] {
-    return ['cliniko', 'halaxy', 'nookal'];
+    return ['cliniko', 'nookal', 'other'];
   }
 
   static validateCredentials(pmsType: PMSType, credentials: PMSApiCredentials): boolean {

@@ -92,7 +92,7 @@ export interface PMSApiInterface {
   getPractitioners(): Promise<PMSPractitioner[]>;
 }
 
-export type PMSType = 'cliniko' | 'halaxy' | 'nookal';
+export type PMSType = 'cliniko' | 'nookal' | 'other';
 
 export interface SyncLogEntry {
   id: string;

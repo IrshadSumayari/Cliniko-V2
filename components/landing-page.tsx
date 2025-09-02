@@ -279,15 +279,11 @@ const LandingPage = ({ onGetStarted, onLogin, onSignup }: LandingPageProps) => {
 
                 <div className="flex items-center justify-center gap-20">
                   <div className="group text-center space-y-4">
-                    <div className="w-24 h-24 mx-auto rounded-full overflow-hidden shadow-[0_8px_32px_rgba(0,0,0,0.12)] border-3 border-white/20 backdrop-blur-sm bg-white/10 group-hover:shadow-[0_12px_40px_rgba(0,0,0,0.2)] transition-all duration-500 hover:scale-110 hover:border-white/40">
-                      <img
-                        src="/assets/logos/halaxy.png"
-                        alt="Halaxy"
-                        className="w-full h-full object-cover"
-                      />
+                    <div className="w-24 h-24 mx-auto rounded-full overflow-hidden shadow-[0_8px_32px_rgba(0,0,0,0.12)] border-3 border-white/20 backdrop-blur-sm bg-white/10 group-hover:shadow-[0_12px_40px_rgba(0,0,0,0.2)] transition-all duration-500 hover:scale-110 hover:border-white/40 flex items-center justify-center">
+                      <span className="text-2xl font-bold text-white">O</span>
                     </div>
                     <p className="text-sm font-medium text-muted-foreground group-hover:text-foreground transition-colors">
-                      Halaxy
+                      Other
                     </p>
                   </div>
 
@@ -695,7 +691,7 @@ const LandingPage = ({ onGetStarted, onLogin, onSignup }: LandingPageProps) => {
                 {
                   question: 'Which practice management systems do you support?',
                   answer:
-                    "We integrate with all major PMS including Halaxy, Cliniko, Power Diary, TM3, and many others. Don't see yours? Contact us for custom integration.",
+                    "We integrate with all major PMS including Cliniko, Nookal, Power Diary, TM3, and many others. Don't see yours? We can set up custom integrations within 24 hours.",
                 },
                 {
                   question: 'Is my patient data secure?',

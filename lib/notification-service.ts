@@ -384,17 +384,17 @@ export class NotificationService {
   /**
    * Send test notification
    */
-  async sendTestNotification(recipientEmail: string): Promise<void> {
+  async sendTestNotification(recipientEmail: string): Promise<boolean> {
     try {
       const testEmail = {
-        subject: '✅ MyPhysioFlow Test Notification',
+        subject: 'MyPhysioFlow Test Notification',
         html: '<h1>Test Email</h1><p>This is a test notification from MyPhysioFlow.</p>',
         text: 'Test Email\n\nThis is a test notification from MyPhysioFlow.',
       };
 
       const emailId = await this.emailService.queueEmail({
         to_email: recipientEmail,
-        subject: '✅ MyPhysioFlow Test Notification',
+        subject: 'MyPhysioFlow Test Notification',
         html_content: testEmail.html,
         text_content: testEmail.text,
         type: 'general',
@@ -403,8 +403,10 @@ export class NotificationService {
       });
 
       console.log(`Test notification queued: ${emailId}`);
+      return true;
     } catch (error) {
       console.error('Error sending test notification:', error);
+      return false;
     }
   }
 

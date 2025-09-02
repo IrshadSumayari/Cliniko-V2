@@ -474,8 +474,8 @@ const Settings = ({ onBack }: { onBack: () => void }) => {
                 >
                   <option value="">Select your PMS</option>
                   <option value="Cliniko">Cliniko</option>
-                  <option value="Halaxy">Halaxy</option>
                   <option value="Nookal">Nookal</option>
+                  <option value="Other">Other</option>
                 </select>
                 {pmsConnection.connected && (
                   <p className="text-xs text-muted-foreground mt-1">
@@ -553,8 +553,8 @@ const Settings = ({ onBack }: { onBack: () => void }) => {
                   <span className="text-muted-foreground">/month</span>
                 </div>
                 <ul className="space-y-1 text-sm text-muted-foreground">
-                  <li>✓ Unlimited patient matching</li>
-                  <li>✓ Advanced analytics and reporting</li>
+                  <li>Unlimited patient matching</li>
+                  <li>Advanced analytics and reporting</li>
                 </ul>
               </div>
               <Button

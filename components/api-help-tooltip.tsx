@@ -31,15 +31,15 @@ export default function ApiHelpTooltip({ pmsName }: ApiHelpTooltipProps) {
           ],
           url: 'https://help.nookal.com/article/api-access',
         };
-      case 'Halaxy':
+      case 'Other':
         return {
           steps: [
-            'Login to Halaxy → Settings',
-            'Go to Integrations → API',
-            "Click 'Generate API Key'",
-            "Copy the key (starts with 'hx_')",
+            'Contact your PMS provider for API access',
+            'Request API key or integration credentials',
+            'Provide the API key to our support team',
+            'We will set up the integration within 24 hours',
           ],
-          url: 'https://help.halaxy.com/api-integration',
+          url: '',
         };
       default:
         return {
