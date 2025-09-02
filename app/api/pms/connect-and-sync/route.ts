@@ -305,6 +305,7 @@ async function performInitialSync(supabase: any, userId: string, pmsClient: any,
   let wcPatients = 0;
   let epcPatients = 0;
   let totalAppointments = 0;
+  let actionNeededPatients = 0;
 
   try {
     console.log('[SERVER] Starting initial sync for user:', userId);
@@ -612,6 +613,27 @@ async function performInitialSync(supabase: any, userId: string, pmsClient: any,
     wcPatients = 0;
     epcPatients = 0;
 
+    // Calculate action needed patients count using same logic as dashboard
+    try {
+      const { data: casesData, error: casesError } = await supabase
+        .from('cases')
+        .select('id, quota, sessions_used, status')
+        .eq('user_id', userId)
+        .eq('status', 'active');
+
+      if (!casesError && casesData) {
+        actionNeededPatients = casesData.filter((caseItem: any) => {
+          const remainingSessions = caseItem.quota - caseItem.sessions_used;
+          // Use same logic as dashboard: warning status with remaining sessions > 0
+          return remainingSessions <= 2 && remainingSessions > 0;
+        }).length;
+        
+        console.log(`[SERVER] 📊 Action needed patients: ${actionNeededPatients}`);
+      }
+    } catch (actionError) {
+      console.error('[SERVER] Error calculating action needed patients:', actionError);
+    }
+
     // Practitioners are already synced before this function is called
     console.log('[SERVER] ✅ Practitioners already synced in previous step');
 
@@ -667,6 +689,7 @@ async function performInitialSync(supabase: any, userId: string, pmsClient: any,
       wcPatients,
       epcPatients,
       totalAppointments,
+      actionNeededPatients,
       issues: issues.length > 0 ? issues : undefined,
     };
   } catch (error) {
@@ -675,6 +698,7 @@ async function performInitialSync(supabase: any, userId: string, pmsClient: any,
       wcPatients: 0,
       epcPatients: 0,
       totalAppointments: 0,
+      actionNeededPatients: 0,
       issues: [`Sync failed: ${error instanceof Error ? error.message : 'Unknown error'}`],
     };
   }

@@ -31,6 +31,19 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Invalid or expired token' }, { status: 401 });
     }
 
+    // Get the user ID from the users table
+    const { data: userRecordForId, error: userError } = await supabase
+      .from('users')
+      .select('id')
+      .eq('auth_user_id', user.id)
+      .single();
+
+    if (userError || !userRecordForId) {
+      return NextResponse.json({ error: 'User not found' }, { status: 404 });
+    }
+
+    const userId = userRecordForId.id;
+
     // Update the user's tags using the same pattern as is_onboarded updates
     const { data: updatedUser, error: updateError } = await supabase
       .from('users')
@@ -65,6 +78,7 @@ export async function POST(request: NextRequest) {
     let wcCount = 0;
     let epcCount = 0;
     let totalAppointmentsCount = 0;
+    let actionNeededPatientsCount = 0;
 
     try {
       // Debug: Let's see all appointment types for this user
@@ -202,6 +216,8 @@ export async function POST(request: NextRequest) {
       // Total appointments is the sum of WC + EPC appointments
       totalAppointmentsCount = wcAppointmentCount + epcAppointmentCount;
 
+      // Action needed patients calculation will be done after cases table is populated
+
       try {
         // Get all patients for this user
         const { data: allPatients, error: patientsError } = await supabase
@@ -337,6 +353,26 @@ export async function POST(request: NextRequest) {
             console.log(
               `Final counts from cases table: ${finalWcCount} WC + ${finalEpcCount} EPC = ${finalWcCount + finalEpcCount} total`
             );
+            
+            // Calculate action needed patients count using same logic as dashboard
+            // This must be done AFTER cases table is populated
+            try {
+              const { data: actionNeededData, error: actionError } = await supabase
+                .from('cases')
+                .select('id, quota, sessions_used, status')
+                .eq('user_id', userId)
+                .eq('status', 'active');
+
+              if (!actionError && actionNeededData) {
+                actionNeededPatientsCount = actionNeededData.filter((caseItem: any) => {
+                  const remainingSessions = caseItem.quota - caseItem.sessions_used;
+                  // Use same logic as dashboard: warning status with remaining sessions > 0
+                  return remainingSessions <= 2 && remainingSessions > 0;
+                }).length;
+              }
+            } catch (actionError) {
+              console.error('Error calculating action needed patients:', actionError);
+            }
           }
         }
       } catch (casesPopulationError) {
@@ -348,6 +384,7 @@ export async function POST(request: NextRequest) {
         [`${wcTag}Patients`]: wcCount,
         [`${epcTag}Patients`]: epcCount,
         totalAppointments: totalAppointmentsCount,
+        actionNeededPatients: actionNeededPatientsCount,
       });
     } catch (countingError) {
       console.error('Error in counting logic:', countingError);
@@ -355,6 +392,7 @@ export async function POST(request: NextRequest) {
       wcCount = 0;
       epcCount = 0;
       totalAppointmentsCount = 0;
+      actionNeededPatientsCount = 0;
     }
 
     return NextResponse.json({
@@ -364,6 +402,7 @@ export async function POST(request: NextRequest) {
         [`${wcTag}Patients`]: wcCount,
         [`${epcTag}Patients`]: epcCount,
         totalAppointments: totalAppointmentsCount,
+        actionNeededPatients: actionNeededPatientsCount,
       },
     });
   } catch (error) {

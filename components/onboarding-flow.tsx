@@ -27,6 +27,7 @@ interface SyncResults {
   wcPatients: number;
   epcPatients: number;
   totalAppointments: number;
+  actionNeededPatients: number;
   issues?: string[];
   customTags?: {
     wc: string;
@@ -60,6 +61,7 @@ export default function OnboardingFlow() {
     wcPatients: 0,
     epcPatients: 0,
     totalAppointments: 0,
+    actionNeededPatients: 0,
     issues: [],
     customTags: {
       wc: 'WC',
@@ -113,7 +115,7 @@ export default function OnboardingFlow() {
     }
   };
 
-    const handleOtherPMSSubmit = async () => {
+  const handleOtherPMSSubmit = async () => {
     if (!otherPMSData.softwareName.trim() || !otherPMSData.softwareUrl.trim()) {
       toast.error('Please fill in both software name and software URL');
       return;
@@ -121,20 +123,20 @@ export default function OnboardingFlow() {
 
     try {
       setIsProcessing(true);
-      
+
       // Get the access token from auth context
       const token = getAccessToken();
       if (!token) {
         toast.error('Authentication token not found. Please try logging in again.');
         return;
       }
-      
+
       // Send the custom PMS setup request using direct fetch with manual headers
       const response = await fetch('/api/pms/pms-request', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`,
+          Authorization: `Bearer ${token}`,
         },
         body: JSON.stringify({
           softwareName: otherPMSData.softwareName,
@@ -275,6 +277,7 @@ export default function OnboardingFlow() {
               wcPatients: responseData.wcPatients || 0,
               epcPatients: responseData.epcPatients || 0,
               totalAppointments: responseData.totalAppointments || 0,
+              actionNeededPatients: responseData.actionNeededPatients || 0,
               issues: responseData.issues || [],
             });
 
@@ -327,6 +330,7 @@ export default function OnboardingFlow() {
         wcPatients: result.wcPatients || 0,
         epcPatients: result.epcPatients || 0,
         totalAppointments: result.totalAppointments || 0,
+        actionNeededPatients: result.actionNeededPatients || 0,
         issues: result.issues || [],
       });
 
@@ -492,6 +496,7 @@ export default function OnboardingFlow() {
         wcPatients: result.newCounts[wcKey] || 0,
         epcPatients: result.newCounts[epcKey] || 0,
         totalAppointments: result.newCounts.totalAppointments || 0,
+        actionNeededPatients: result.newCounts.actionNeededPatients || 0,
         customTags: {
           wc: customTags.wc,
           epc: customTags.epc,
@@ -847,7 +852,7 @@ export default function OnboardingFlow() {
             </div>
 
             <div className="max-w-4xl mx-auto space-y-6">
-              <div className="grid md:grid-cols-3 gap-6">
+              <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-6">
                 <Card className="p-6 text-center">
                   <div className="text-4xl font-bold text-blue-600 mb-2">
                     {syncResults.wcPatients}
@@ -865,6 +870,12 @@ export default function OnboardingFlow() {
                     {syncResults.totalAppointments}
                   </div>
                   <div className="text-sm text-muted-foreground">Total Appointments</div>
+                </Card>
+                <Card className="p-6 text-center">
+                  <div className="text-4xl font-bold text-orange-600 mb-2">
+                    {syncResults.actionNeededPatients}
+                  </div>
+                  <div className="text-sm text-muted-foreground">Action Needed Patients</div>
                 </Card>
               </div>
 
@@ -933,7 +944,8 @@ export default function OnboardingFlow() {
               </div>
               <h3 className="text-lg font-semibold mb-2">Custom Practice Management Software</h3>
               <p className="text-sm text-muted-foreground">
-                Our team will reach out to you to set up your custom integration. Please provide your software details below.
+                Our team will reach out to you to set up your custom integration. Please provide
+                your software details below.
               </p>
             </div>
 
@@ -955,7 +967,9 @@ export default function OnboardingFlow() {
                   type="url"
                   placeholder="https://your-software.com"
                   value={otherPMSData.softwareUrl}
-                  onChange={(e) => setOtherPMSData({ ...otherPMSData, softwareUrl: e.target.value })}
+                  onChange={(e) =>
+                    setOtherPMSData({ ...otherPMSData, softwareUrl: e.target.value })
+                  }
                   className="text-sm"
                 />
                 <p className="text-xs text-muted-foreground mt-1">
@@ -983,7 +997,9 @@ export default function OnboardingFlow() {
                 onClick={handleOtherPMSSubmit}
                 className="flex-1"
                 disabled={
-                  !otherPMSData.softwareName.trim() || !otherPMSData.softwareUrl.trim() || isProcessing
+                  !otherPMSData.softwareName.trim() ||
+                  !otherPMSData.softwareUrl.trim() ||
+                  isProcessing
                 }
               >
                 {isProcessing ? (
