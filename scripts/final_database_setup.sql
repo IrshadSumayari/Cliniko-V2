@@ -1661,6 +1661,107 @@ GRANT ALL ON system_alerts TO authenticated;
 GRANT ALL ON quota_alerts_sent TO authenticated;
 
 -- ============================================================================
+-- DATABASE PERFORMANCE OPTIMIZATION
+-- ============================================================================
+-- This section optimizes the database for better performance and reduces timeout issues
+
+-- Ensure the critical index for auth_user_id exists and is optimized
+CREATE INDEX IF NOT EXISTS idx_users_auth_user_id_optimized 
+ON users(auth_user_id) 
+WHERE auth_user_id IS NOT NULL;
+
+-- Add a partial index for active users only (if you have a lot of inactive users)
+CREATE INDEX IF NOT EXISTS idx_users_auth_user_id_active 
+ON users(auth_user_id) 
+WHERE auth_user_id IS NOT NULL AND is_onboarded IS NOT NULL;
+
+-- Optimize the users table query pattern used in auth context
+CREATE INDEX IF NOT EXISTS idx_users_auth_onboarded 
+ON users(auth_user_id, is_onboarded) 
+WHERE auth_user_id IS NOT NULL;
+
+-- Create a function to get user onboarding status efficiently
+CREATE OR REPLACE FUNCTION get_user_onboarding_status(p_auth_user_id UUID)
+RETURNS BOOLEAN AS $$
+DECLARE
+    v_is_onboarded BOOLEAN;
+BEGIN
+    -- Use a simple, fast query with proper indexing
+    SELECT COALESCE(is_onboarded, FALSE) INTO v_is_onboarded
+    FROM users 
+    WHERE auth_user_id = p_auth_user_id
+    LIMIT 1;
+    
+    -- Return false if user not found
+    RETURN COALESCE(v_is_onboarded, FALSE);
+EXCEPTION
+    WHEN OTHERS THEN
+        -- Return false on any error to prevent auth failures
+        RETURN FALSE;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+-- Update table statistics to help query planner
+ANALYZE users;
+
+-- Create a view for monitoring slow queries (if pg_stat_statements is enabled)
+CREATE OR REPLACE VIEW slow_queries AS
+SELECT 
+    query,
+    calls,
+    total_exec_time,
+    mean_exec_time,
+    rows
+FROM pg_stat_statements 
+WHERE mean_exec_time > 100 -- queries taking more than 100ms on average
+ORDER BY mean_exec_time DESC
+LIMIT 20;
+
+-- Function to check index usage
+CREATE OR REPLACE FUNCTION check_index_usage()
+RETURNS TABLE(
+    table_name TEXT,
+    index_name TEXT,
+    index_size TEXT,
+    index_scans BIGINT
+) AS $$
+BEGIN
+    RETURN QUERY
+    SELECT 
+        schemaname||'.'||tablename as table_name,
+        indexname as index_name,
+        pg_size_pretty(pg_relation_size(indexrelid)) as index_size,
+        idx_scan as index_scans
+    FROM pg_stat_user_indexes 
+    WHERE schemaname = 'public'
+    AND tablename = 'users'
+    ORDER BY idx_scan DESC;
+END;
+$$ LANGUAGE plpgsql;
+
+-- Function to get table statistics
+CREATE OR REPLACE FUNCTION get_table_stats(p_table_name TEXT DEFAULT 'users')
+RETURNS TABLE(
+    table_name TEXT,
+    row_count BIGINT,
+    table_size TEXT,
+    index_size TEXT,
+    total_size TEXT
+) AS $$
+BEGIN
+    RETURN QUERY
+    SELECT 
+        schemaname||'.'||tablename as table_name,
+        n_tup_ins - n_tup_del as row_count,
+        pg_size_pretty(pg_total_relation_size(schemaname||'.'||tablename) - pg_relation_size(schemaname||'.'||tablename)) as table_size,
+        pg_size_pretty(pg_total_relation_size(schemaname||'.'||tablename) - pg_relation_size(schemaname||'.'||tablename)) as index_size,
+        pg_size_pretty(pg_total_relation_size(schemaname||'.'||tablename)) as total_size
+    FROM pg_stat_user_tables 
+    WHERE tablename = p_table_name;
+END;
+$$ LANGUAGE plpgsql;
+
+-- ============================================================================
 -- FINAL SETUP COMPLETE
 -- ============================================================================
 -- Your database is now fully configured with:
@@ -1671,5 +1772,7 @@ GRANT ALL ON quota_alerts_sent TO authenticated;
 -- 5. Row Level Security (RLS) policies
 -- 6. Performance indexes and helper functions
 -- 7. Duplicate prevention and sync management
+-- 8. Database performance optimization for auth queries
+-- 9. Monitoring functions for performance tracking
 
 -- All systems are ready for production use!

@@ -336,10 +336,6 @@ export default function OnboardingFlow() {
       toast.info('You can connect your PMS later in settings.');
       const success = await updateUserOnboardingStatus(false);
       if (success) {
-        // // Force a page reload to update the auth context
-        // setTimeout(() => {
-        //   window.location.reload();
-        // }, 1000);
       } else {
         toast.error('Failed to update status. Please try again.');
       }

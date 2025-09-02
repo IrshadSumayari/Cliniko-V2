@@ -59,10 +59,25 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         console.warn('Failed to read from localStorage:', localStorageError);
       }
 
+      if (cachedOnboardingStatus !== null) {
+        const cacheTimestamp = localStorage.getItem('user_onboarding_status_timestamp');
+        if (cacheTimestamp) {
+          const cacheAge = Date.now() - parseInt(cacheTimestamp);
+          if (cacheAge < 5 * 60 * 1000) {
+            console.log(
+              'Using cached onboarding status (age:',
+              Math.round(cacheAge / 1000),
+              'seconds)'
+            );
+            return { ...authUser, isOnboarded: cachedOnboardingStatus };
+          }
+        }
+      }
+
       let userData: any = null;
       let error: any = null;
       let retryCount = 0;
-      const maxRetries = 2;
+      const maxRetries = 1; // Reduced retries for faster failure
 
       while (retryCount <= maxRetries) {
         try {
@@ -70,6 +85,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             throw new Error('Supabase client not initialized');
           }
 
+          // Optimized query with shorter timeout
           const queryPromise = supabase
             .from('users')
             .select('is_onboarded')
@@ -77,7 +93,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             .single();
 
           const timeoutPromise = new Promise<never>((_, reject) => {
-            setTimeout(() => reject(new Error('Database query timeout')), 30000); // Increased to 30 seconds for heavy operations
+            setTimeout(() => reject(new Error('Database query timeout')), 5000); // Reduced to 5 seconds
           });
 
           const result = await Promise.race([queryPromise, timeoutPromise]);
@@ -93,7 +109,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           console.log(
             `Database query attempt ${retryCount} failed, retrying... (${retryError instanceof Error ? retryError.message : 'Unknown error'})`
           );
-          await new Promise((resolve) => setTimeout(resolve, 1000 * retryCount));
+          await new Promise((resolve) => setTimeout(resolve, 500)); // Reduced retry delay
         }
       }
 
@@ -124,6 +140,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       // Store the onboarding status in localStorage for future fallback
       try {
         localStorage.setItem('user_onboarding_status', String(userData?.is_onboarded || false));
+        localStorage.setItem('user_onboarding_status_timestamp', Date.now().toString());
       } catch (localStorageError) {
         console.warn('Failed to store onboarding status in localStorage:', localStorageError);
       }
@@ -224,7 +241,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         // Add timeout protection for auth initialization
         const authPromise = validateTokenAndGetUser();
         const timeoutPromise = new Promise<never>((_, reject) => {
-          authTimeoutId = setTimeout(() => reject(new Error('Auth timeout')), 10000); // 10 second timeout
+          authTimeoutId = setTimeout(() => reject(new Error('Auth timeout')), 5000); // Reduced to 5 second timeout
         });
 
         const authUser = await Promise.race([authPromise, timeoutPromise]);
@@ -380,7 +397,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       console.log('Updating onboarding status to:', isOnboarded, 'for user:', user.id);
 
       // Add timeout protection for database operations
-      const dbTimeout = 10000; // 10 seconds
+      const dbTimeout = 5000; // 5 seconds
       if (!supabase) {
         throw new Error('Supabase client not initialized');
       }
@@ -486,12 +503,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       return false;
     }
 
-    console.log('🚀 completeDashboardSetup called for user:', user.id);
+    console.log('completeDashboardSetup called for user:', user.id);
     setIsLoading(true);
 
     try {
       // IMMEDIATE: Update local state and localStorage first for instant user feedback
-      console.log('⚡ Immediate: Updating local state and localStorage');
+      console.log('Immediate: Updating local state and localStorage');
       setUser((prev) => (prev ? { ...prev, isOnboarded: true } : null));
 
       // Store in localStorage immediately
@@ -499,16 +516,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         localStorage.setItem('user_onboarding_status', 'true');
         localStorage.setItem('dashboard_setup_completed', 'true');
         localStorage.setItem('dashboard_setup_timestamp', Date.now().toString());
-        console.log('✅ Local state and localStorage updated immediately');
+        console.log('Local state and localStorage updated immediately');
       } catch (localStorageError) {
         console.warn('Failed to store in localStorage:', localStorageError);
       }
 
       // ASYNC: Try to update database in background (non-blocking)
-      console.log('🔄 Background: Attempting database update');
+      console.log('Background: Attempting database update');
 
       // Use a more aggressive timeout for production
-      const dbTimeout = 8000; // 8 seconds (reduced for faster failure)
+      const dbTimeout = 5000; // 5 seconds (reduced for faster failure)
 
       // Create a background promise that doesn't block the UI
       const backgroundUpdate = (async () => {
@@ -533,28 +550,28 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           const { error } = await Promise.race([updatePromise, timeoutPromise]);
 
           if (error) {
-            console.warn('⚠️ Background database update failed:', error);
+            console.warn('Background database update failed:', error);
             // Don't fail the user experience, just log it
             localStorage.setItem('dashboard_db_failed', 'true');
           } else {
-            console.log('✅ Background database update successful');
+            console.log('Background database update successful');
             localStorage.removeItem('dashboard_db_failed');
           }
         } catch (dbError) {
-          console.warn('⚠️ Background database update error:', dbError);
+          console.warn('Background database update error:', dbError);
           localStorage.setItem('dashboard_db_failed', 'true');
         }
       })();
 
       // Don't wait for the background update - return success immediately
-      console.log('🎉 Dashboard setup completed successfully (local state)');
+      console.log('Dashboard setup completed successfully (local state)');
       return true;
     } catch (error) {
-      console.error('❌ Error in completeDashboardSetup:', error);
+      console.error('Error in completeDashboardSetup:', error);
 
       // Even if there's an error, the local state is already updated
       // So we can still return success for user experience
-      console.warn('⚠️ Returning success despite error - local state is updated');
+      console.warn('Returning success despite error - local state is updated');
       return true;
     } finally {
       setIsLoading(false);
