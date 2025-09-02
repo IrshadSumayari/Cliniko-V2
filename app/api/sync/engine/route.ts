@@ -166,7 +166,8 @@ export async function POST(req: NextRequest) {
 
       // Step 5: Check for Action Needed patients and send notifications
       const actionNeededPatients = await checkActionNeededPatients(userId);
-      await sendActionNeededNotifications(actionNeededPatients, userData);
+      // Email notifications commented out per user request
+      // await sendActionNeededNotifications(actionNeededPatients, userData);
 
       // Step 6: Update sync log
       await createAdminClient()

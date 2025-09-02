@@ -475,7 +475,7 @@ class SyncScheduler {
         pms_last_modified: patient.lastModified || patient.pms_last_modified || patient.updated_at,
       };
     } else {
-      // Nookal and Halaxy use snake_case properties (matching database schema)
+      // Nookal uses snake_case properties (matching database schema)
       return {
         id: patient.id,
         first_name: patient.first_name,
@@ -501,7 +501,7 @@ class SyncScheduler {
         duration_minutes: appointment.duration_minutes || appointment.duration,
       };
     } else {
-      // Nookal and Halaxy use snake_case properties (matching database schema)
+      // Nookal uses snake_case properties (matching database schema)
       return {
         id: appointment.id,
         appointment_date: appointment.appointment_date,

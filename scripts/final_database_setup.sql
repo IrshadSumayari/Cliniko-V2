@@ -1661,6 +1661,54 @@ GRANT ALL ON system_alerts TO authenticated;
 GRANT ALL ON quota_alerts_sent TO authenticated;
 
 -- ============================================================================
+-- DATABASE PERFORMANCE OPTIMIZATION
+-- ============================================================================
+-- This section optimizes the database for better performance and reduces timeout issues
+
+-- Ensure the critical index for auth_user_id exists and is optimized
+CREATE INDEX IF NOT EXISTS idx_users_auth_user_id_optimized 
+ON users(auth_user_id) 
+WHERE auth_user_id IS NOT NULL;
+
+-- Add a partial index for active users only (if you have a lot of inactive users)
+CREATE INDEX IF NOT EXISTS idx_users_auth_user_id_active 
+ON users(auth_user_id) 
+WHERE auth_user_id IS NOT NULL AND is_onboarded IS NOT NULL;
+
+-- Optimize the users table query pattern used in auth context
+CREATE INDEX IF NOT EXISTS idx_users_auth_onboarded 
+ON users(auth_user_id, is_onboarded) 
+WHERE auth_user_id IS NOT NULL;
+
+-- Create a function to get user onboarding status efficiently
+CREATE OR REPLACE FUNCTION get_user_onboarding_status(p_auth_user_id UUID)
+RETURNS BOOLEAN AS $$
+DECLARE
+    v_is_onboarded BOOLEAN;
+BEGIN
+    -- Use a simple, fast query with proper indexing
+    SELECT COALESCE(is_onboarded, FALSE) INTO v_is_onboarded
+    FROM users 
+    WHERE auth_user_id = p_auth_user_id
+    LIMIT 1;
+    
+    -- Return false if user not found
+    RETURN COALESCE(v_is_onboarded, FALSE);
+EXCEPTION
+    WHEN OTHERS THEN
+        -- Return false on any error to prevent auth failures
+        RETURN FALSE;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+-- Update table statistics to help query planner
+ANALYZE users;
+
+
+
+
+
+-- ============================================================================
 -- FINAL SETUP COMPLETE
 -- ============================================================================
 -- Your database is now fully configured with:
@@ -1671,5 +1719,6 @@ GRANT ALL ON quota_alerts_sent TO authenticated;
 -- 5. Row Level Security (RLS) policies
 -- 6. Performance indexes and helper functions
 -- 7. Duplicate prevention and sync management
+-- 8. Database performance optimization for auth queries
 
 -- All systems are ready for production use!

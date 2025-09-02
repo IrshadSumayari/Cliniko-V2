@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import {
   ArrowRight,
   ArrowLeft,
@@ -49,6 +50,11 @@ export default function OnboardingFlow() {
   const [formData, setFormData] = useState({
     selectedPMS: '',
     apiKey: '',
+  });
+  const [showOtherPopup, setShowOtherPopup] = useState(false);
+  const [otherPMSData, setOtherPMSData] = useState({
+    softwareName: '',
+    softwareUrl: '',
   });
   const [syncResults, setSyncResults] = useState<SyncResults>({
     wcPatients: 0,
@@ -100,7 +106,70 @@ export default function OnboardingFlow() {
   }, [getAccessToken]);
 
   const handlePMSSelect = (pms: string) => {
-    setFormData({ ...formData, selectedPMS: pms });
+    if (pms === 'Other') {
+      setShowOtherPopup(true);
+    } else {
+      setFormData({ ...formData, selectedPMS: pms });
+    }
+  };
+
+    const handleOtherPMSSubmit = async () => {
+    if (!otherPMSData.softwareName.trim() || !otherPMSData.softwareUrl.trim()) {
+      toast.error('Please fill in both software name and software URL');
+      return;
+    }
+
+    try {
+      setIsProcessing(true);
+      
+      // Get the access token from auth context
+      const token = getAccessToken();
+      if (!token) {
+        toast.error('Authentication token not found. Please try logging in again.');
+        return;
+      }
+      
+      // Send the custom PMS setup request using direct fetch with manual headers
+      const response = await fetch('/api/pms/pms-request', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          softwareName: otherPMSData.softwareName,
+          softwareUrl: otherPMSData.softwareUrl,
+        }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to submit request');
+      }
+
+      const result = await response.json();
+
+      toast.success(result.message || 'Custom PMS integration request submitted successfully!');
+
+      // Close popup and skip to completion
+      setShowOtherPopup(false);
+      setOtherPMSData({ softwareName: '', softwareUrl: '' });
+
+      // Skip the normal flow and go to a completion step
+      setCurrentStep('tag-complete');
+    } catch (error) {
+      console.error('Error submitting custom PMS request:', error);
+      toast.error(
+        error instanceof Error ? error.message : 'Failed to submit request. Please try again.'
+      );
+    } finally {
+      setIsProcessing(false);
+    }
+  };
+
+  const handleOtherPMSCancel = () => {
+    setShowOtherPopup(false);
+    setOtherPMSData({ softwareName: '', softwareUrl: '' });
   };
 
   const resetSyncProgress = () => {
@@ -283,38 +352,36 @@ export default function OnboardingFlow() {
       // Use the new optimized function for dashboard setup
       const success = await completeDashboardSetup();
       if (success) {
+        // Email notifications commented out per user request
         // Trigger Action Needed notifications for all patients
-        try {
-          const token = getAccessToken();
-          if (token) {
-            const response = await fetch('/api/notifications/send-action-needed', {
-              method: 'POST',
-              headers: {
-                'Content-Type': 'application/json',
-                Authorization: `Bearer ${token}`,
-              },
-              body: JSON.stringify({
-                triggerOnboarding: true,
-                userId: user?.id,
-              }),
-            });
+        // try {
+        //   const token = getAccessToken();
+        //   if (token) {
+        //     const response = await fetch('/api/notifications/send-action-needed', {
+        //       method: 'POST',
+        //       headers: {
+        //         'Content-Type': 'application/json',
+        //         Authorization: `Bearer ${token}`,
+        //       },
+        //       body: JSON.stringify({
+        //         triggerOnboarding: true,
+        //         userId: user?.id,
+        //       }),
+        //     });
 
-            if (response.ok) {
-              const result = await response.json();
-              console.log(
-                '✅ Action Needed notifications triggered on onboarding completion:',
-                result
-              );
-            } else {
-              console.error(
-                '❌ Failed to trigger Action Needed notifications:',
-                response.statusText
-              );
-            }
-          }
-        } catch (notificationError) {
-          console.error('Error triggering notifications:', notificationError);
-        }
+        //     if (response.ok) {
+        //       const result = await response.json();
+        //       console.log(
+        //         'Action Needed notifications triggered on onboarding completion:',
+        //         result
+        //       );
+        //     } else {
+        //       console.error('Failed to trigger Action Needed notifications:', response.statusText);
+        //     }
+        //   }
+        // } catch (notificationError) {
+        //   console.error('Error triggering notifications:', notificationError);
+        // }
 
         toast.success('Setup complete! Welcome to your dashboard.');
       } else {
@@ -336,10 +403,6 @@ export default function OnboardingFlow() {
       toast.info('You can connect your PMS later in settings.');
       const success = await updateUserOnboardingStatus(false);
       if (success) {
-        // // Force a page reload to update the auth context
-        // setTimeout(() => {
-        //   window.location.reload();
-        // }, 1000);
       } else {
         toast.error('Failed to update status. Please try again.');
       }
@@ -372,20 +435,20 @@ export default function OnboardingFlow() {
         "Click 'Generate new API key'",
         'Copy the key and paste it below',
       ],
-      halaxy: [
-        'Log into your Halaxy account',
-        'Go to Settings → Integrations → API Access',
-        'Generate a new API token',
-        'Copy the token and paste it below',
-      ],
       nookal: [
         'Log into your Nookal account',
         'Go to Settings → API → Generate Key',
         'Create a new API key',
         'Copy the key and paste it below',
       ],
+      other: [
+        'Contact your PMS provider for API access',
+        'Request API key or integration credentials',
+        'Provide the API key to our support team',
+        'Our team will reach out to you to set up the integration',
+      ],
     };
-    return instructions[pms.toLowerCase() as keyof typeof instructions] || instructions.cliniko;
+    return instructions[pms.toLowerCase() as keyof typeof instructions] || instructions.other;
   };
 
   const handleSaveTags = async () => {
@@ -400,12 +463,8 @@ export default function OnboardingFlow() {
         return;
       }
 
-      const response = await fetch('/api/user/update-tags', {
+      const response = await authenticatedFetch('/api/user/update-tags', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`,
-        },
         body: JSON.stringify({
           wcTag: customTags.wc,
           epcTag: customTags.epc,
@@ -487,7 +546,7 @@ export default function OnboardingFlow() {
               {[
                 { name: 'Cliniko', letter: 'C' },
                 { name: 'Nookal', letter: 'N' },
-                { name: 'Halaxy', letter: 'H' },
+                { name: 'Other', letter: 'O' },
               ].map((pms) => (
                 <Card
                   key={pms.name}
@@ -856,6 +915,93 @@ export default function OnboardingFlow() {
   return (
     <div className="min-h-screen bg-background flex items-center justify-center px-6 py-12">
       <div className="w-full max-w-5xl">{renderStep()}</div>
+
+      {/* Other PMS Popup */}
+      <Dialog open={showOtherPopup} onOpenChange={setShowOtherPopup}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Settings className="h-5 w-5" />
+              Manual Setup Required
+            </DialogTitle>
+          </DialogHeader>
+
+          <div className="space-y-6">
+            <div className="text-center">
+              <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-blue-100 dark:bg-blue-900/20 flex items-center justify-center">
+                <Settings className="h-8 w-8 text-blue-600" />
+              </div>
+              <h3 className="text-lg font-semibold mb-2">Custom Practice Management Software</h3>
+              <p className="text-sm text-muted-foreground">
+                Our team will reach out to you to set up your custom integration. Please provide your software details below.
+              </p>
+            </div>
+
+            <div className="space-y-4">
+              <div>
+                <label className="text-sm font-medium mb-2 block">Management Software Name</label>
+                <Input
+                  placeholder="e.g., MyClinic Pro, PracticeMax, etc."
+                  value={otherPMSData.softwareName}
+                  onChange={(e) =>
+                    setOtherPMSData({ ...otherPMSData, softwareName: e.target.value })
+                  }
+                />
+              </div>
+
+              <div>
+                <label className="text-sm font-medium mb-2 block">Software URL</label>
+                <Input
+                  type="url"
+                  placeholder="https://your-software.com"
+                  value={otherPMSData.softwareUrl}
+                  onChange={(e) => setOtherPMSData({ ...otherPMSData, softwareUrl: e.target.value })}
+                  className="text-sm"
+                />
+                <p className="text-xs text-muted-foreground mt-1">
+                  Enter the URL where your software is hosted
+                </p>
+              </div>
+            </div>
+
+            <div className="bg-blue-50 dark:bg-blue-950/20 p-4 rounded-lg">
+              <h4 className="font-medium text-sm mb-2">What happens next?</h4>
+              <ul className="text-xs text-muted-foreground space-y-1">
+                <li>• Our team will review your software details</li>
+                <li>• We'll reach out to you to discuss the integration process</li>
+                <li>• We'll create a custom integration for your software</li>
+                <li>• You'll receive an email confirmation once ready</li>
+                <li>• Your dashboard will be set up automatically</li>
+              </ul>
+            </div>
+
+            <div className="flex gap-3">
+              <Button variant="outline" onClick={handleOtherPMSCancel} className="flex-1">
+                Cancel
+              </Button>
+              <Button
+                onClick={handleOtherPMSSubmit}
+                className="flex-1"
+                disabled={
+                  !otherPMSData.softwareName.trim() || !otherPMSData.softwareUrl.trim() || isProcessing
+                }
+              >
+                {isProcessing ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Submitting...
+                  </>
+                ) : (
+                  <>
+                    Submit Request
+                    <ArrowRight className="ml-2 h-4 w-4" />
+                  </>
+                )}
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

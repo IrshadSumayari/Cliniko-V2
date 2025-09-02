@@ -4,12 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { RefreshCw, Settings, LogOut, Activity } from 'lucide-react';
 import { useAuth } from '@/contexts/auth-context';
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipProvider,
-  TooltipTrigger,
-} from '@/components/ui/tooltip';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 
 interface DashboardHeaderProps {
   onSync: () => void;
@@ -36,7 +31,7 @@ export function DashboardHeader({ onSync, isSync, onNavigate, onSignOut }: Dashb
           </div>
 
           <div className="flex items-center gap-4">
-            <TooltipProvider>
+            {/* <TooltipProvider>
               <Tooltip>
                 <TooltipTrigger asChild>
                   <Button
@@ -54,8 +49,8 @@ export function DashboardHeader({ onSync, isSync, onNavigate, onSignOut }: Dashb
                   <p>Manually sync your latest data from your PMS</p>
                 </TooltipContent>
               </Tooltip>
-            </TooltipProvider>
-            
+            </TooltipProvider> */}
+
             {onNavigate && (
               <Button
                 variant="outline"
@@ -67,7 +62,7 @@ export function DashboardHeader({ onSync, isSync, onNavigate, onSignOut }: Dashb
                 Settings
               </Button>
             )}
-            
+
             <Button
               variant="ghost"
               size="lg"
