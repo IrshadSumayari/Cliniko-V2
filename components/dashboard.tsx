@@ -235,7 +235,8 @@ const Dashboard = ({ onNavigate }: DashboardProps) => {
           fetchDashboardData(); // Refresh data
         }, 500);
       } else {
-        throw new Error('Failed to close case');
+        const errorData = await response.json();
+        throw new Error(`Failed to close case: ${errorData.error || 'Unknown error'}`);
       }
     } catch (error) {
       toast({

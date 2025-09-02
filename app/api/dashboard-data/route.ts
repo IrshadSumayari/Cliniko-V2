@@ -175,7 +175,7 @@ export async function GET(req: NextRequest) {
         urgency = 'medium';
       }
 
-      // If case is pending or archived, override the status
+      // Determine status and alerts based on requirements (only if not pending or archived)
       if (caseItem.status === 'pending') {
         status = 'pending';
         alert = 'Waiting for approval';
@@ -184,21 +184,21 @@ export async function GET(req: NextRequest) {
         status = 'archived';
         alert = 'Case closed';
         urgency = 'low';
-      }
-
-      // Determine status and alerts based on requirements
-      if (remainingSessions <= 0) {
-        status = 'critical';
-        alert = `${patientType} quota exhausted - renewal needed immediately`;
-        urgency = 'critical';
-      } else if (remainingSessions <= 2) {
-        status = 'warning';
-        alert = `${patientType} referral expires soon - ${remainingSessions} sessions left`;
-        urgency = 'high';
-      } else if (remainingSessions <= 3) {
-        status = 'warning';
-        alert = `${patientType} sessions running low - ${remainingSessions} sessions left`;
-        urgency = 'medium';
+      } else {
+        // Only apply session-based status logic if case is not pending or archived
+        if (remainingSessions <= 0) {
+          status = 'critical';
+          alert = `${patientType} quota exhausted - renewal needed immediately`;
+          urgency = 'critical';
+        } else if (remainingSessions <= 2) {
+          status = 'warning';
+          alert = `${patientType} referral expires soon - ${remainingSessions} sessions left`;
+          urgency = 'high';
+        } else if (remainingSessions <= 3) {
+          status = 'warning';
+          alert = `${patientType} sessions running low - ${remainingSessions} sessions left`;
+          urgency = 'medium';
+        }
       }
 
       // Use case data for next appointment and other details
