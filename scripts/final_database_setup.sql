@@ -59,6 +59,7 @@ CREATE TABLE IF NOT EXISTS users (
     is_onboarded BOOLEAN DEFAULT FALSE,
     subscription_status TEXT DEFAULT 'trial',
     trial_ends_at TIMESTAMP WITH TIME ZONE DEFAULT (NOW() + INTERVAL '7 days'),
+    stripe_customer_id TEXT, -- Stripe customer ID for subscription management
     pms_type TEXT,
     WC TEXT DEFAULT 'WC',
     EPC TEXT DEFAULT 'EPC',
@@ -1708,6 +1709,8 @@ ANALYZE users;
 
 
 
+
+
 -- ============================================================================
 -- FINAL SETUP COMPLETE
 -- ============================================================================
@@ -1720,5 +1723,6 @@ ANALYZE users;
 -- 6. Performance indexes and helper functions
 -- 7. Duplicate prevention and sync management
 -- 8. Database performance optimization for auth queries
+-- 9. Stripe integration with customer ID tracking
 
 -- All systems are ready for production use!

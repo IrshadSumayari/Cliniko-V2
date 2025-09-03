@@ -1,10 +1,18 @@
 import { NextRequest, NextResponse } from 'next/server';
 import Stripe from 'stripe';
-import { supabase } from '@/integrations/supabase/client';
+import { createClient } from '@supabase/supabase-js';
 import { config } from '@/lib/config';
 
+// Use server-side Supabase client with service role key for webhooks
+const supabase = createClient(config.supabase.url, config.supabase.serviceRoleKey, {
+  auth: {
+    autoRefreshToken: false,
+    persistSession: false,
+  },
+});
+
 const stripe = new Stripe(config.stripe.secretKey, {
-  apiVersion: '2024-06-20',
+  apiVersion: '2025-07-30.basil',
 });
 
 const endpointSecret = config.stripe.webhookSecret;
@@ -12,27 +20,29 @@ const webhookSecret = config.stripe.webhookSecret;
 
 export async function POST(request: NextRequest) {
   try {
+    console.log('🚀 Stripe webhook called!');
     const body = await request.text();
     const signature = request.headers.get('stripe-signature');
+
+    console.log('📝 Request body length:', body.length);
+    console.log('🔐 Signature present:', !!signature);
 
     if (!signature) {
       console.error('No Stripe signature found');
       return NextResponse.json({ error: 'No signature provided' }, { status: 400 });
     }
 
-    // // Handle test signatures from the test page
-    // if (signature === "invalid_test_signature") {
-    //   console.log("Test webhook call detected, returning success");
-    //   return NextResponse.json({ received: true, test: true });
-    // }
+    // Handle test signatures for local development
+    if (signature === 'test_signature' || signature === 'invalid_test_signature') {
+      console.log('🧪 Test webhook call detected, simulating payment success');
+      const testSessionId = 'cs_test_' + Math.random().toString(36).substring(7);
+      return NextResponse.json({ received: true, test: true, sessionId: testSessionId });
+    }
 
-    // if (!webhookSecret) {
-    //   console.error("Webhook secret not configured");
-    //   return NextResponse.json(
-    //     { error: "Webhook secret not configured" },
-    //     { status: 500 }
-    //   );
-    // }
+    if (!webhookSecret) {
+      console.error('Webhook secret not configured');
+      return NextResponse.json({ error: 'Webhook secret not configured' }, { status: 500 });
+    }
 
     let event: Stripe.Event;
 
@@ -53,10 +63,13 @@ export async function POST(request: NextRequest) {
       case 'checkout.session.completed':
         const session = event.data.object as Stripe.Checkout.Session;
         console.log('Checkout session completed:', session.id);
+        console.log('Session metadata:', session.metadata);
+        console.log('Customer ID:', session.customer);
 
         // Update user subscription status
         if (session.metadata?.userId) {
-          const { error } = await supabase
+          // Try to update by database ID first
+          let { error } = await supabase
             .from('users')
             .update({
               subscription_status: 'active',
@@ -64,22 +77,85 @@ export async function POST(request: NextRequest) {
             })
             .eq('id', session.metadata.userId);
 
-          if (error) {
-            console.error('Error updating user subscription:', error);
-          } else {
-            console.log('User subscription updated successfully');
+          // If that fails and we have authUserId, try updating by auth_user_id
+          if (error && session.metadata.authUserId) {
+            console.log('⚠️ Retrying with auth_user_id...');
+            ({ error } = await supabase
+              .from('users')
+              .update({
+                subscription_status: 'active',
+                stripe_customer_id: session.customer as string,
+              })
+              .eq('auth_user_id', session.metadata.authUserId));
           }
+
+          if (error) {
+            console.error('❌ Error updating user subscription:', error);
+            // Log the error details for debugging
+            console.error('User ID from metadata:', session.metadata.userId);
+            console.error('Auth User ID from metadata:', session.metadata.authUserId);
+            console.error('Customer ID from session:', session.customer);
+
+            // Try to find the user to see what IDs exist
+            const { data: foundUser } = await supabase
+              .from('users')
+              .select('id, auth_user_id, email, subscription_status')
+              .eq('auth_user_id', session.metadata.authUserId || session.metadata.userId)
+              .single();
+            console.error('Found user in database:', foundUser);
+          } else {
+            console.log('✅ User subscription updated successfully');
+            console.log('Updated user ID:', session.metadata.userId);
+            console.log('Stripe customer ID:', session.customer);
+          }
+        } else {
+          console.error('❌ No userId found in session metadata');
+          console.error('Available metadata:', session.metadata);
         }
         break;
 
       case 'customer.subscription.updated':
         const subscription = event.data.object as Stripe.Subscription;
         console.log('Subscription updated:', subscription.id);
+
+        // Update subscription status based on Stripe subscription status
+        if (subscription.metadata?.userId) {
+          const subscriptionStatus = subscription.status === 'active' ? 'active' : 'inactive';
+
+          const { error } = await supabase
+            .from('users')
+            .update({
+              subscription_status: subscriptionStatus,
+            })
+            .eq('id', subscription.metadata.userId);
+
+          if (error) {
+            console.error('Error updating subscription status:', error);
+          } else {
+            console.log('Subscription status updated successfully');
+          }
+        }
         break;
 
       case 'customer.subscription.deleted':
         const deletedSubscription = event.data.object as Stripe.Subscription;
         console.log('Subscription deleted:', deletedSubscription.id);
+
+        // Set subscription to inactive when cancelled
+        if (deletedSubscription.metadata?.userId) {
+          const { error } = await supabase
+            .from('users')
+            .update({
+              subscription_status: 'inactive',
+            })
+            .eq('id', deletedSubscription.metadata.userId);
+
+          if (error) {
+            console.error('Error updating subscription status to inactive:', error);
+          } else {
+            console.log('Subscription status set to inactive successfully');
+          }
+        }
         break;
 
       default:

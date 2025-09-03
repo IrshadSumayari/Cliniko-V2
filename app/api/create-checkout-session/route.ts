@@ -53,6 +53,9 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'User ID is required' }, { status: 400 });
     }
 
+    console.log('🔍 Debug - Auth user ID:', user.id);
+    console.log('🔍 Debug - Requested userId:', userId);
+
     // Verify that the authenticated user matches the requested userId
     if (user.id !== userId) {
       return NextResponse.json(
@@ -60,6 +63,21 @@ export async function POST(request: NextRequest) {
         { status: 403 }
       );
     }
+
+    // Get the database user record to use the correct internal ID
+    const { data: dbUser, error: dbUserError } = await supabase
+      .from('users')
+      .select('id, auth_user_id, email')
+      .eq('auth_user_id', user.id)
+      .single();
+
+    if (dbUserError || !dbUser) {
+      console.error('Database user not found:', dbUserError);
+      return NextResponse.json({ error: 'User record not found in database' }, { status: 404 });
+    }
+
+    console.log('🔍 Debug - Database user ID:', dbUser.id);
+    console.log('🔍 Debug - Database auth_user_id:', dbUser.auth_user_id);
 
     // Get the professional plan price ID
     const priceId = config.stripe.priceIds.professional;
@@ -89,12 +107,14 @@ export async function POST(request: NextRequest) {
       success_url: `${config.app.url}/?session_id={CHECKOUT_SESSION_ID}`,
       cancel_url: `${config.app.url}/`,
       metadata: {
-        userId: userId,
+        userId: dbUser.id, // Use database user ID instead of auth user ID
+        authUserId: user.id, // Keep auth user ID for reference
         planType: 'professional',
       },
       subscription_data: {
         metadata: {
-          userId: userId,
+          userId: dbUser.id, // Use database user ID instead of auth user ID
+          authUserId: user.id, // Keep auth user ID for reference
         },
       },
     });
