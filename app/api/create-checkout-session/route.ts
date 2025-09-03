@@ -104,7 +104,7 @@ export async function POST(request: NextRequest) {
         },
       ],
       mode: 'subscription',
-      success_url: `${config.app.url}/?session_id={CHECKOUT_SESSION_ID}`,
+      success_url: `${config.app.url}/payment-success?session_id={CHECKOUT_SESSION_ID}`,
       cancel_url: `${config.app.url}/`,
       metadata: {
         userId: dbUser.id, // Use database user ID instead of auth user ID

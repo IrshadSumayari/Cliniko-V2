@@ -38,6 +38,9 @@ interface UserProfile {
   pms_type?: string;
   pms_connected?: boolean;
   pms_last_sync?: string;
+  subscription_status?: string;
+  trial_ends_at?: string;
+  stripe_customer_id?: string;
   created_at: string;
   updated_at: string;
 }
@@ -74,7 +77,7 @@ const Settings = ({ onBack }: { onBack: () => void }) => {
     lastSync: '',
   });
 
-  const [subscriptionStatus] = useState({
+  const [subscriptionStatus, setSubscriptionStatus] = useState({
     plan: 'Free Trial',
     daysLeft: 7,
     usage: 45,
@@ -95,12 +98,21 @@ const Settings = ({ onBack }: { onBack: () => void }) => {
         throw new Error('Failed to fetch user profile');
       }
 
-      const userData = await response.json();
-
-      console.log('Profile data received:', userData);
+      const responseData = await response.json();
+      const userData = responseData.user || responseData;
 
       // Update profile state with database data
       setProfile(userData);
+
+      if (userData.subscription_status) {
+        const isActive = userData.subscription_status === 'active';
+        setSubscriptionStatus({
+          plan: isActive ? 'Professional' : 'Free Trial',
+          daysLeft: isActive ? 0 : 7,
+          usage: isActive ? 0 : 45,
+          limit: isActive ? 0 : 100,
+        });
+      }
 
       // Now fetch PMS credentials with the updated profile data
       await fetchPMSCredentials(userData);
@@ -157,15 +169,17 @@ const Settings = ({ onBack }: { onBack: () => void }) => {
     fetchUserProfile();
   }, [user?.id]);
 
-  // Debug: Log profile data changes
+  // Refresh data when component becomes visible (e.g., after returning from payment)
   useEffect(() => {
-    console.log('Profile state updated:', profile);
-  }, [profile]);
+    const handleVisibilityChange = () => {
+      if (!document.hidden && user?.id) {
+        fetchUserProfile();
+      }
+    };
 
-  // Debug: Log PMS connection changes
-  useEffect(() => {
-    console.log('PMS connection state updated:', pmsConnection);
-  }, [pmsConnection]);
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
+  }, [user?.id]);
 
   const handleProfileSave = async () => {
     if (!user?.id) return;
@@ -436,152 +450,111 @@ const Settings = ({ onBack }: { onBack: () => void }) => {
             </div>
           </Card>
 
-          {/* PMS Connection */}
-          <Card className="p-6">
-            <div className="flex items-center justify-between mb-6">
-              <div className="flex items-center gap-3">
-                <Plug className="h-5 w-5 text-primary" />
-                <h2 className="text-xl font-semibold">PMS Connection</h2>
-              </div>
-              {pmsConnection.connected ? (
-                <Badge variant="secondary" className="bg-green-100 text-green-800 border-green-200">
-                  <CheckCircle className="h-3 w-3 mr-1" />
-                  Connected
-                </Badge>
-              ) : (
-                <Badge variant="secondary" className="bg-red-100 text-red-800 border-red-200">
-                  <XCircle className="h-3 w-3 mr-1" />
-                  Not Connected
-                </Badge>
-              )}
-            </div>
-
-            <div className="space-y-4">
-              <div>
-                <label className="text-sm font-medium text-muted-foreground">
-                  Practice Management Software
-                </label>
-                <select
-                  className="w-full mt-1 p-2 border border-border rounded-md bg-background"
-                  value={pmsConnection.software}
-                  onChange={(e) =>
-                    setPmsConnection((prev) => ({
-                      ...prev,
-                      software: e.target.value,
-                    }))
-                  }
-                  disabled={pmsConnection.connected}
-                >
-                  <option value="">Select your PMS</option>
-                  <option value="Cliniko">Cliniko</option>
-                  <option value="Nookal">Nookal</option>
-                  <option value="Other">Other</option>
-                </select>
-                {pmsConnection.connected && (
-                  <p className="text-xs text-muted-foreground mt-1">
-                    Currently connected to {pmsConnection.software}
-                  </p>
-                )}
-              </div>
-
-              <div>
-                <label className="text-sm font-medium text-muted-foreground">API Key</label>
-                <Input
-                  type="password"
-                  placeholder={
-                    pmsConnection.connected
-                      ? 'API key is encrypted and stored securely'
-                      : 'Enter your API key'
-                  }
-                  value={pmsConnection.apiKey}
-                  onChange={(e) =>
-                    setPmsConnection((prev) => ({
-                      ...prev,
-                      apiKey: e.target.value,
-                    }))
-                  }
-                  disabled={pmsConnection.connected}
-                />
-                {pmsConnection.connected && (
-                  <p className="text-xs text-muted-foreground mt-1">
-                    API key is encrypted and stored securely in the database
-                  </p>
-                )}
-              </div>
-
-              {pmsConnection.connected && pmsConnection.lastSync && (
-                <div className="text-sm text-muted-foreground">
-                  Last sync: {new Date(pmsConnection.lastSync).toLocaleString()}
-                </div>
-              )}
-
-              {pmsConnection.connected ? (
-                <Button variant="outline" onClick={handlePMSDisconnect} className="w-full">
-                  <XCircle className="h-4 w-4 mr-2" />
-                  Disconnect
-                </Button>
-              ) : (
-                <Button
-                  onClick={handlePMSConnect}
-                  className="w-full"
-                  disabled={isConnecting || !pmsConnection.software || !pmsConnection.apiKey}
-                >
-                  {isConnecting ? (
-                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                  ) : (
-                    <Plug className="h-4 w-4 mr-2" />
-                  )}
-                  {isConnecting ? 'Connecting...' : 'Connect PMS'}
-                </Button>
-              )}
-            </div>
-          </Card>
-
-          {/* Upgrade Card */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Crown className="h-5 w-5 text-primary" />
-                Upgrade to Professional
-              </CardTitle>
-              <CardDescription>Unlock all features and get unlimited access</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="space-y-2">
-                <div className="flex items-center justify-between">
-                  <span className="text-2xl font-bold">$30</span>
-                  <span className="text-muted-foreground">/month</span>
-                </div>
-                <ul className="space-y-1 text-sm text-muted-foreground">
-                  <li>Unlimited patient matching</li>
-                  <li>Advanced analytics and reporting</li>
-                </ul>
-              </div>
-              <Button
-                onClick={handleUpgrade}
-                disabled={upgradeLoading}
-                className="w-full"
-                size="lg"
-              >
-                {upgradeLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                Upgrade Now
-              </Button>
-            </CardContent>
-          </Card>
-
           {/* Account Actions */}
-          <Card className="p-6">
+          <Card className="p-6 flex flex-col h-full">
             <div className="flex items-center gap-3 mb-6">
               <Building2 className="h-5 w-5 text-primary" />
               <h2 className="text-xl font-semibold">Account Actions</h2>
             </div>
 
-            <div className="space-y-3">
+            <div className="flex-1 space-y-4">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <Plug className="h-5 w-5 text-primary" />
+                  <span className="text-sm font-medium">PMS Connection Status</span>
+                </div>
+                {pmsConnection.connected ? (
+                  <Badge
+                    variant="secondary"
+                    className="bg-green-100 text-green-800 border-green-200"
+                  >
+                    <CheckCircle className="h-3 w-3 mr-1" />
+                    Connected
+                  </Badge>
+                ) : (
+                  <Badge variant="secondary" className="bg-red-100 text-red-800 border-red-200">
+                    <XCircle className="h-3 w-3 mr-1" />
+                    Not Connected
+                  </Badge>
+                )}
+              </div>
+
+              <hr className="border-border" />
+            </div>
+
+            <div className="mt-auto">
               <Button variant="outline" onClick={signOut} className="w-full">
                 Sign Out
               </Button>
             </div>
           </Card>
+        </div>
+
+        {/* Subscription Card - Full Width at Bottom */}
+        <div className="mt-8">
+          {subscriptionStatus.plan === 'Professional' ||
+          profile.subscription_status === 'active' ? (
+            <Card className="border-green-200 bg-green-50">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2 text-green-700">
+                  <Crown className="h-5 w-5 text-green-600" />
+                  Professional Plan Active
+                </CardTitle>
+                <CardDescription className="text-green-600">
+                  You have unlimited access to all features
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between">
+                    <span className="text-2xl font-bold text-green-700">$30</span>
+                    <span className="text-green-600">/month</span>
+                  </div>
+                  <ul className="space-y-1 text-sm text-green-600">
+                    <li>✅ Unlimited patient matching</li>
+                    <li>✅ Advanced analytics and reporting</li>
+                    <li>✅ Priority support</li>
+                  </ul>
+                </div>
+                <div className="p-3 bg-green-100 rounded-lg">
+                  <p className="text-sm text-green-700 font-medium">
+                    🎉 Thank you for being a Professional subscriber!
+                  </p>
+                </div>
+              </CardContent>
+            </Card>
+          ) : (
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Crown className="h-5 w-5 text-primary" />
+                  Upgrade to Professional
+                </CardTitle>
+                <CardDescription>Unlock all features and get unlimited access</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between">
+                    <span className="text-2xl font-bold">$30</span>
+                    <span className="text-muted-foreground">/month</span>
+                  </div>
+                  <ul className="space-y-1 text-sm text-muted-foreground">
+                    <li>Unlimited patient matching</li>
+                    <li>Advanced analytics and reporting</li>
+                  </ul>
+                </div>
+                <Button
+                  onClick={handleUpgrade}
+                  disabled={upgradeLoading}
+                  className="w-full"
+                  size="lg"
+                >
+                  {upgradeLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                  Upgrade Now
+                </Button>
+              </CardContent>
+            </Card>
+          )}
         </div>
       </div>
     </div>
