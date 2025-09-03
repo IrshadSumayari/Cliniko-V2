@@ -44,6 +44,7 @@ import {
   Plus,
   SlidersHorizontal,
   ChevronDown,
+  Crown,
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/contexts/auth-context';
@@ -72,7 +73,12 @@ const Dashboard = ({ onNavigate }: DashboardProps) => {
     subscription_status: string;
     trial_ends_at: string;
     daysRemaining: number;
-  } | null>(null);
+  } | null>({
+    subscription_status: 'trial', // Default to trial to prevent premium access during loading
+    trial_ends_at: '',
+    daysRemaining: 0
+  });
+  const [subscriptionLoaded, setSubscriptionLoaded] = useState(false);
   const [showAlertSettings, setShowAlertSettings] = useState(false);
   const [showSettingsModal, setShowSettingsModal] = useState(false);
   const [selectedClients, setSelectedClients] = useState<number[]>([]);
@@ -333,6 +339,7 @@ const Dashboard = ({ onNavigate }: DashboardProps) => {
             trial_ends_at: data.user.trial_ends_at,
             daysRemaining: Math.max(0, daysRemaining), // Don't show negative days
           });
+          setSubscriptionLoaded(true);
         }
       }
     } catch (error) {
@@ -1092,7 +1099,7 @@ const Dashboard = ({ onNavigate }: DashboardProps) => {
 
         <div className="container mx-auto px-8 py-10">
           {/* Trial Banner - Only show for trial users */}
-          {userSubscription && userSubscription.subscription_status === 'trial' && (
+          {subscriptionLoaded && userSubscription && userSubscription.subscription_status === 'trial' && (
             <div
               className={`p-6 mb-10 rounded-2xl shadow-sm ${
                 userSubscription.daysRemaining <= 1
@@ -1384,7 +1391,8 @@ const Dashboard = ({ onNavigate }: DashboardProps) => {
                   </TabsTrigger>
                   <TabsTrigger
                     value="action-needed"
-                    className="text-base font-semibold h-10 rounded-xl data-[state=active]:bg-background data-[state=active]:shadow-sm"
+                    className="text-base font-semibold h-10 rounded-xl data-[state=active]:bg-background data-[state=active]:shadow-sm relative"
+                    disabled={!subscriptionLoaded || userSubscription?.subscription_status === 'trial'}
                   >
                     <Bell className="h-5 w-5 mr-2" />
                     Action Needed
@@ -1395,6 +1403,11 @@ const Dashboard = ({ onNavigate }: DashboardProps) => {
                         ).length
                       }
                     </Badge>
+                    {(!subscriptionLoaded || userSubscription?.subscription_status === 'trial') && (
+                      <div className="absolute -top-1 -right-1">
+                        <Crown className="h-4 w-4 text-yellow-500 fill-yellow-500" />
+                      </div>
+                    )}
                   </TabsTrigger>
                   <TabsTrigger
                     value="pending"
@@ -1408,7 +1421,8 @@ const Dashboard = ({ onNavigate }: DashboardProps) => {
                   </TabsTrigger>
                   <TabsTrigger
                     value="overdue"
-                    className="text-base font-semibold h-10 rounded-xl data-[state=active]:bg-background data-[state=active]:shadow-sm"
+                    className="text-base font-semibold h-10 rounded-xl data-[state=active]:bg-background data-[state=active]:shadow-sm relative"
+                    disabled={!subscriptionLoaded || userSubscription?.subscription_status === 'trial'}
                   >
                     <AlertTriangle className="h-5 w-5 mr-2" />
                     Overdue
@@ -1422,6 +1436,11 @@ const Dashboard = ({ onNavigate }: DashboardProps) => {
                         }).length
                       }
                     </Badge>
+                    {(!subscriptionLoaded || userSubscription?.subscription_status === 'trial') && (
+                      <div className="absolute -top-1 -right-1">
+                        <Crown className="h-4 w-4 text-yellow-500 fill-yellow-500" />
+                      </div>
+                    )}
                   </TabsTrigger>
                   <TabsTrigger
                     value="archived"
