@@ -72,23 +72,23 @@ export async function GET(request: NextRequest) {
       console.log('User already exists with ID:', userId);
     }
 
-    // Now fetch user profile from the profiles table and user tags from users table
+    // Now fetch user profile from the profiles table and user data from users table
     const { data: profile, error: profileError } = await supabase
       .from('profiles')
       .select('*')
       .eq('id', userId)
       .single();
 
-    // Also fetch user tags (WC and EPC) from the users table
-    const { data: userTags, error: tagsError } = await supabase
+    // Also fetch user data (subscription status, tags, etc.) from the users table
+    const { data: userData, error: userDataError } = await supabase
       .from('users')
-      .select('wc, epc')
+      .select('subscription_status, trial_ends_at, stripe_customer_id, wc, epc')
       .eq('id', userId)
       .single();
 
-    if (tagsError) {
-      console.error('Error fetching user tags:', tagsError);
-      // Don't fail the request if tags fetch fails
+    if (userDataError) {
+      console.error('Error fetching user data:', userDataError);
+      // Don't fail the request if user data fetch fails
     }
 
     if (profileError) {
@@ -135,15 +135,27 @@ export async function GET(request: NextRequest) {
 
       console.log('Successfully created profile:', newProfile);
       return NextResponse.json({
-        ...newProfile,
-        userTags: userTags || { wc: 'WC', epc: 'EPC' },
+        success: true,
+        user: {
+          ...newProfile,
+          subscription_status: userData?.subscription_status || 'trial',
+          trial_ends_at: userData?.trial_ends_at,
+          stripe_customer_id: userData?.stripe_customer_id,
+        },
+        userTags: { wc: userData?.wc || 'WC', epc: userData?.epc || 'EPC' },
       });
     }
 
-    // Return profile with user tags
+    // Return profile with user data and tags
     return NextResponse.json({
-      ...profile,
-      userTags: userTags || { wc: 'WC', epc: 'EPC' },
+      success: true,
+      user: {
+        ...profile,
+        subscription_status: userData?.subscription_status || 'trial',
+        trial_ends_at: userData?.trial_ends_at,
+        stripe_customer_id: userData?.stripe_customer_id,
+      },
+      userTags: { wc: userData?.wc || 'WC', epc: userData?.epc || 'EPC' },
     });
   } catch (error) {
     console.error('Profile GET error:', error);

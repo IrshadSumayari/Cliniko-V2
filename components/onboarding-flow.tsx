@@ -57,6 +57,7 @@ export default function OnboardingFlow() {
     softwareName: '',
     softwareUrl: '',
   });
+  const [websiteError, setWebsiteError] = useState('');
   const [syncResults, setSyncResults] = useState<SyncResults>({
     wcPatients: 0,
     epcPatients: 0,
@@ -107,6 +108,25 @@ export default function OnboardingFlow() {
     fetchUserTags();
   }, [getAccessToken]);
 
+  const validateWebsiteUrl = (url: string): boolean => {
+    try {
+      // Basic URL validation
+      const urlPattern = /^https?:\/\/.+/;
+      if (!urlPattern.test(url)) {
+        setWebsiteError('Please enter a valid URL starting with http:// or https://');
+        return false;
+      }
+
+      // Try to create a URL object to validate the format
+      new URL(url);
+      setWebsiteError('');
+      return true;
+    } catch (error) {
+      setWebsiteError('Please enter a valid website URL (e.g., https://example.com)');
+      return false;
+    }
+  };
+
   const handlePMSSelect = (pms: string) => {
     if (pms === 'Other') {
       setShowOtherPopup(true);
@@ -118,6 +138,11 @@ export default function OnboardingFlow() {
   const handleOtherPMSSubmit = async () => {
     if (!otherPMSData.softwareName.trim() || !otherPMSData.softwareUrl.trim()) {
       toast.error('Please fill in both software name and software URL');
+      return;
+    }
+
+    // Validate website URL
+    if (!validateWebsiteUrl(otherPMSData.softwareUrl)) {
       return;
     }
 
@@ -172,6 +197,7 @@ export default function OnboardingFlow() {
   const handleOtherPMSCancel = () => {
     setShowOtherPopup(false);
     setOtherPMSData({ softwareName: '', softwareUrl: '' });
+    setWebsiteError('');
   };
 
   const resetSyncProgress = () => {
@@ -967,14 +993,29 @@ export default function OnboardingFlow() {
                   type="url"
                   placeholder="https://your-software.com"
                   value={otherPMSData.softwareUrl}
-                  onChange={(e) =>
-                    setOtherPMSData({ ...otherPMSData, softwareUrl: e.target.value })
-                  }
-                  className="text-sm"
+                  onChange={(e) => {
+                    const url = e.target.value;
+                    setOtherPMSData({ ...otherPMSData, softwareUrl: url });
+                    // Clear error when user starts typing
+                    if (websiteError) {
+                      setWebsiteError('');
+                    }
+                  }}
+                  onBlur={(e) => {
+                    // Validate on blur if there's a value
+                    if (e.target.value.trim()) {
+                      validateWebsiteUrl(e.target.value);
+                    }
+                  }}
+                  className={`text-sm ${websiteError ? 'border-red-500 focus:border-red-500' : ''}`}
                 />
-                <p className="text-xs text-muted-foreground mt-1">
-                  Enter the URL where your software is hosted
-                </p>
+                {websiteError ? (
+                  <p className="text-xs text-red-500 mt-1">{websiteError}</p>
+                ) : (
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Enter the URL where your software is hosted
+                  </p>
+                )}
               </div>
             </div>
 
@@ -999,6 +1040,7 @@ export default function OnboardingFlow() {
                 disabled={
                   !otherPMSData.softwareName.trim() ||
                   !otherPMSData.softwareUrl.trim() ||
+                  !!websiteError ||
                   isProcessing
                 }
               >
