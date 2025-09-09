@@ -567,57 +567,82 @@ export default function OnboardingFlow() {
     switch (currentStep) {
       case 'pms':
         return (
-          <div className="space-y-6 fade-in">
-            <div className="text-center">
-              <h2 className="text-3xl font-bold mb-2">Connect Your Practice Management Software</h2>
-              <p className="text-muted-foreground">Choose your current system</p>
-            </div>
+          <div className="min-h-screen flex items-center justify-center px-6">
+            <div className="space-y-6 fade-in w-full max-w-2xl">
+              {/* Progress Indicator */}
+              <div className="flex justify-center mb-8">
+                <div className="flex items-center gap-2">
+                  {['pms', 'api', 'syncing'].map((step, index) => {
+                    const steps: OnboardingStep[] = ['pms', 'api', 'syncing'];
+                    const currentIndex = steps.indexOf(currentStep);
+                    const isCompleted = index < currentIndex;
+                    const isCurrent = index === currentIndex;
 
-            <div className="grid md:grid-cols-3 gap-6 max-w-2xl mx-auto">
-              {[
-                { name: 'Cliniko', letter: 'C' },
-                { name: 'Nookal', letter: 'N' },
-                { name: 'Other', letter: 'O' },
-              ].map((pms) => (
-                <Card
-                  key={pms.name}
-                  className={`p-8 text-center cursor-pointer transition-all hover:scale-105 ${
-                    formData.selectedPMS === pms.name
-                      ? 'ring-2 ring-primary border-primary bg-primary/5'
-                      : 'hover:border-primary/50'
-                  }`}
-                  onClick={() => handlePMSSelect(pms.name)}
-                >
-                  <div className="text-6xl font-bold mb-4 text-primary">{pms.letter}</div>
-                  <div className="font-semibold text-lg">{pms.name}</div>
-                </Card>
-              ))}
-            </div>
-
-            <div className="text-center space-y-4">
-              <div className="flex items-center justify-center gap-2 text-sm text-muted-foreground">
-                <Shield className="h-4 w-4" />
-                Your data will stay encrypted and secure at all times.
+                    return (
+                      <div key={step} className="flex items-center">
+                        <div
+                          className={`w-3 h-3 rounded-full transition-colors ${
+                            isCompleted ? 'bg-primary' : isCurrent ? 'bg-primary' : 'bg-muted'
+                          }`}
+                        />
+                        {index < 2 && (
+                          <div className={`w-8 h-0.5 ${isCompleted ? 'bg-primary' : 'bg-muted'}`} />
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
               </div>
 
-              <Button
-                variant="default"
-                size="lg"
-                onClick={() => setCurrentStep('api')}
-                disabled={!formData.selectedPMS || isProcessing || isLoading}
-                className="min-w-[280px]"
-              >
-                Continue with Selected System
-                <ArrowRight className="ml-2 h-5 w-5" />
-              </Button>
+              <div className="text-center">
+                <h2 className="text-3xl font-bold mb-2">
+                  Connect Your Practice Management Software
+                </h2>
+                <p className="text-muted-foreground">Choose your current system</p>
+              </div>
 
-              <div className="pt-4">
-                <Button variant="outline" onClick={handleSkip} disabled={isProcessing || isLoading}>
-                  Back to Home
+              <div className="grid md:grid-cols-3 gap-6">
+                {['Cliniko', 'Nookal', 'Other'].map((pms) => (
+                  <div
+                    key={pms}
+                    className={`luxury-card p-6 text-center cursor-pointer transition-all hover:scale-105 ${
+                      formData.selectedPMS === pms ? 'ring-2 ring-primary' : ''
+                    }`}
+                    onClick={() => handlePMSSelect(pms)}
+                  >
+                    <div className="text-4xl font-bold mb-2">{pms[0]}</div>
+                    <div className="font-semibold">{pms}</div>
+                  </div>
+                ))}
+              </div>
+
+              <div className="text-center space-y-4">
+                <div className="flex items-center justify-center gap-2 text-sm text-muted-foreground mb-4">
+                  <Shield className="h-4 w-4" />
+                  Your data will stay encrypted and secure at all times.
+                </div>
+
+                <Button
+                  variant="default"
+                  size="lg"
+                  onClick={() => setCurrentStep('api')}
+                  disabled={!formData.selectedPMS || isProcessing || isLoading}
+                  className="min-w-[280px] h-12"
+                >
+                  Continue with Selected System
+                  <ArrowRight className="ml-2 h-5 w-5" />
                 </Button>
-                {/* <Button variant="outline" onClick={handleTest} disabled={isProcessing || isLoading}>
-                  Testing
-                </Button> */}
+
+                <div className="pt-4">
+                  <Button
+                    variant="outline"
+                    onClick={handleSkip}
+                    disabled={isProcessing || isLoading}
+                  >
+                    <ArrowLeft className="mr-2 h-4 w-4" />
+                    Back to Home
+                  </Button>
+                </div>
               </div>
             </div>
           </div>
@@ -631,6 +656,8 @@ export default function OnboardingFlow() {
                 <div className="w-3 h-3 rounded-full bg-primary"></div>
                 <div className="w-8 h-0.5 bg-primary"></div>
                 <div className="w-3 h-3 rounded-full bg-primary"></div>
+                <div className="w-8 h-0.5 bg-muted"></div>
+                <div className="w-3 h-3 rounded-full bg-muted"></div>
               </div>
               <h2 className="text-3xl font-bold mb-2">Get Your {formData.selectedPMS} API Key</h2>
               <p className="text-muted-foreground">
