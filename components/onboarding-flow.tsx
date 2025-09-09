@@ -905,30 +905,53 @@ export default function OnboardingFlow() {
             </div>
 
             <div className="max-w-4xl mx-auto space-y-6">
-              <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-6">
-                <Card className="p-6 text-center">
-                  <div className="text-4xl font-bold text-blue-600 mb-2">
-                    {syncResults.wcPatients}
+              <div className="grid md:grid-cols-4 gap-6">
+                <Card className="p-6 text-center bg-gradient-to-br from-red-50 to-red-100 dark:from-red-950/30 dark:to-red-900/30 border-red-200 dark:border-red-800">
+                  <div className="text-3xl font-bold text-red-700 dark:text-red-300 mb-2">
+                    {syncResults.overduePatients || 0}
                   </div>
-                  <div className="text-sm text-muted-foreground">Workers Compensation Patients</div>
-                </Card>
-                <Card className="p-6 text-center">
-                  <div className="text-4xl font-bold text-green-600 mb-2">
-                    {syncResults.epcPatients}
+                  <div className="text-sm font-medium text-red-600 dark:text-red-400 mb-1">
+                    Overdue Patients
                   </div>
-                  <div className="text-sm text-muted-foreground">EPC Patients</div>
-                </Card>
-                <Card className="p-6 text-center">
-                  <div className="text-4xl font-bold text-purple-600 mb-2">
-                    {syncResults.totalAppointments}
+                  <div className="text-xs text-red-500 dark:text-red-500">
+                    Urgent action required
                   </div>
-                  <div className="text-sm text-muted-foreground">Total Appointments</div>
                 </Card>
-                <Card className="p-6 text-center">
-                  <div className="text-4xl font-bold text-orange-600 mb-2">
+
+                <Card className="p-6 text-center bg-gradient-to-br from-orange-50 to-orange-100 dark:from-orange-950/30 dark:to-orange-900/30 border-orange-200 dark:border-orange-800">
+                  <div className="text-3xl font-bold text-orange-700 dark:text-orange-300 mb-2">
                     {syncResults.actionNeededPatients}
                   </div>
-                  <div className="text-sm text-muted-foreground">Action Needed Patients</div>
+                  <div className="text-sm font-medium text-orange-600 dark:text-orange-400 mb-1">
+                    Action Needed
+                  </div>
+                  <div className="text-xs text-orange-500 dark:text-orange-500">
+                    Approaching quota limits
+                  </div>
+                </Card>
+
+                <Card className="p-6 text-center bg-gradient-to-br from-green-50 to-green-100 dark:from-green-950/30 dark:to-green-900/30 border-green-200 dark:border-green-800">
+                  <div className="text-3xl font-bold text-green-700 dark:text-green-300 mb-2">
+                    {syncResults.epcPatients}
+                  </div>
+                  <div className="text-sm font-medium text-green-600 dark:text-green-400 mb-1">
+                    EPC Patients
+                  </div>
+                  <div className="text-xs text-green-500 dark:text-green-500">
+                    Active care plans tracked
+                  </div>
+                </Card>
+
+                <Card className="p-6 text-center bg-gradient-to-br from-blue-50 to-blue-100 dark:from-blue-950/30 dark:to-blue-900/30 border-blue-200 dark:border-blue-800">
+                  <div className="text-3xl font-bold text-blue-700 dark:text-blue-300 mb-2">
+                    {syncResults.wcPatients}
+                  </div>
+                  <div className="text-sm font-medium text-blue-600 dark:text-blue-400 mb-1">
+                    Workers Comp
+                  </div>
+                  <div className="text-xs text-blue-500 dark:text-blue-500">
+                    Ready for quota tracking
+                  </div>
                 </Card>
               </div>
 
@@ -952,12 +975,18 @@ export default function OnboardingFlow() {
                 </Card>
               )}
 
-              <div className="flex justify-center">
+              <div className="text-center mt-8">
+                <p className="text-muted-foreground mb-6">
+                  Your practice data has been successfully synced and analyzed. You're ready to
+                  start tracking your quota compliance!
+                </p>
+
                 <Button
                   variant="default"
                   size="lg"
                   onClick={handleCompleteOnboarding}
                   disabled={isProcessing || isLoading || isCompleting}
+                  className="bg-black hover:bg-gray-800 text-white"
                 >
                   {isCompleting ? (
                     <Loader2 className="mr-2 h-4 w-4 animate-spin" />
