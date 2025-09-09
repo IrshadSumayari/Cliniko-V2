@@ -6,6 +6,8 @@ import { Input } from '@/components/ui/input';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
+import { VideoPlayer } from '@/components/ui/video-player';
 import {
   ArrowRight,
   ArrowLeft,
@@ -14,6 +16,9 @@ import {
   CheckCircle,
   Settings,
   ExternalLink,
+  Clock,
+  Copy,
+  Eye,
 } from 'lucide-react';
 import { useAuth } from '@/contexts/auth-context';
 import { toast } from 'sonner';
@@ -649,124 +654,249 @@ export default function OnboardingFlow() {
         );
 
       case 'api':
+        const getVideoInfo = (pms: string) => {
+          switch (pms.toLowerCase()) {
+            case 'cliniko':
+              return {
+                videoId: 'mnOw1RxSBlY',
+                title: 'How to get your Cliniko API key',
+                duration: '2 min'
+              };
+            case 'nookal':
+              return {
+                videoId: 'GY3lWkzGgrg',
+                title: 'How to get your Nookal API key',
+                duration: '2 min'
+              };
+            default:
+              return null;
+          }
+        };
+
+        const videoInfo = getVideoInfo(formData.selectedPMS);
+
         return (
-          <div className="space-y-8 fade-in">
-            <div className="text-center">
-              <div className="flex items-center justify-center gap-2 mb-4">
-                <div className="w-3 h-3 rounded-full bg-primary"></div>
-                <div className="w-8 h-0.5 bg-primary"></div>
-                <div className="w-3 h-3 rounded-full bg-primary"></div>
-                <div className="w-8 h-0.5 bg-muted"></div>
-                <div className="w-3 h-3 rounded-full bg-muted"></div>
-              </div>
-              <h2 className="text-3xl font-bold mb-2">Get Your {formData.selectedPMS} API Key</h2>
-              <p className="text-muted-foreground">
-                Follow these step-by-step instructions to connect your practice management system
-              </p>
-            </div>
-
-            <div className="max-w-4xl mx-auto grid md:grid-cols-2 gap-8">
-              {/* Instructions Card */}
-              <Card className="p-6">
-                <div className="flex items-center gap-2 mb-6">
-                  <Settings className="h-5 w-5 text-primary" />
-                  <h3 className="font-semibold">Step-by-Step Instructions</h3>
+          <div className="min-h-screen bg-background">
+            <div className="container mx-auto px-6 py-8">
+              <div className="space-y-8 fade-in">
+                {/* Header */}
+                <div className="text-center pt-4 pb-4 max-w-xl mx-auto px-6">
+                  {/* Step Progress Indicator */}
+                  <div className="flex items-center justify-center gap-2 mb-6">
+                    <div className="w-3 h-3 rounded-full bg-primary"></div>
+                    <div className="w-8 h-0.5 bg-primary"></div>
+                    <div className="w-3 h-3 rounded-full bg-primary"></div>
+                    <div className="w-8 h-0.5 bg-muted"></div>
+                    <div className="w-3 h-3 rounded-full bg-muted"></div>
+                  </div>
+                  
+                  <div className="inline-flex items-center gap-2 bg-primary/10 px-3 py-1 rounded-full text-xs font-medium text-primary mb-2">
+                    <Clock className="h-3 w-3" />
+                    One-time setup
+                  </div>
+                  <h1 className="text-xl font-bold mb-2">Get Your {formData.selectedPMS} API Key</h1>
+                  <p className="text-sm text-muted-foreground">
+                    Paste your API key to securely link your practice data. An API key is like a special password that lets apps talk to each other safely. It's much safer than using your {formData.selectedPMS} username and password because it only allows specific data access and can be revoked anytime without changing your main login.
+                  </p>
                 </div>
 
-                <div className="space-y-4">
-                  {getPMSInstructions(formData.selectedPMS).map((instruction, index) => (
-                    <div key={index} className="flex gap-3">
-                      <Badge
-                        variant="outline"
-                        className="rounded-full w-6 h-6 flex items-center justify-center text-xs shrink-0"
-                      >
-                        {index + 1}
-                      </Badge>
-                      <p className="text-sm flex-1">{instruction}</p>
+                {/* Main Content */}
+                <div className="max-w-5xl mx-auto px-6 pb-8">
+                  <div className="grid lg:grid-cols-2 gap-6 items-start">
+                    
+                    {/* Left Column - Steps */}
+                    <div className="space-y-6">
+                      {/* Step Progress Bar */}
+                      <Card className="p-3">
+                        <h3 className="font-medium mb-3 text-xs">Follow these steps:</h3>
+                        <div className="space-y-2">
+                          {(() => {
+                            const steps = formData.selectedPMS === "Cliniko" 
+                              ? [
+                                  { step: "1", title: "Go to My Info", desc: "Click small arrow next to your name (bottom left)" },
+                                  { step: "2", title: "Scroll down", desc: "Enable API Keys" },
+                                  { step: "3", title: "Save changes", desc: "Click Save Changes" },
+                                  { step: "4", title: "Click manage API keys", desc: "Then manage API keys" },
+                                  { step: "5", title: "Create new API key", desc: "Click Create new API key" },
+                                  { step: "6", title: "Name the key", desc: "MyPhysioFlow" },
+                                  { step: "7", title: "Copy and paste", desc: "Copy key to MyPhysioFlow" }
+                                ]
+                              : [
+                                  { step: "1", title: "Log in to Nookal", desc: "Use your usual clinic login" },
+                                  { step: "2", title: "Go to Setup", desc: "Gear icon in top menu - opens clinic settings" },
+                                  { step: "3", title: "Click Connections", desc: "In left sidebar, then select API Keys" },
+                                  { step: "4", title: "Generate new key", desc: "Click + Generate API Key" },
+                                  { step: "5", title: "Select locations", desc: "Choose your clinic locations" },
+                                  { step: "6", title: "Leave unchecked", desc: "Clinical Notes/Invoices/Documents" },
+                                  { step: "7", title: "Save changes", desc: "Click Save Changes" },
+                                  { step: "8", title: "Copy API key", desc: "Copy for the key text box" },
+                                  { step: "9", title: "Paste in MyPhysioFlow", desc: "Connect Securely screen & click Connect" }
+                                ];
+                            return steps.map((item, index) => (
+                            <div key={index} className="flex items-center gap-2 p-1.5 rounded hover:bg-muted/30 transition-colors">
+                              <div className="w-4 h-4 bg-primary text-primary-foreground rounded-full flex items-center justify-center text-[10px] font-medium flex-shrink-0">
+                                {item.step}
+                              </div>
+                              <div className="flex-1 min-w-0">
+                                <div className="font-medium text-xs">{item.title}</div>
+                                <div className="text-[10px] text-muted-foreground">{item.desc}</div>
+                              </div>
+                            </div>
+                          ));
+                          })()}
+                        </div>
+                      </Card>
+
+                      {/* Quick Access Button */}
+                      <Button variant="outline" size="default" className="w-full text-sm" asChild>
+                        <a href={`https://${formData.selectedPMS.toLowerCase()}.com/docs/api`} target="_blank" rel="noopener noreferrer">
+                          <ExternalLink className="mr-2 h-4 w-4" />
+                          Open {formData.selectedPMS} Settings
+                        </a>
+                      </Button>
                     </div>
-                  ))}
-                </div>
 
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="mt-6 w-full bg-transparent"
-                  onClick={() =>
-                    window.open(
-                      `https://${formData.selectedPMS.toLowerCase()}.com/docs/api`,
-                      '_blank'
-                    )
-                  }
-                >
-                  <ExternalLink className="mr-2 h-4 w-4" />
-                  Open {formData.selectedPMS} Documentation
-                </Button>
+                    {/* Right Column - Video & API Input */}
+                    <div className="space-y-5">
+                      {/* Video Player */}
+                      {videoInfo && (
+                        <VideoPlayer
+                          videoId={videoInfo.videoId}
+                          title={videoInfo.title}
+                          duration={videoInfo.duration}
+                          className="w-full"
+                        />
+                      )}
 
-                <div className="mt-4 p-3 bg-muted rounded-lg">
-                  <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                    <Shield className="h-3 w-3" />
-                    Your API key will look like: ck_abc123def456...
+                      {/* API Key Input */}
+                      <Card className="p-4">
+                        <div className="space-y-3">
+                          <div className="text-center">
+                            <h3 className="font-medium mb-2 text-sm">Step 2: Paste Your API Key</h3>
+                            <p className="text-xs text-muted-foreground">
+                              An API key is like a secure password that lets MyPhysioFlow safely read your {formData.selectedPMS} data. Copy it from step 1 and paste it here.
+                            </p>
+                          </div>
+
+                          <div className="space-y-3">
+                            <div className="relative">
+                              <Input
+                                type="text"
+                                placeholder="ck_1234abcd5678..."
+                                value={formData.apiKey}
+                                onChange={(e) => setFormData({...formData, apiKey: e.target.value})}
+                                className="font-mono text-xs h-10 pr-16"
+                              />
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                className="absolute right-1 top-1 h-8 px-2 text-xs"
+                                onClick={async () => {
+                                  try {
+                                    const text = await navigator.clipboard.readText();
+                                    setFormData({...formData, apiKey: text.trim()});
+                                  } catch (err) {
+                                    console.error('Failed to read clipboard:', err);
+                                  }
+                                }}
+                              >
+                                <Copy className="h-3 w-3 mr-1" />
+                                Paste
+                              </Button>
+                            </div>
+
+                            <Button
+                              variant="default"
+                              size="default"
+                              className="w-full bg-black hover:bg-gray-800 text-white text-sm h-10"
+                              onClick={handleConnectAndSync}
+                              disabled={!formData.apiKey.trim() || isProcessing}
+                            >
+                              {isProcessing ? (
+                                <Loader2 className="mr-2 h-3 w-3 animate-spin" />
+                              ) : (
+                                <>
+                                  <Shield className="mr-2 h-3 w-3" />
+                                  Connect Securely
+                                </>
+                              )}
+                            </Button>
+
+                            <div className="flex items-center justify-center gap-2 text-xs text-muted-foreground">
+                              <Shield className="h-3 w-3 text-green-500" />
+                              API keys are like a permission slip - we get read-only access only
+                            </div>
+                          </div>
+                        </div>
+                      </Card>
+                    </div>
+                  </div>
+
+                  {/* Reassurance Section */}
+                  <div className="mt-12 pt-6 border-t">
+                    <div className="grid md:grid-cols-3 gap-4 max-w-3xl mx-auto text-center">
+                      <div className="flex flex-col items-center gap-2">
+                        <div className="w-8 h-8 bg-green-100 dark:bg-green-900/20 rounded-full flex items-center justify-center">
+                          <Shield className="h-4 w-4 text-green-600" />
+                        </div>
+                        <div>
+                          <h4 className="font-medium text-sm">Encrypted & Secure</h4>
+                          <p className="text-xs text-muted-foreground">Your data is protected with enterprise-grade encryption</p>
+                        </div>
+                      </div>
+                      <div className="flex flex-col items-center gap-2">
+                        <div className="w-8 h-8 bg-blue-100 dark:bg-blue-900/20 rounded-full flex items-center justify-center">
+                          <Eye className="h-4 w-4 text-blue-600" />
+                        </div>
+                        <div>
+                          <h4 className="font-medium text-sm">Read-only Access</h4>
+                          <p className="text-xs text-muted-foreground">We can only view your data, never edit or delete anything</p>
+                        </div>
+                      </div>
+                      <div className="flex flex-col items-center gap-2">
+                        <div className="w-8 h-8 bg-purple-100 dark:bg-purple-900/20 rounded-full flex items-center justify-center">
+                          <Clock className="h-4 w-4 text-purple-600" />
+                        </div>
+                        <div>
+                          <h4 className="font-medium text-sm">Done in 2 Minutes</h4>
+                          <p className="text-xs text-muted-foreground">Most clinics complete this setup in under 2 minutes</p>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* FAQ Section */}
+                  <div className="mt-10 max-w-2xl mx-auto">
+                    <h3 className="font-medium text-center mb-4 text-sm">Frequently Asked Questions</h3>
+                    <Accordion type="single" collapsible className="w-full">
+                      <AccordionItem value="item-1">
+                        <AccordionTrigger>What is an API key?</AccordionTrigger>
+                        <AccordionContent>
+                          An API key is like a secure password that allows MyPhysioFlow to read data from your {formData.selectedPMS} account. It's completely safe and gives us read-only access - we can see your data but never change or delete anything.
+                        </AccordionContent>
+                      </AccordionItem>
+                      <AccordionItem value="item-2">
+                        <AccordionTrigger>Is this safe?</AccordionTrigger>
+                        <AccordionContent>
+                          Absolutely! API keys are the industry standard for secure data access. We use enterprise-grade encryption and only get read-only permissions. Your patient data stays 100% private and secure in your {formData.selectedPMS} account.
+                        </AccordionContent>
+                      </AccordionItem>
+                      <AccordionItem value="item-3">
+                        <AccordionTrigger>Why can't you just log in with my username/password?</AccordionTrigger>
+                        <AccordionContent>
+                          API keys are much safer than passwords! They can be revoked instantly if needed, give limited permissions (read-only), and follow security best practices. This way, you maintain full control over your account.
+                        </AccordionContent>
+                      </AccordionItem>
+                      <AccordionItem value="item-4">
+                        <AccordionTrigger>What if I get stuck?</AccordionTrigger>
+                        <AccordionContent>
+                          No worries! Watch the video tutorial above, or contact our support team. We're here to help you get connected quickly and easily. Most issues are resolved in just a few minutes.
+                        </AccordionContent>
+                      </AccordionItem>
+                    </Accordion>
                   </div>
                 </div>
-              </Card>
-
-              {/* API Key Input Card */}
-              <Card className="p-6">
-                <div className="flex items-center gap-2 mb-6">
-                  <Shield className="h-5 w-5 text-primary" />
-                  <h3 className="font-semibold">Enter Your API Key</h3>
-                </div>
-
-                <div className="space-y-4">
-                  <Input
-                    type="password"
-                    placeholder={`Paste your ${formData.selectedPMS} API key here`}
-                    value={formData.apiKey}
-                    onChange={(e) => setFormData({ ...formData, apiKey: e.target.value })}
-                    className="font-mono text-sm"
-                  />
-
-                  <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                    <Shield className="h-3 w-3" />
-                    Your API key is encrypted and stored securely
-                  </div>
-
-                  <div className="bg-blue-50 dark:bg-blue-950/20 p-4 rounded-lg">
-                    <h4 className="font-medium text-sm mb-2">What happens next?</h4>
-                    <ul className="text-xs text-muted-foreground space-y-1">
-                      <li>• We'll securely connect to your {formData.selectedPMS} account</li>
-                      <li>• Import your patient data and appointment history</li>
-                      <li>• Set up your personalized dashboard</li>
-                      <li>• You'll be ready to use the system immediately</li>
-                    </ul>
-                  </div>
-
-                  <Button
-                    variant="default"
-                    size="lg"
-                    className="w-full"
-                    onClick={handleConnectAndSync}
-                    disabled={!formData.apiKey.trim() || isProcessing}
-                  >
-                    {isProcessing ? (
-                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    ) : (
-                      'Connect & Sync Data'
-                    )}
-                    {!isProcessing && <ArrowRight className="ml-2 h-4 w-4" />}
-                  </Button>
-                </div>
-              </Card>
-            </div>
-
-            <div className="flex justify-center gap-4">
-              <Button variant="outline" onClick={handleBack} disabled={isProcessing}>
-                <ArrowLeft className="mr-2 h-4 w-4" />
-                Back to PMS Selection
-              </Button>
-              <Button variant="outline" onClick={handleSkip} disabled={isProcessing}>
-                Back to Home
-              </Button>
+              </div>
             </div>
           </div>
         );

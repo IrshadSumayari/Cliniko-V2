@@ -17,7 +17,7 @@ export function DashboardHeader({ onSync, isSync, onNavigate, onSignOut }: Dashb
   const { user } = useAuth();
 
   return (
-    <div className="bg-background/95 backdrop-blur-sm border-b border-border/30 sticky top-0 z-50">
+    <div className="bg-[#f1ede5] dark:bg-[#0f0f0f] backdrop-blur-sm border-b border-border/30 sticky top-0 z-50">
       <div className="container mx-auto px-8 py-6">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-6">
