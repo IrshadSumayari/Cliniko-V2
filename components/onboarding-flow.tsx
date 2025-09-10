@@ -33,6 +33,7 @@ interface SyncResults {
   epcPatients: number;
   totalAppointments: number;
   actionNeededPatients: number;
+  overduePatients?: number;
   issues?: string[];
   customTags?: {
     wc: string;
@@ -60,9 +61,9 @@ export default function OnboardingFlow() {
   const [showOtherPopup, setShowOtherPopup] = useState(false);
   const [otherPMSData, setOtherPMSData] = useState({
     softwareName: '',
-    softwareUrl: '',
+    phoneNumber: '',
   });
-  const [websiteError, setWebsiteError] = useState('');
+  const [phoneError, setPhoneError] = useState('');
   const [syncResults, setSyncResults] = useState<SyncResults>({
     wcPatients: 0,
     epcPatients: 0,
@@ -113,23 +114,15 @@ export default function OnboardingFlow() {
     fetchUserTags();
   }, [getAccessToken]);
 
-  const validateWebsiteUrl = (url: string): boolean => {
-    try {
-      // Basic URL validation
-      const urlPattern = /^https?:\/\/.+/;
-      if (!urlPattern.test(url)) {
-        setWebsiteError('Please enter a valid URL starting with http:// or https://');
-        return false;
-      }
-
-      // Try to create a URL object to validate the format
-      new URL(url);
-      setWebsiteError('');
-      return true;
-    } catch (error) {
-      setWebsiteError('Please enter a valid website URL (e.g., https://example.com)');
+  const validatePhoneNumber = (phone: string): boolean => {
+    // Basic phone number validation - allow various formats
+    const phonePattern = /^[\+]?[\d\s\-\(\)]{10,}$/;
+    if (!phonePattern.test(phone)) {
+      setPhoneError('Please enter a valid phone number (at least 10 digits)');
       return false;
     }
+    setPhoneError('');
+    return true;
   };
 
   const handlePMSSelect = (pms: string) => {
@@ -141,13 +134,13 @@ export default function OnboardingFlow() {
   };
 
   const handleOtherPMSSubmit = async () => {
-    if (!otherPMSData.softwareName.trim() || !otherPMSData.softwareUrl.trim()) {
-      toast.error('Please fill in both software name and software URL');
+    if (!otherPMSData.softwareName.trim() || !otherPMSData.phoneNumber.trim()) {
+      toast.error('Please fill in both software name and phone number');
       return;
     }
 
-    // Validate website URL
-    if (!validateWebsiteUrl(otherPMSData.softwareUrl)) {
+    // Validate phone number
+    if (!validatePhoneNumber(otherPMSData.phoneNumber)) {
       return;
     }
 
@@ -170,7 +163,7 @@ export default function OnboardingFlow() {
         },
         body: JSON.stringify({
           softwareName: otherPMSData.softwareName,
-          softwareUrl: otherPMSData.softwareUrl,
+          phoneNumber: otherPMSData.phoneNumber,
         }),
       });
 
@@ -185,7 +178,7 @@ export default function OnboardingFlow() {
 
       // Close popup and skip to completion
       setShowOtherPopup(false);
-      setOtherPMSData({ softwareName: '', softwareUrl: '' });
+      setOtherPMSData({ softwareName: '', phoneNumber: '' });
 
       // Skip the normal flow and go to a completion step
       setCurrentStep('tag-complete');
@@ -201,8 +194,8 @@ export default function OnboardingFlow() {
 
   const handleOtherPMSCancel = () => {
     setShowOtherPopup(false);
-    setOtherPMSData({ softwareName: '', softwareUrl: '' });
-    setWebsiteError('');
+    setOtherPMSData({ softwareName: '', phoneNumber: '' });
+    setPhoneError('');
   };
 
   const resetSyncProgress = () => {
@@ -1156,7 +1149,7 @@ export default function OnboardingFlow() {
               </div>
               <h3 className="text-lg font-semibold mb-2">Custom Practice Management Software</h3>
               <p className="text-sm text-muted-foreground">
-                Our team will reach out to you to set up your custom integration. Please provide
+                Our team will reach out to you to set up your custom integration within 3 hours for the same price. Please provide
                 your software details below.
               </p>
             </div>
@@ -1174,32 +1167,32 @@ export default function OnboardingFlow() {
               </div>
 
               <div>
-                <label className="text-sm font-medium mb-2 block">Software URL</label>
+                <label className="text-sm font-medium mb-2 block">Phone Number</label>
                 <Input
-                  type="url"
-                  placeholder="https://your-software.com"
-                  value={otherPMSData.softwareUrl}
+                  type="tel"
+                  placeholder="+1 (555) 123-4567"
+                  value={otherPMSData.phoneNumber}
                   onChange={(e) => {
-                    const url = e.target.value;
-                    setOtherPMSData({ ...otherPMSData, softwareUrl: url });
+                    const phone = e.target.value;
+                    setOtherPMSData({ ...otherPMSData, phoneNumber: phone });
                     // Clear error when user starts typing
-                    if (websiteError) {
-                      setWebsiteError('');
+                    if (phoneError) {
+                      setPhoneError('');
                     }
                   }}
                   onBlur={(e) => {
                     // Validate on blur if there's a value
                     if (e.target.value.trim()) {
-                      validateWebsiteUrl(e.target.value);
+                      validatePhoneNumber(e.target.value);
                     }
                   }}
-                  className={`text-sm ${websiteError ? 'border-red-500 focus:border-red-500' : ''}`}
+                  className={`text-sm ${phoneError ? 'border-red-500 focus:border-red-500' : ''}`}
                 />
-                {websiteError ? (
-                  <p className="text-xs text-red-500 mt-1">{websiteError}</p>
+                {phoneError ? (
+                  <p className="text-xs text-red-500 mt-1">{phoneError}</p>
                 ) : (
                   <p className="text-xs text-muted-foreground mt-1">
-                    Enter the URL where your software is hosted
+                    We'll call you to discuss the integration details
                   </p>
                 )}
               </div>
@@ -1209,8 +1202,8 @@ export default function OnboardingFlow() {
               <h4 className="font-medium text-sm mb-2">What happens next?</h4>
               <ul className="text-xs text-muted-foreground space-y-1">
                 <li>• Our team will review your software details</li>
-                <li>• We'll reach out to you to discuss the integration process</li>
-                <li>• We'll create a custom integration for your software</li>
+                <li>• We'll call you within 3 hours to discuss the integration process</li>
+                <li>• We'll create a custom integration for your software at the same price</li>
                 <li>• You'll receive an email confirmation once ready</li>
                 <li>• Your dashboard will be set up automatically</li>
               </ul>
@@ -1225,8 +1218,8 @@ export default function OnboardingFlow() {
                 className="flex-1"
                 disabled={
                   !otherPMSData.softwareName.trim() ||
-                  !otherPMSData.softwareUrl.trim() ||
-                  !!websiteError ||
+                  !otherPMSData.phoneNumber.trim() ||
+                  !!phoneError ||
                   isProcessing
                 }
               >

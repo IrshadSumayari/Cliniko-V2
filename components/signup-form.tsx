@@ -127,7 +127,7 @@ const SignupForm = () => {
         <Button
           onClick={handleGoogleSignup}
           variant="outline"
-          className="w-full mb-4 bg-white hover:bg-gray-50 text-gray-900 border border-gray-300 font-medium"
+          className="w-full mb-4 bg-stone-100 dark:bg-gray-300 hover:bg-gray-50 text-gray-900 border border-gray-300 font-medium"
           disabled={isLoading}
         >
           {isLoading ? (
