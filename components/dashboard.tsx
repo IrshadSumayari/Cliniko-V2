@@ -51,6 +51,16 @@ import { useAuth } from '@/contexts/auth-context';
 import { useRouter } from 'next/navigation';
 import { QuotaEditModal } from './quota-edit-modal';
 import AlertSettings from './alert-settings';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 
 interface DashboardProps {
   onNavigate?: (view: 'settings' | 'onboarding') => void;
@@ -66,6 +76,7 @@ const Dashboard = ({ onNavigate }: DashboardProps) => {
   const [selectedPhysio, setSelectedPhysio] = useState('all');
   const [selectedLocation, setSelectedLocation] = useState('all');
   const [selectedPractitioner, setSelectedPractitioner] = useState('all');
+  const [showOverduePrompt, setShowOverduePrompt] = useState(false);
   const [practitionerOptions, setPractitionerOptions] = useState([]);
   const [physioPopoverOpen, setPhysioPopoverOpen] = useState(false);
   const [activeTab, setActiveTab] = useState('all-patients');
@@ -453,6 +464,18 @@ const Dashboard = ({ onNavigate }: DashboardProps) => {
   useEffect(() => {
     fetchDashboardData();
   }, [selectedPractitioner]);
+
+  useEffect(() => {
+    const hasSeenOverduePrompt = localStorage.getItem('hasSeenOverduePrompt');
+    if (!hasSeenOverduePrompt) {
+      setShowOverduePrompt(true);
+    }
+  }, []);
+
+  const handleOverduePromptDismiss = () => {
+    setShowOverduePrompt(false);
+    localStorage.setItem('hasSeenOverduePrompt', 'true');
+  };
 
   const handleSync = async () => {
     setIsSync(true);
@@ -1096,6 +1119,30 @@ const Dashboard = ({ onNavigate }: DashboardProps) => {
             </div>
           </div>
         </div>
+
+        {/* Overdue Patients Prompt */}
+        <AlertDialog open={showOverduePrompt} onOpenChange={setShowOverduePrompt}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 bg-amber-100 rounded-full flex items-center justify-center">
+                  <AlertTriangle className="h-5 w-5 text-amber-600" />
+                </div>
+                <AlertDialogTitle className="text-left">
+                  Manual Quota Updates Required
+                </AlertDialogTitle>
+              </div>
+              <AlertDialogDescription className="text-left text-base leading-relaxed">
+                Some overdue patients will need to have their quotas manually updated as
+                MyPhysioFlow doesn't have access to some data from your practice management system.
+                You can update these quotas directly from the patient list.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogAction onClick={handleOverduePromptDismiss}>Got it</AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
 
         <div className="container mx-auto px-8 py-10">
           {/* Trial Banner - Only show for trial users */}
