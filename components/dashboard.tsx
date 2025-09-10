@@ -1550,6 +1550,31 @@ const Dashboard = ({ onNavigate }: DashboardProps) => {
 
       {/* Alert Settings Modal */}
       {showSettingsModal && <AlertSettings onClose={() => setShowSettingsModal(false)} />}
+
+      {/* Medical Disclaimer Footer */}
+      <footer className="bg-background/95 backdrop-blur-sm border-t border-border/50 py-6 mt-12">
+        <div className="container mx-auto px-8">
+          <div className="text-center">
+            <p className="text-xs text-muted-foreground leading-relaxed max-w-4xl mx-auto">
+              <strong>Medical Disclaimer:</strong> MyPhysioFlow is an administrative support tool. It does not provide medical advice or replace professional clinical judgment. Clinics are responsible for ensuring patient data accuracy, obtaining patient consent, and meeting Medicare/WorkCover/NDIS obligations.
+            </p>
+            <div className="flex justify-center gap-6 mt-4 text-xs">
+              <a 
+                href="/terms-of-service" 
+                className="text-muted-foreground hover:text-primary transition-colors"
+              >
+                Terms of Service
+              </a>
+              <a 
+                href="/privacy-policy" 
+                className="text-muted-foreground hover:text-primary transition-colors"
+              >
+                Privacy Policy
+              </a>
+            </div>
+          </div>
+        </div>
+      </footer>
     </TooltipProvider>
   );
 };

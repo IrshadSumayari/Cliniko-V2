@@ -270,7 +270,24 @@ const SignupForm = () => {
 
         <Separator className="my-6" />
 
-        <div className="text-center">
+        <div className="text-center space-y-4">
+          <p className="text-xs text-muted-foreground">
+            By signing up, you agree to our{' '}
+            <Link
+              href="/terms-of-service"
+              className="text-primary hover:underline font-medium"
+            >
+              Terms of Service
+            </Link>{' '}
+            and{' '}
+            <Link
+              href="/privacy-policy"
+              className="text-primary hover:underline font-medium"
+            >
+              Privacy Policy
+            </Link>
+            .
+          </p>
           <p className="text-sm text-muted-foreground">
             Already have an account?{' '}
             <Link
