@@ -81,6 +81,19 @@ export default function OnboardingFlow() {
     epc: 'EPC',
   });
 
+  // Function to get appropriate syncing subtext based on progress percentage
+  const getSyncingSubtext = (progress: number): string => {
+    if (progress >= 40 && progress < 60) {
+      return "Securely syncing with your booking system to prepare your live dashboard.";
+    } else if (progress >= 60 && progress < 75) {
+      return "Setting up your patient overview and session tracking — securely and automatically.";
+    } else if (progress >= 75 && progress < 90) {
+      return "Loading your dashboard — your data stays private and read-only.";
+    } else {
+      return "Securely syncing with your booking system to prepare your live dashboard.";
+    }
+  };
+
   useEffect(() => {
     const fetchUserTags = async () => {
       try {
@@ -910,8 +923,7 @@ export default function OnboardingFlow() {
               </div>
               <h2 className="text-3xl font-bold mb-2">Setting Up Your Dashboard</h2>
               <p className="text-muted-foreground mb-8">
-                We're connecting to your clinic's data and mapping your patients, quotas and
-                appointments...
+                {getSyncingSubtext(syncProgress.progress)}
               </p>
             </div>
 

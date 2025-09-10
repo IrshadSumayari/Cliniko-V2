@@ -1132,7 +1132,7 @@ const Dashboard = ({ onNavigate }: DashboardProps) => {
                         }`}
                       />
                     </div>
-                    <div>
+                    {/* <div>
                       <span className="font-semibold text-foreground">
                         {userSubscription.daysRemaining === 0
                           ? 'Your free trial expires today'
@@ -1145,7 +1145,7 @@ const Dashboard = ({ onNavigate }: DashboardProps) => {
                           ? 'Upgrade now to avoid service interruption'
                           : 'Unlock unlimited features and advanced analytics'}
                       </p>
-                    </div>
+                    </div> */}
                   </div>
                   <Button
                     className={`transition-transform hover:scale-105 ${
