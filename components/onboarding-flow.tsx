@@ -302,6 +302,7 @@ export default function OnboardingFlow() {
               epcPatients: responseData.epcPatients || 0,
               totalAppointments: responseData.totalAppointments || 0,
               actionNeededPatients: responseData.actionNeededPatients || 0,
+              overduePatients: responseData.overduePatientsCount || 0,
               issues: responseData.issues || [],
             });
 
@@ -355,6 +356,7 @@ export default function OnboardingFlow() {
         epcPatients: result.epcPatients || 0,
         totalAppointments: result.totalAppointments || 0,
         actionNeededPatients: result.actionNeededPatients || 0,
+        overduePatients: result.overduePatientsCount || 0,
         issues: result.issues || [],
       });
 
@@ -521,6 +523,7 @@ export default function OnboardingFlow() {
         epcPatients: result.newCounts[epcKey] || 0,
         totalAppointments: result.newCounts.totalAppointments || 0,
         actionNeededPatients: result.newCounts.actionNeededPatients || 0,
+        overduePatients: result.newCounts.overduePatientsCount || 0,
         customTags: {
           wc: customTags.wc,
           epc: customTags.epc,

@@ -169,6 +169,9 @@ export async function POST(req: NextRequest) {
       // Email notifications commented out per user request
       // await sendActionNeededNotifications(actionNeededPatients, userData);
 
+      // Step 5.5: Calculate overdue patients
+      const overduePatients = await calculateOverduePatients(userId);
+
       // Step 6: Update sync log
       await createAdminClient()
         .from('sync_logs')
@@ -197,6 +200,7 @@ export async function POST(req: NextRequest) {
         casesCreated: casesResult.casesCreated || 0,
         casesUpdated: casesResult.casesUpdated || 0,
         actionNeededCount: actionNeededPatients.length,
+        overduePatientsCount: overduePatients.length,
         errors: [],
         lastSyncTime: new Date().toISOString(),
         nextSyncTime,
@@ -513,6 +517,23 @@ async function checkActionNeededPatients(userId: string) {
   return patients.filter((patient) => {
     const remainingSessions = patient.total_sessions - patient.sessions_used;
     return remainingSessions <= 2; // Warning threshold
+  });
+}
+
+// Calculate overdue patients (sessions used > quota)
+async function calculateOverduePatients(userId: string) {
+  const { data: patients } = await createAdminClient()
+    .from('patients')
+    .select('*')
+    .eq('user_id', userId)
+    .eq('is_active', true);
+
+  if (!patients) return [];
+
+  return patients.filter((patient) => {
+    const sessionsUsed = parseInt(patient.sessions_used) || 0;
+    const quota = parseInt(patient.total_sessions) || 0;
+    return sessionsUsed > quota; // Overdue if sessions used exceeds quota
   });
 }
 
