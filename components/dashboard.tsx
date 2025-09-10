@@ -51,6 +51,16 @@ import { useAuth } from '@/contexts/auth-context';
 import { useRouter } from 'next/navigation';
 import { QuotaEditModal } from './quota-edit-modal';
 import AlertSettings from './alert-settings';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 
 interface DashboardProps {
   onNavigate?: (view: 'settings' | 'onboarding') => void;
@@ -66,6 +76,7 @@ const Dashboard = ({ onNavigate }: DashboardProps) => {
   const [selectedPhysio, setSelectedPhysio] = useState('all');
   const [selectedLocation, setSelectedLocation] = useState('all');
   const [selectedPractitioner, setSelectedPractitioner] = useState('all');
+  const [showOverduePrompt, setShowOverduePrompt] = useState(false);
   const [practitionerOptions, setPractitionerOptions] = useState([]);
   const [physioPopoverOpen, setPhysioPopoverOpen] = useState(false);
   const [activeTab, setActiveTab] = useState('all-patients');
@@ -453,6 +464,18 @@ const Dashboard = ({ onNavigate }: DashboardProps) => {
   useEffect(() => {
     fetchDashboardData();
   }, [selectedPractitioner]);
+
+  useEffect(() => {
+    const hasSeenOverduePrompt = localStorage.getItem('hasSeenOverduePrompt');
+    if (!hasSeenOverduePrompt) {
+      setShowOverduePrompt(true);
+    }
+  }, []);
+
+  const handleOverduePromptDismiss = () => {
+    setShowOverduePrompt(false);
+    localStorage.setItem('hasSeenOverduePrompt', 'true');
+  };
 
   const handleSync = async () => {
     setIsSync(true);
@@ -1097,6 +1120,30 @@ const Dashboard = ({ onNavigate }: DashboardProps) => {
           </div>
         </div>
 
+        {/* Overdue Patients Prompt */}
+        <AlertDialog open={showOverduePrompt} onOpenChange={setShowOverduePrompt}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 bg-amber-100 rounded-full flex items-center justify-center">
+                  <AlertTriangle className="h-5 w-5 text-amber-600" />
+                </div>
+                <AlertDialogTitle className="text-left">
+                  Manual Quota Updates Required
+                </AlertDialogTitle>
+              </div>
+              <AlertDialogDescription className="text-left text-base leading-relaxed">
+                Some overdue patients will need to have their quotas manually updated as
+                MyPhysioFlow doesn't have access to some data from your practice management system.
+                You can update these quotas directly from the patient list.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogAction onClick={handleOverduePromptDismiss}>Got it</AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
+
         <div className="container mx-auto px-8 py-10">
           {/* Trial Banner - Only show for trial users */}
           {subscriptionLoaded &&
@@ -1132,7 +1179,7 @@ const Dashboard = ({ onNavigate }: DashboardProps) => {
                         }`}
                       />
                     </div>
-                    <div>
+                    {/* <div>
                       <span className="font-semibold text-foreground">
                         {userSubscription.daysRemaining === 0
                           ? 'Your free trial expires today'
@@ -1145,7 +1192,7 @@ const Dashboard = ({ onNavigate }: DashboardProps) => {
                           ? 'Upgrade now to avoid service interruption'
                           : 'Unlock unlimited features and advanced analytics'}
                       </p>
-                    </div>
+                    </div> */}
                   </div>
                   <Button
                     className={`transition-transform hover:scale-105 ${
@@ -1503,6 +1550,31 @@ const Dashboard = ({ onNavigate }: DashboardProps) => {
 
       {/* Alert Settings Modal */}
       {showSettingsModal && <AlertSettings onClose={() => setShowSettingsModal(false)} />}
+
+      {/* Medical Disclaimer Footer */}
+      <footer className="bg-background/95 backdrop-blur-sm border-t border-border/50 py-6 mt-12">
+        <div className="container mx-auto px-8">
+          <div className="text-center">
+            <p className="text-xs text-muted-foreground leading-relaxed max-w-4xl mx-auto">
+              <strong>Medical Disclaimer:</strong> MyPhysioFlow is an administrative support tool. It does not provide medical advice or replace professional clinical judgment. Clinics are responsible for ensuring patient data accuracy, obtaining patient consent, and meeting Medicare/WorkCover/NDIS obligations.
+            </p>
+            <div className="flex justify-center gap-6 mt-4 text-xs">
+              <a 
+                href="/terms-of-service" 
+                className="text-muted-foreground hover:text-primary transition-colors"
+              >
+                Terms of Service
+              </a>
+              <a 
+                href="/privacy-policy" 
+                className="text-muted-foreground hover:text-primary transition-colors"
+              >
+                Privacy Policy
+              </a>
+            </div>
+          </div>
+        </div>
+      </footer>
     </TooltipProvider>
   );
 };

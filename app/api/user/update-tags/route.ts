@@ -79,6 +79,7 @@ export async function POST(request: NextRequest) {
     let epcCount = 0;
     let totalAppointmentsCount = 0;
     let actionNeededPatientsCount = 0;
+    let overduePatientsCount = 0;
 
     try {
       // Debug: Let's see all appointment types for this user
@@ -373,6 +374,26 @@ export async function POST(request: NextRequest) {
             } catch (actionError) {
               console.error('Error calculating action needed patients:', actionError);
             }
+
+            // Calculate overdue patients count using same logic as dashboard
+            try {
+              const { data: overdueData, error: overdueError } = await supabase
+                .from('cases')
+                .select('id, quota, sessions_used, status')
+                .eq('user_id', userId)
+                .eq('status', 'active');
+
+              if (!overdueError && overdueData) {
+                // Use same logic as dashboard: sessionsUsed > totalSessions
+                overduePatientsCount = overdueData.filter((caseItem: any) => {
+                  const sessionsUsed = caseItem.sessions_used || 0;
+                  const totalSessions = caseItem.quota || 5; // Use same default as dashboard
+                  return sessionsUsed > totalSessions; // Overdue if sessions used exceeds total sessions
+                }).length;
+              }
+            } catch (overdueError) {
+              console.error('Error calculating overdue patients:', overdueError);
+            }
           }
         }
       } catch (casesPopulationError) {
@@ -380,12 +401,6 @@ export async function POST(request: NextRequest) {
         // Don't fail the entire operation, just log the error
       }
 
-      console.log('Final counts:', {
-        [`${wcTag}Patients`]: wcCount,
-        [`${epcTag}Patients`]: epcCount,
-        totalAppointments: totalAppointmentsCount,
-        actionNeededPatients: actionNeededPatientsCount,
-      });
     } catch (countingError) {
       console.error('Error in counting logic:', countingError);
       // Set default values if counting fails
@@ -393,6 +408,7 @@ export async function POST(request: NextRequest) {
       epcCount = 0;
       totalAppointmentsCount = 0;
       actionNeededPatientsCount = 0;
+      overduePatientsCount = 0;
     }
 
     return NextResponse.json({
@@ -403,6 +419,7 @@ export async function POST(request: NextRequest) {
         [`${epcTag}Patients`]: epcCount,
         totalAppointments: totalAppointmentsCount,
         actionNeededPatients: actionNeededPatientsCount,
+        overduePatientsCount: overduePatientsCount,
       },
     });
   } catch (error) {

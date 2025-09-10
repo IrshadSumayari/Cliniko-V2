@@ -926,6 +926,76 @@ const LandingPage = ({ onGetStarted, onLogin, onSignup }: LandingPageProps) => {
           </div>
         </div>
       </section>
+
+      {/* Footer */}
+      <footer className="bg-background border-t border-border/50 py-12">
+        <div className="container mx-auto px-6 max-w-6xl">
+          <div className="grid md:grid-cols-4 gap-8">
+            {/* Company Info */}
+            <div className="md:col-span-2">
+              <div className="flex items-center gap-3 mb-4">
+                <img
+                  src="/assets/logos/0ed091e5-2cfd-4e42-9b90-641896ead380.png"
+                  alt="MyPhysioFlow Logo"
+                  className="h-10 w-auto max-w-[200px]"
+                />
+              </div>
+              <p className="text-muted-foreground text-sm leading-relaxed mb-4">
+                Built for Australian physiotherapy clinics to track EPC and WorkCover sessions, 
+                ensuring compliance and preventing revenue loss from missed renewals.
+              </p>
+              <div className="text-sm text-muted-foreground">
+                <p>4 William Street, Maryville, Australia</p>
+                <p>support@myphysioflow.com.au</p>
+              </div>
+            </div>
+
+            {/* Legal Links */}
+            <div>
+              <h3 className="font-semibold text-foreground mb-4">Legal</h3>
+              <div className="space-y-2">
+                <a 
+                  href="/terms-of-service" 
+                  className="block text-sm text-muted-foreground hover:text-primary transition-colors"
+                >
+                  Terms of Service
+                </a>
+                <a 
+                  href="/privacy-policy" 
+                  className="block text-sm text-muted-foreground hover:text-primary transition-colors"
+                >
+                  Privacy Policy
+                </a>
+              </div>
+            </div>
+
+            {/* Support */}
+            <div>
+              <h3 className="font-semibold text-foreground mb-4">Support</h3>
+              <div className="space-y-2">
+                <a 
+                  href="mailto:support@myphysioflow.com.au" 
+                  className="block text-sm text-muted-foreground hover:text-primary transition-colors"
+                >
+                  Contact Support
+                </a>
+                <a 
+                  href="mailto:privacy@myphysioflow.com.au" 
+                  className="block text-sm text-muted-foreground hover:text-primary transition-colors"
+                >
+                  Privacy Officer
+                </a>
+              </div>
+            </div>
+          </div>
+
+          <div className="border-t border-border/50 mt-8 pt-8 text-center">
+            <p className="text-sm text-muted-foreground">
+              © 2025 MyPhysioFlow. All rights reserved. Built for Australian physios.
+            </p>
+          </div>
+        </div>
+      </footer>
     </div>
   );
 };

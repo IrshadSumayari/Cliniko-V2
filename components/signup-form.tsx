@@ -127,7 +127,7 @@ const SignupForm = () => {
         <Button
           onClick={handleGoogleSignup}
           variant="outline"
-          className="w-full mb-4 bg-white hover:bg-gray-50 text-gray-900 border border-gray-300 font-medium"
+          className="w-full mb-4 bg-stone-100 dark:bg-gray-300 hover:bg-gray-50 text-gray-900 border border-gray-300 font-medium"
           disabled={isLoading}
         >
           {isLoading ? (
@@ -270,7 +270,24 @@ const SignupForm = () => {
 
         <Separator className="my-6" />
 
-        <div className="text-center">
+        <div className="text-center space-y-4">
+          <p className="text-xs text-muted-foreground">
+            By signing up, you agree to our{' '}
+            <Link
+              href="/terms-of-service"
+              className="text-primary hover:underline font-medium"
+            >
+              Terms of Service
+            </Link>{' '}
+            and{' '}
+            <Link
+              href="/privacy-policy"
+              className="text-primary hover:underline font-medium"
+            >
+              Privacy Policy
+            </Link>
+            .
+          </p>
           <p className="text-sm text-muted-foreground">
             Already have an account?{' '}
             <Link

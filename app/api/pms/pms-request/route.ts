@@ -72,11 +72,11 @@ export async function POST(request: NextRequest) {
     }
 
     // Parse request body
-    const { softwareName, softwareUrl } = await request.json();
+    const { softwareName, phoneNumber } = await request.json();
 
-    if (!softwareName || !softwareUrl) {
+    if (!softwareName || !phoneNumber) {
       return NextResponse.json(
-        { error: 'Software name and software URL are required.' },
+        { error: 'Software name and phone number are required.' },
         { status: 400 }
       );
     }
@@ -103,7 +103,7 @@ export async function POST(request: NextRequest) {
           <div style="background: white; padding: 20px; border-radius: 8px; margin: 20px 0; border-left: 4px solid #28a745;">
             <h3 style="color: #28a745; margin-top: 0;">PMS Details</h3>
             <p><strong>Software Name:</strong> ${softwareName}</p>
-            <p><strong>Software URL:</strong> <a href="${softwareUrl}" style="color: #007bff; text-decoration: none;">${softwareUrl}</a></p>
+            <p><strong>Phone Number:</strong> <a href="tel:${phoneNumber}" style="color: #007bff; text-decoration: none;">${phoneNumber}</a></p>
           </div>
           
          
@@ -125,18 +125,17 @@ Customer Information:
 
 PMS Details:
 - Software Name: ${softwareName}
-- Software URL: ${softwareUrl}
+- Phone Number: ${phoneNumber}
 
 Action Required: Please reach out to the customer to discuss the integration process and timeline.
 
 Next Steps:
-1. Contact the customer to discuss integration requirements
+1. Call the customer within 3 hours to discuss integration requirements
 2. Review the PMS software and documentation
-3. Access the software at the provided URL
-4. Create custom integration adapter
-5. Test the integration with the software
-6. Update the user's PMS connection in the system
-7. Send confirmation email to customer
+3. Create custom integration adapter for the same price
+4. Test the integration with the software
+5. Update the user's PMS connection in the system
+6. Send confirmation email to customer
 
 View User Profile: ${config.app.url}/admin/users/${userData.id}
 
@@ -158,7 +157,7 @@ Request submitted at: ${new Date().toLocaleString()}
     return NextResponse.json({
       success: true,
       message:
-        'Custom PMS integration request submitted successfully. Our team will reach out to you to discuss the integration process.',
+        'Custom PMS integration request submitted successfully. Our team will call you within 3 hours to discuss the integration process at the same price.',
     });
   } catch (error) {
     console.error('Error processing custom PMS request:', error);

@@ -242,6 +242,7 @@ export async function GET(req: NextRequest) {
       (p: any) => p.status === 'warning' && p.remainingSessions > 0
     ).length;
     const pendingPatients = dashboardData.filter((p: any) => p.status === 'pending').length;
+    const overduePatients = dashboardData.filter((p: any) => p.sessionsUsed > p.totalSessions).length;
     const totalSessionsRemaining = dashboardData.reduce(
       (sum: number, p: any) => sum + p.remainingSessions,
       0
@@ -267,6 +268,7 @@ export async function GET(req: NextRequest) {
         totalSessionsRemaining,
         actionNeededPatients,
         pendingPatients,
+        overduePatients,
         wcPatients,
         epcPatients,
       },
