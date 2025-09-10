@@ -9,124 +9,128 @@ All colors MUST be HSL.
 @layer base {
   :root {
     /* Premium cream & charcoal color palette */
-    --background: 0 0% 100%; /* Sophisticated cream white */
-    --foreground: 222.2 84% 4.9%; /* Deep charcoal */
+    --background: 40 25% 95%; /* Warm, noticeable cream background */
+    --foreground: 0 0% 8%; /* Deep charcoal #141414 */
 
-    --card: 0 0% 100%; /* Pure white cards */
-    --card-foreground: 222.2 84% 4.9%;
+    --card: 42 30% 92%; /* Rich cream cards - very noticeable */
+    --card-foreground: 0 0% 8%;
 
-    --popover: 0 0% 100%;
-    --popover-foreground: 222.2 84% 4.9%;
+    --popover: 42 30% 92%; /* Rich cream popover background */
+    --popover-foreground: 0 0% 8%;
 
     /* Primary - Elegant charcoal */
-    --primary: 0 0% 9%;
-    --primary-foreground: 210 40% 98%; /* Pure white */
+    --primary: 0 0% 8%; /* Deep charcoal #141414 */
+    --primary-foreground: 40 25% 95%; /* Warm cream foreground */
 
     /* Secondary - Warm cream variations */
-    --secondary: 210 40% 96%; /* Light cream */
-    --secondary-foreground: 222.2 84% 4.9%;
+    --secondary: 45 35% 88%; /* Deep, warm cream */
+    --secondary-foreground: 0 0% 8%;
 
     /* Muted tones - Sophisticated neutrals */
-    --muted: 210 40% 96%; /* Subtle cream */
-    --muted-foreground: 215.4 16.3% 46.9%; /* Medium gray */
+    --muted: 38 20% 90%; /* Noticeable warm cream */
+    --muted-foreground: 0 0% 45%; /* Medium gray */
 
     /* Accent - Premium cream */
-    --accent: 210 40% 96%; /* Very light cream */
-    --accent-foreground: 222.2 84% 4.9%;
+    --accent: 44 40% 90%; /* Rich, saturated cream accent */
+    --accent-foreground: 0 0% 8%;
 
     /* Status colors - Enhanced attractive palette */
-    --destructive: 0 84.2% 60.2%; /* Vibrant coral red */
-    --destructive-foreground: 210 40% 98%;
+    --destructive: 0 75% 60%; /* Vibrant coral red */
+    --destructive-foreground: 0 0% 100%;
 
-    --success: 142.1 76.2% 36.3%; /* Fresh emerald green */
-    --success-foreground: 355.7 100% 97.3%; /* Bright white */
+    --success: 140 55% 50%; /* Fresh emerald green */
+    --success-foreground: 0 0% 100%;
 
-    --warning: 32.5 94.6% 43.7%; /* Rich golden amber */
-    --warning-foreground: 210 40% 98%; /* Deep charcoal */
+    --warning: 32 95% 58%; /* Rich golden amber */
+    --warning-foreground: 0 0% 100%;
+
+    /* NDIS Beta Banner Colors */
+    --ndis-beta: 32 85% 65%; /* Soft gold */
+    --ndis-beta-foreground: 0 0% 20%;
 
     /* Borders and inputs */
-    --border: 214.3 31.8% 91.4%; /* Soft cream border */
-    --input: 214.3 31.8% 91.4%; /* Light input background */
-    --ring: 221.2 83.2% 53.3%; /* Focus ring */
+    --border: 38 15% 82%; /* Much more noticeable cream border */
+    --input: 40 20% 88%; /* Rich cream input background */
+    --ring: 0 0% 8%; /* Charcoal focus ring */
 
     /* Program type colors */
-    --epc: 142.1 76.2% 36.3%; /* Warm cream for EPC */
-    --epc-foreground: 355.7 100% 97.3%; /* Bright white */
+    --epc: 45 35% 85%; /* Rich warm cream for EPC */
+    --epc-foreground: 0 0% 8%;
 
-    --ctp: 221.2 83.2% 53.3%; /* Professional blue for CTP */
-    --ctp-foreground: 210 40% 98%; /* Pure white */
+    --ctp: 200 65% 55%; /* Professional blue for CTP */
+    --ctp-foreground: 0 0% 100%;
 
-    --workcover: 32.5 94.6% 43.7%; /* Muted blue-gray for Workers Comp */
-    --workcover-foreground: 210 40% 98%; /* Deep charcoal */
-
-    --ndis-beta: 262.1 83.3% 57.8%; /* NDIS Beta color */
-    --ndis-beta-foreground: 210 40% 98%; /* Deep charcoal */
+    --workcover: 220 8% 50%; /* Muted blue-gray for Workers Comp */
+    --workcover-foreground: 0 0% 100%;
 
     /* Premium gradients */
-    --gradient-hero: linear-gradient(135deg, hsl(35 12% 98%), hsl(35 20% 96%));
-    --gradient-card: linear-gradient(145deg, hsl(0 0% 100%), hsl(35 15% 97%));
+    --gradient-hero: linear-gradient(135deg, hsl(40 25% 95%), hsl(45 35% 88%));
+    --gradient-card: linear-gradient(145deg, hsl(42 30% 92%), hsl(44 40% 90%));
     --gradient-button: linear-gradient(135deg, hsl(0 0% 8%), hsl(0 0% 12%));
-    --gradient-accent: linear-gradient(135deg, hsl(35 20% 96%), hsl(35 15% 97%));
+    --gradient-accent: linear-gradient(135deg, hsl(45 35% 88%), hsl(44 40% 90%));
 
     /* Luxury shadows - More refined */
     --shadow-card: 0 2px 20px hsl(0 0% 0% / 0.04), 0 1px 4px hsl(0 0% 0% / 0.08);
     --shadow-card-hover: 0 4px 28px hsl(0 0% 0% / 0.08), 0 2px 8px hsl(0 0% 0% / 0.12);
     --shadow-button: 0 2px 8px hsl(0 0% 0% / 0.12);
-    --shadow-float: 0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+    --shadow-float: 0 8px 40px hsl(0 0% 0% / 0.08), 0 4px 16px hsl(0 0% 0% / 0.12);
     --shadow-elegant: 0 1px 3px hsl(0 0% 0% / 0.05), 0 20px 60px hsl(0 0% 0% / 0.04);
 
     --radius: 0.75rem;
 
     --sidebar-background: 0 0% 98%;
+
     --sidebar-foreground: 240 5.3% 26.1%;
+
     --sidebar-primary: 240 5.9% 10%;
+
     --sidebar-primary-foreground: 0 0% 98%;
+
     --sidebar-accent: 240 4.8% 95.9%;
+
     --sidebar-accent-foreground: 240 5.9% 10%;
+
     --sidebar-border: 220 13% 91%;
+
     --sidebar-ring: 217.2 91.2% 59.8%;
   }
 
   .dark {
     --background: 222.2 84% 4.9%;
     --foreground: 210 40% 98%;
+
     --card: 222.2 84% 4.9%;
     --card-foreground: 210 40% 98%;
+
     --popover: 222.2 84% 4.9%;
     --popover-foreground: 210 40% 98%;
-    --primary: 217.2 91.2% 59.8%;
-    --primary-foreground: 222.2 84% 4.9%;
+
+    --primary: 210 40% 98%;
+    --primary-foreground: 222.2 47.4% 11.2%;
+
     --secondary: 217.2 32.6% 17.5%;
     --secondary-foreground: 210 40% 98%;
+
     --muted: 217.2 32.6% 17.5%;
     --muted-foreground: 215 20.2% 65.1%;
+
     --accent: 217.2 32.6% 17.5%;
     --accent-foreground: 210 40% 98%;
+
     --destructive: 0 62.8% 30.6%;
     --destructive-foreground: 210 40% 98%;
-    --success: 142.1 70.6% 45.3%;
-    --success-foreground: 144.9 80.4% 10%; /* Dark green */
-    --warning: 32.5 94.6% 43.7%;
-    --warning-foreground: 210 40% 98%;
+
     --border: 217.2 32.6% 17.5%;
     --input: 217.2 32.6% 17.5%;
-    --ring: 224.3 76.3% 48%; /* Lighter focus ring */
-    --epc: 142.1 70.6% 45.3%; /* Darker EPC color */
-    --epc-foreground: 144.9 80.4% 10%; /* Dark green */
-    --ctp: 217.2 91.2% 59.8%; /* Darker CTP color */
-    --ctp-foreground: 222.2 84% 4.9%; /* Pure white */
-    --workcover: 32.5 94.6% 43.7%; /* Rich golden amber */
-    --workcover-foreground: 210 40% 98%; /* Deep charcoal */
-    --ndis-beta: 262.1 83.3% 57.8%; /* NDIS Beta color */
-    --ndis-beta-foreground: 210 40% 98%; /* Deep charcoal */
-    --sidebar-background: 240 5.9% 10%; /* Darker sidebar background */
-    --sidebar-foreground: 240 4.8% 95.9%; /* Lighter sidebar foreground */
-    --sidebar-primary: 224.3 76.3% 48%; /* Lighter sidebar primary */
-    --sidebar-primary-foreground: 0 0% 100%; /* Pure white */
-    --sidebar-accent: 240 3.7% 15.9%; /* Darker sidebar accent */
-    --sidebar-accent-foreground: 240 4.8% 95.9%; /* Lighter sidebar accent foreground */
-    --sidebar-border: 240 3.7% 15.9%; /* Darker sidebar border */
-    --sidebar-ring: 217.2 91.2% 59.8%; /* Focus ring */
+    --ring: 212.7 26.8% 83.9%;
+    --sidebar-background: 240 5.9% 10%;
+    --sidebar-foreground: 240 4.8% 95.9%;
+    --sidebar-primary: 224.3 76.3% 48%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 240 3.7% 15.9%;
+    --sidebar-accent-foreground: 240 4.8% 95.9%;
+    --sidebar-border: 240 3.7% 15.9%;
+    --sidebar-ring: 217.2 91.2% 59.8%;
   }
 }
 
@@ -134,6 +138,11 @@ All colors MUST be HSL.
   * {
     @apply border-border;
   }
+
+  html {
+    scroll-behavior: smooth;
+  }
+
   body {
     @apply bg-background text-foreground font-sans;
   }
@@ -142,25 +151,26 @@ All colors MUST be HSL.
 /* Premium utility classes for luxury UX */
 @layer components {
   .luxury-card {
-    @apply bg-white/80 dark:bg-slate-800/80 backdrop-blur-sm border-0 shadow-lg hover:shadow-xl transition-all duration-300;
+    @apply bg-card border border-border/60 rounded-xl shadow-[var(--shadow-card)] 
+           transition-all duration-300 hover:shadow-[var(--shadow-card-hover)] hover:border-border/80;
   }
 
   .luxury-card-elevated {
     @apply bg-gradient-to-br from-card to-accent border border-border/60 rounded-xl 
-           shadow-lg hover:shadow-xl 
+           shadow-[var(--shadow-elegant)] hover:shadow-[var(--shadow-float)] 
            transition-all duration-500 hover:scale-[1.01] hover:border-border/80;
   }
 
   .luxury-button {
     @apply bg-gradient-to-r from-primary to-primary/90 text-primary-foreground font-medium 
-           px-6 py-3 rounded-lg shadow-lg 
-           hover:shadow-xl transition-all duration-300 
+           px-6 py-3 rounded-lg shadow-[var(--shadow-button)] 
+           hover:shadow-[var(--shadow-float)] transition-all duration-300 
            hover:scale-[1.02] hover:from-primary/90 hover:to-primary/80;
   }
 
   .glass-card {
     @apply bg-card/80 backdrop-blur-sm border border-border/40 rounded-xl 
-           shadow-lg transition-all duration-300;
+           shadow-[var(--shadow-elegant)] transition-all duration-300;
   }
 
   .luxury-input {
@@ -169,17 +179,22 @@ All colors MUST be HSL.
            transition-all duration-200 placeholder:text-muted-foreground/60;
   }
 
-  .fade-in {
-    animation: fadeIn 0.6s ease-in-out;
+  .fade-in-up {
+    @apply animate-[fadeInUp_0.6s_ease-out_forwards];
   }
 
-  .slide-up {
-    animation: slideUp 0.8s ease-out;
+  .slide-in-left {
+    @apply animate-[slideInLeft_0.5s_ease-out_forwards];
+  }
+
+  .scale-in {
+    @apply animate-[scaleIn_0.4s_ease-out_forwards];
   }
 
   .program-badge-epc {
     @apply bg-gradient-to-r from-epc to-epc/80 text-epc-foreground 
-           px-3 py-1.5 rounded-full text-xs font-semibold shadow-sm border border-epc/20;
+           px-3 py-1.5 rounded-full text-xs font-semibold shadow-sm border border-epc/20
+           flex items-center justify-center;
   }
 
   .program-badge-ctp {
@@ -192,29 +207,92 @@ All colors MUST be HSL.
            px-3 py-1.5 rounded-full text-xs font-semibold shadow-sm;
   }
 
+  .program-badge-wc {
+    @apply bg-gradient-to-r from-workcover to-workcover/80 text-workcover-foreground 
+           px-3 py-1.5 rounded-full text-xs font-semibold shadow-sm border border-workcover/20
+           flex items-center justify-center;
+  }
+
   .ndis-beta-banner {
-    @apply bg-gradient-to-r from-ndis-beta to-ndis-beta/90 text-ndis-beta-foreground 
-           border border-ndis-beta/20 px-6 py-4 rounded-xl 
-           shadow-lg hover:shadow-xl 
+    @apply bg-gradient-to-r from-ndis-beta/20 to-ndis-beta/10 text-ndis-beta-foreground 
+           border border-ndis-beta/30 px-6 py-4 rounded-xl 
+           shadow-[0_4px_20px_hsl(var(--ndis-beta)/0.15)] 
+           hover:shadow-[0_6px_30px_hsl(var(--ndis-beta)/0.25)] 
            transition-all duration-300;
   }
 
   .status-indicator {
-    @apply w-2 h-2 rounded-full;
+    @apply w-2 h-2 rounded-full transition-all duration-300;
   }
 
   .status-good {
-    @apply bg-green-500 shadow-lg shadow-green-500/30;
+    @apply bg-success shadow-success/30;
   }
   .status-warning {
-    @apply bg-yellow-500 shadow-lg shadow-yellow-500/30 animate-pulse;
+    @apply bg-warning shadow-warning/30 animate-pulse;
   }
   .status-critical {
-    @apply bg-red-500 shadow-lg shadow-red-500/30 animate-pulse;
+    @apply bg-destructive shadow-destructive/30 animate-pulse;
+  }
+
+  /* Section and Flow Arrow Styles */
+  .landing-section {
+    @apply relative overflow-visible;
+    scroll-margin-top: 88px;
+    padding: 96px 0 140px;
+  }
+
+  @media (max-width: 768px) {
+    .landing-section {
+      padding: 72px 0 120px;
+    }
+  }
+
+  .flow-arrow {
+    transition:
+      opacity 0.25s ease,
+      transform 0.3s ease;
+  }
+
+  .flow-arrow:hover {
+    transform: translateX(-50%) translateY(2px);
   }
 }
 
 /* Premium animations */
+@keyframes fadeInUp {
+  from {
+    opacity: 0;
+    transform: translateY(30px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes slideInLeft {
+  from {
+    opacity: 0;
+    transform: translateX(-30px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@keyframes scaleIn {
+  from {
+    opacity: 0;
+    transform: scale(0.95);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
 @keyframes fadeIn {
   from {
     opacity: 0;
@@ -229,11 +307,61 @@ All colors MUST be HSL.
 @keyframes slideUp {
   from {
     opacity: 0;
-    transform: translateY(40px);
+    transform: translateY(30px);
   }
   to {
     opacity: 1;
     transform: translateY(0);
+  }
+}
+
+@keyframes spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* Dashboard Loading Animation */
+@keyframes progressLoad {
+  0% {
+    width: 0%;
+  }
+  100% {
+    width: 100%;
+  }
+}
+
+@keyframes countUp {
+  0% {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes alertSlide {
+  0% {
+    opacity: 0;
+    transform: translateX(-20px) scale(0.95);
+  }
+  100% {
+    opacity: 1;
+    transform: translateX(0) scale(1);
+  }
+}
+
+@keyframes shimmer {
+  0% {
+    transform: translateX(-100%);
+  }
+  100% {
+    transform: translateX(100%);
   }
 }
 

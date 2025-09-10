@@ -76,7 +76,7 @@ const Dashboard = ({ onNavigate }: DashboardProps) => {
   } | null>({
     subscription_status: 'trial', // Default to trial to prevent premium access during loading
     trial_ends_at: '',
-    daysRemaining: 0
+    daysRemaining: 0,
   });
   const [subscriptionLoaded, setSubscriptionLoaded] = useState(false);
   const [showAlertSettings, setShowAlertSettings] = useState(false);
@@ -1099,74 +1099,76 @@ const Dashboard = ({ onNavigate }: DashboardProps) => {
 
         <div className="container mx-auto px-8 py-10">
           {/* Trial Banner - Only show for trial users */}
-          {subscriptionLoaded && userSubscription && userSubscription.subscription_status === 'trial' && (
-            <div
-              className={`p-6 mb-10 rounded-2xl shadow-sm ${
-                userSubscription.daysRemaining <= 1
-                  ? 'bg-gradient-to-r from-red-50 to-red-100 border border-red-200 dark:from-red-950/20 dark:to-red-900/20 dark:border-red-800/30'
-                  : userSubscription.daysRemaining <= 3
-                    ? 'bg-gradient-to-r from-orange-50 to-orange-100 border border-orange-200 dark:from-orange-950/20 dark:to-orange-900/20 dark:border-orange-800/30'
-                    : 'bg-gradient-to-r from-warning/5 to-warning/10 border border-warning/20'
-              }`}
-            >
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-4">
-                  <div
-                    className={`p-2 rounded-xl ${
-                      userSubscription.daysRemaining <= 1
-                        ? 'bg-red-100 dark:bg-red-900/30'
-                        : userSubscription.daysRemaining <= 3
-                          ? 'bg-orange-100 dark:bg-orange-900/30'
-                          : 'bg-warning/10'
-                    }`}
-                  >
-                    <AlertTriangle
-                      className={`h-5 w-5 ${
+          {subscriptionLoaded &&
+            userSubscription &&
+            userSubscription.subscription_status === 'trial' && (
+              <div
+                className={`p-6 mb-10 rounded-2xl shadow-sm ${
+                  userSubscription.daysRemaining <= 1
+                    ? 'bg-gradient-to-r from-red-50 to-red-100 border border-red-200 dark:from-red-950/20 dark:to-red-900/20 dark:border-red-800/30'
+                    : userSubscription.daysRemaining <= 3
+                      ? 'bg-gradient-to-r from-orange-50 to-orange-100 border border-orange-200 dark:from-orange-950/20 dark:to-orange-900/20 dark:border-orange-800/30'
+                      : 'bg-gradient-to-r from-warning/5 to-warning/10 border border-warning/20'
+                }`}
+              >
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-4">
+                    <div
+                      className={`p-2 rounded-xl ${
                         userSubscription.daysRemaining <= 1
-                          ? 'text-red-600 dark:text-red-400'
+                          ? 'bg-red-100 dark:bg-red-900/30'
                           : userSubscription.daysRemaining <= 3
-                            ? 'text-orange-600 dark:text-orange-400'
-                            : 'text-warning'
+                            ? 'bg-orange-100 dark:bg-orange-900/30'
+                            : 'bg-warning/10'
                       }`}
-                    />
+                    >
+                      <AlertTriangle
+                        className={`h-5 w-5 ${
+                          userSubscription.daysRemaining <= 1
+                            ? 'text-red-600 dark:text-red-400'
+                            : userSubscription.daysRemaining <= 3
+                              ? 'text-orange-600 dark:text-orange-400'
+                              : 'text-warning'
+                        }`}
+                      />
+                    </div>
+                    <div>
+                      <span className="font-semibold text-foreground">
+                        {userSubscription.daysRemaining === 0
+                          ? 'Your free trial expires today'
+                          : userSubscription.daysRemaining === 1
+                            ? '1 day left in your free trial'
+                            : `${userSubscription.daysRemaining} days left in your free trial`}
+                      </span>
+                      <p className="text-sm text-muted-foreground">
+                        {userSubscription.daysRemaining <= 1
+                          ? 'Upgrade now to avoid service interruption'
+                          : 'Unlock unlimited features and advanced analytics'}
+                      </p>
+                    </div>
                   </div>
-                  <div>
-                    <span className="font-semibold text-foreground">
-                      {userSubscription.daysRemaining === 0
-                        ? 'Your free trial expires today'
-                        : userSubscription.daysRemaining === 1
-                          ? '1 day left in your free trial'
-                          : `${userSubscription.daysRemaining} days left in your free trial`}
-                    </span>
-                    <p className="text-sm text-muted-foreground">
-                      {userSubscription.daysRemaining <= 1
-                        ? 'Upgrade now to avoid service interruption'
-                        : 'Unlock unlimited features and advanced analytics'}
-                    </p>
-                  </div>
+                  <Button
+                    className={`transition-transform hover:scale-105 ${
+                      userSubscription.daysRemaining <= 1
+                        ? 'bg-gradient-to-r from-red-600 to-red-700 text-white hover:from-red-700 hover:to-red-800'
+                        : userSubscription.daysRemaining <= 3
+                          ? 'bg-gradient-to-r from-orange-600 to-orange-700 text-white hover:from-orange-700 hover:to-orange-800'
+                          : 'bg-gradient-to-r from-warning to-warning/90 text-warning-foreground'
+                    }`}
+                    onClick={() => onNavigate?.('settings')}
+                  >
+                    {userSubscription.daysRemaining <= 1 ? 'Upgrade Now!' : 'Upgrade Now'}
+                  </Button>
                 </div>
-                <Button
-                  className={`transition-transform hover:scale-105 ${
-                    userSubscription.daysRemaining <= 1
-                      ? 'bg-gradient-to-r from-red-600 to-red-700 text-white hover:from-red-700 hover:to-red-800'
-                      : userSubscription.daysRemaining <= 3
-                        ? 'bg-gradient-to-r from-orange-600 to-orange-700 text-white hover:from-orange-700 hover:to-orange-800'
-                        : 'bg-gradient-to-r from-warning to-warning/90 text-warning-foreground'
-                  }`}
-                  onClick={() => onNavigate?.('settings')}
-                >
-                  {userSubscription.daysRemaining <= 1 ? 'Upgrade Now!' : 'Upgrade Now'}
-                </Button>
               </div>
-            </div>
-          )}
+            )}
 
           {/* KPI Summary */}
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8 mb-12">
             {kpiData.map((kpi, index) => (
               <div
                 key={index}
-                className="p-8 bg-gradient-to-br from-background via-background/95 to-accent/10 border border-border/30 rounded-2xl shadow-sm hover:shadow-lg transition-all duration-300 group cursor-pointer"
+                className="p-8 bg-[#f0ebde] dark:bg-gray-900 border border-border/30 rounded-2xl shadow-sm hover:shadow-lg transition-all duration-300 group cursor-pointer"
                 style={{ animationDelay: `${index * 0.1}s` }}
               >
                 <div className="flex items-center justify-between mb-4">
@@ -1392,7 +1394,9 @@ const Dashboard = ({ onNavigate }: DashboardProps) => {
                   <TabsTrigger
                     value="action-needed"
                     className="text-base font-semibold h-10 rounded-xl data-[state=active]:bg-background data-[state=active]:shadow-sm relative"
-                    disabled={!subscriptionLoaded || userSubscription?.subscription_status === 'trial'}
+                    disabled={
+                      !subscriptionLoaded || userSubscription?.subscription_status === 'trial'
+                    }
                   >
                     <Bell className="h-5 w-5 mr-2" />
                     Action Needed
@@ -1422,7 +1426,9 @@ const Dashboard = ({ onNavigate }: DashboardProps) => {
                   <TabsTrigger
                     value="overdue"
                     className="text-base font-semibold h-10 rounded-xl data-[state=active]:bg-background data-[state=active]:shadow-sm relative"
-                    disabled={!subscriptionLoaded || userSubscription?.subscription_status === 'trial'}
+                    disabled={
+                      !subscriptionLoaded || userSubscription?.subscription_status === 'trial'
+                    }
                   >
                     <AlertTriangle className="h-5 w-5 mr-2" />
                     Overdue
