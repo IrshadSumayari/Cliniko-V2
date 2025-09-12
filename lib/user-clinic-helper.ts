@@ -5,9 +5,6 @@ export interface UserClinicData {
   clinicId: string | null;
   clinicName: string;
   subscriptionStatus: string;
-  trialStartedAt: string | null;
-  trialExpiresAt: string | null;
-  isTrialExpired: boolean;
 }
 
 export async function getUserClinicData(userId: string): Promise<UserClinicData | null> {
@@ -15,16 +12,11 @@ export async function getUserClinicData(userId: string): Promise<UserClinicData 
     // For now, return mock data since we're working around database schema issues
     // TODO: Implement proper database queries once schema is fixed
 
-    const mockTrialExpiry = new Date(Date.now() + 5 * 24 * 60 * 60 * 1000); // 5 days from now
-
     return {
       userId,
       clinicId: `clinic_${userId}`,
       clinicName: 'Default Clinic',
-      subscriptionStatus: 'trial',
-      trialStartedAt: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString(), // 2 days ago
-      trialExpiresAt: mockTrialExpiry.toISOString(),
-      isTrialExpired: false,
+      subscriptionStatus: 'inactive',
     };
   } catch (error) {
     console.error('Error in getUserClinicData:', error);
@@ -49,29 +41,21 @@ export async function ensureUserClinicRelationship(
 
 export async function checkUserAccess(userId: string): Promise<{
   hasAccess: boolean;
-  isTrialExpired: boolean;
-  trialExpiresAt: string | null;
   subscriptionStatus: string;
 }> {
   try {
-    // For now, always allow access since we're bypassing the trial system
+    // For now, always allow access since we're bypassing the subscription system
     // TODO: Implement proper access checking once database schema is ready
-
-    const mockTrialExpiry = new Date(Date.now() + 5 * 24 * 60 * 60 * 1000); // 5 days from now
 
     return {
       hasAccess: true,
-      isTrialExpired: false,
-      trialExpiresAt: mockTrialExpiry.toISOString(),
-      subscriptionStatus: 'trial',
+      subscriptionStatus: 'inactive',
     };
   } catch (error) {
     console.error('Error checking user access:', error);
     // Fail open - allow access if we can't determine status
     return {
       hasAccess: true,
-      isTrialExpired: false,
-      trialExpiresAt: null,
       subscriptionStatus: 'unknown',
     };
   }

@@ -21,7 +21,6 @@ export async function GET(req: NextRequest) {
         id,
         auth_user_id,
         subscription_status,
-        trial_ends_at,
         pms_type,
         WC,
         EPC
@@ -57,17 +56,13 @@ export async function GET(req: NextRequest) {
       try {
         console.log(`🔄 Syncing clinic ${clinic.id} (${clinic.pms_type})...`);
 
-        // Check if trial expired and no subscription
-        const now = new Date();
-        const trialEndsAt = new Date(clinic.trial_ends_at);
-        const isTrialExpired = now > trialEndsAt && clinic.subscription_status === 'trial';
-
-        if (isTrialExpired) {
-          console.log(`⚠️ Clinic ${clinic.id} trial expired, skipping sync`);
+        // Check if user has active subscription
+        if (clinic.subscription_status !== 'active') {
+          console.log(`⚠️ Clinic ${clinic.id} subscription inactive, skipping sync`);
           syncResults.push({
             clinicId: clinic.id,
             success: false,
-            error: 'Trial expired',
+            error: 'Subscription inactive',
             dashboardLocked: true,
           });
           continue;

@@ -57,8 +57,7 @@ export async function POST(request: NextRequest) {
           email: user.email || '',
           full_name: user.user_metadata?.full_name || '',
           is_onboarded: false,
-          subscription_status: 'trial',
-          trial_ends_at: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(), // 7 days from now
+          subscription_status: 'inactive',
         })
         .select('id, full_name, email')
         .single();

@@ -11,7 +11,6 @@ export type Database = {
           full_name: string | null;
           is_onboarded: boolean;
           subscription_status: string | null;
-          trial_ends_at: string | null;
           stripe_customer_id: string | null;
           pms_type: string | null;
           WC: string | null;
@@ -26,7 +25,6 @@ export type Database = {
           full_name?: string | null;
           is_onboarded?: boolean;
           subscription_status?: string | null;
-          trial_ends_at?: string | null;
           stripe_customer_id?: string | null;
           pms_type?: string | null;
           WC?: string | null;
@@ -41,7 +39,6 @@ export type Database = {
           full_name?: string | null;
           is_onboarded?: boolean | null;
           subscription_status?: string | null;
-          trial_ends_at?: string | null;
           stripe_customer_id?: string | null;
           pms_type?: string | null;
           WC?: string | null;

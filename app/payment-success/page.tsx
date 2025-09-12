@@ -5,12 +5,15 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { CheckCircle, Loader2, XCircle } from 'lucide-react';
+import { useAuth } from '@/contexts/auth-context';
 
 function PaymentSuccessContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
+  const { refreshUserData } = useAuth();
   const [status, setStatus] = useState<'loading' | 'success' | 'error'>('loading');
   const [message, setMessage] = useState('Processing your payment...');
+  const [isRedirecting, setIsRedirecting] = useState(false);
 
   useEffect(() => {
     const processPayment = async () => {
@@ -38,7 +41,12 @@ function PaymentSuccessContent() {
 
         if (response.ok && result.success) {
           setStatus('success');
-          setMessage('Payment successful!');
+          setMessage('Payment successful! Your subscription is now active!');
+          try {
+            await refreshUserData();
+          } catch (error) {
+            console.error('Failed to refresh user data:', error);
+          }
 
           // Don't auto-redirect, let user click the button
         } else {
@@ -71,8 +79,43 @@ function PaymentSuccessContent() {
           {status === 'success' && (
             <div className="space-y-4">
               <p className="text-sm text-gray-600">Your subscription is now active!</p>
-              <Button onClick={() => router.push('/')} className="w-full">
-                Go to Dashboard
+              <Button
+                onClick={async () => {
+                  if (isRedirecting) return;
+
+                  setIsRedirecting(true);
+                  try {
+                    // Clear any cached onboarding status to force fresh fetch
+                    try {
+                      localStorage.removeItem('user_onboarding_status');
+                      localStorage.removeItem('user_onboarding_status_timestamp');
+                    } catch (e) {
+                      console.warn('Failed to clear localStorage:', e);
+                    }
+
+                    await refreshUserData();
+
+                    // Add a small delay to ensure the context is updated
+                    setTimeout(() => {
+                      router.push('/');
+                    }, 1000);
+                  } catch (error) {
+                    console.error('Failed to refresh user data:', error);
+                    // Still redirect even if refresh fails
+                    router.push('/');
+                  }
+                }}
+                className="w-full"
+                disabled={isRedirecting}
+              >
+                {isRedirecting ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Redirecting...
+                  </>
+                ) : (
+                  'Continue to Dashboard'
+                )}
               </Button>
             </div>
           )}

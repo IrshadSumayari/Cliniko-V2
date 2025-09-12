@@ -59,7 +59,7 @@ export async function POST(request: NextRequest) {
 
     console.log('👤 Updating user subscription:', { userId, authUserId });
 
-    // Update user subscription status
+    // Update user subscription status and onboarding
     let updateResult;
     
     if (userId) {
@@ -69,6 +69,7 @@ export async function POST(request: NextRequest) {
         .update({
           subscription_status: 'active',
           stripe_customer_id: session.customer as string,
+          is_onboarded: true, // Mark user as onboarded after successful payment
         })
         .eq('id', userId);
     } else if (authUserId) {
@@ -78,6 +79,7 @@ export async function POST(request: NextRequest) {
         .update({
           subscription_status: 'active',
           stripe_customer_id: session.customer as string,
+          is_onboarded: true, // Mark user as onboarded after successful payment
         })
         .eq('auth_user_id', authUserId);
     }
@@ -96,7 +98,8 @@ export async function POST(request: NextRequest) {
       success: true, 
       message: 'Subscription activated successfully',
       userId: userId || authUserId,
-      subscription_status: 'active'
+      subscription_status: 'active',
+      is_onboarded: true
     });
 
   } catch (error: any) {

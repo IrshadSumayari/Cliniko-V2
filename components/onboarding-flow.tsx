@@ -6,8 +6,14 @@ import { Input } from '@/components/ui/input';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
+import {
+  Accordion,
+  AccordionContent,
+  AccordionItem,
+  AccordionTrigger,
+} from '@/components/ui/accordion';
 import { VideoPlayer } from '@/components/ui/video-player';
+import { MultiTagInput } from '@/components/ui/multi-tag-input';
 import {
   ArrowRight,
   ArrowLeft,
@@ -25,8 +31,9 @@ import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
 import { authenticatedFetch } from '@/lib/utils';
 import { useRouter } from 'next/navigation';
+import PlanSelection from './plan-selection';
 
-type OnboardingStep = 'pms' | 'api' | 'syncing' | 'sync-results' | 'tag-config' | 'tag-complete';
+type OnboardingStep = 'pms' | 'api' | 'syncing' | 'sync-results' | 'plan-selection' | 'tag-config' | 'tag-complete';
 
 interface SyncResults {
   wcPatients: number;
@@ -36,8 +43,8 @@ interface SyncResults {
   overduePatients?: number;
   issues?: string[];
   customTags?: {
-    wc: string;
-    epc: string;
+    wc: string[];
+    epc: string[];
   };
 }
 
@@ -71,26 +78,26 @@ export default function OnboardingFlow() {
     actionNeededPatients: 0,
     issues: [],
     customTags: {
-      wc: 'WC',
-      epc: 'EPC',
+      wc: ['WC'],
+      epc: ['EPC'],
     },
   });
 
   const [customTags, setCustomTags] = useState({
-    wc: 'WC',
-    epc: 'EPC',
+    wc: ['WC'],
+    epc: ['EPC'],
   });
 
   // Function to get appropriate syncing subtext based on progress percentage
   const getSyncingSubtext = (progress: number): string => {
     if (progress >= 40 && progress < 60) {
-      return "Securely syncing with your booking system to prepare your live dashboard.";
+      return 'Securely syncing with your booking system to prepare your live dashboard.';
     } else if (progress >= 60 && progress < 75) {
-      return "Setting up your patient overview and session tracking — securely and automatically.";
+      return 'Setting up your patient overview and session tracking — securely and automatically.';
     } else if (progress >= 75 && progress < 90) {
-      return "Loading your dashboard — your data stays private and read-only.";
+      return 'Loading your dashboard — your data stays private and read-only.';
     } else {
-      return "Securely syncing with your booking system to prepare your live dashboard.";
+      return 'Securely syncing with your booking system to prepare your live dashboard.';
     }
   };
 
@@ -111,8 +118,8 @@ export default function OnboardingFlow() {
         if (response.ok) {
           const userTags = await response.json();
           setCustomTags({
-            wc: userTags.wc || 'WC',
-            epc: userTags.epc || 'EPC',
+            wc: Array.isArray(userTags.wc) ? userTags.wc : [userTags.wc || 'WC'],
+            epc: Array.isArray(userTags.epc) ? userTags.epc : [userTags.epc || 'EPC'],
           });
           console.log('Fetched user tags:', userTags);
         } else {
@@ -320,7 +327,7 @@ export default function OnboardingFlow() {
             });
 
             toast.success('Successfully connected and synced data!');
-            setCurrentStep('tag-config');
+            setCurrentStep('sync-results');
             return;
           }
         } catch (error) {
@@ -498,6 +505,12 @@ export default function OnboardingFlow() {
     try {
       setIsSavingTags(true);
 
+      // Validate that at least one tag is provided for each category
+      if (!customTags.wc.length || !customTags.epc.length) {
+        toast.error('Please add at least one tag for both WC and EPC categories');
+        return;
+      }
+
       // Get the access token from auth context
       const token = getAccessToken();
 
@@ -509,8 +522,8 @@ export default function OnboardingFlow() {
       const response = await authenticatedFetch('/api/user/update-tags', {
         method: 'POST',
         body: JSON.stringify({
-          wcTag: customTags.wc,
-          epcTag: customTags.epc,
+          wcTags: customTags.wc,
+          epcTags: customTags.epc,
         }),
       });
 
@@ -523,17 +536,11 @@ export default function OnboardingFlow() {
       console.log('Tags API response:', result);
 
       // Update the sync results with new counts
-      // The API returns dynamic property names based on user's custom tags
-      const wcKey = `${customTags.wc}Patients`;
-      const epcKey = `${customTags.epc}Patients`;
-
-      console.log('Looking for count keys:', { wcKey, epcKey });
-      console.log('Available keys in newCounts:', Object.keys(result.newCounts || {}));
-
+      // The API returns counts for WC and EPC patients
       setSyncResults((prev) => ({
         ...prev,
-        wcPatients: result.newCounts[wcKey] || 0,
-        epcPatients: result.newCounts[epcKey] || 0,
+        wcPatients: result.newCounts.wcPatients || 0,
+        epcPatients: result.newCounts.epcPatients || 0,
         totalAppointments: result.newCounts.totalAppointments || 0,
         actionNeededPatients: result.newCounts.actionNeededPatients || 0,
         overduePatients: result.newCounts.overduePatientsCount || 0,
@@ -669,13 +676,13 @@ export default function OnboardingFlow() {
               return {
                 videoId: 'mnOw1RxSBlY',
                 title: 'How to get your Cliniko API key',
-                duration: '2 min'
+                duration: '2 min',
               };
             case 'nookal':
               return {
                 videoId: 'GY3lWkzGgrg',
                 title: 'How to get your Nookal API key',
-                duration: '2 min'
+                duration: '2 min',
               };
             default:
               return null;
@@ -698,21 +705,26 @@ export default function OnboardingFlow() {
                     <div className="w-8 h-0.5 bg-muted"></div>
                     <div className="w-3 h-3 rounded-full bg-muted"></div>
                   </div>
-                  
+
                   <div className="inline-flex items-center gap-2 bg-primary/10 px-3 py-1 rounded-full text-xs font-medium text-primary mb-2">
                     <Clock className="h-3 w-3" />
                     One-time setup
                   </div>
-                  <h1 className="text-xl font-bold mb-2">Get Your {formData.selectedPMS} API Key</h1>
+                  <h1 className="text-xl font-bold mb-2">
+                    Get Your {formData.selectedPMS} API Key
+                  </h1>
                   <p className="text-sm text-muted-foreground">
-                    Paste your API key to securely link your practice data. An API key is like a special password that lets apps talk to each other safely. It's much safer than using your {formData.selectedPMS} username and password because it only allows specific data access and can be revoked anytime without changing your main login.
+                    Paste your API key to securely link your practice data. An API key is like a
+                    special password that lets apps talk to each other safely. It's much safer than
+                    using your {formData.selectedPMS} username and password because it only allows
+                    specific data access and can be revoked anytime without changing your main
+                    login.
                   </p>
                 </div>
 
                 {/* Main Content */}
                 <div className="max-w-5xl mx-auto px-6 pb-8">
                   <div className="grid lg:grid-cols-2 gap-6 items-start">
-                    
                     {/* Left Column - Steps */}
                     <div className="space-y-6">
                       {/* Step Progress Bar */}
@@ -720,45 +732,111 @@ export default function OnboardingFlow() {
                         <h3 className="font-medium mb-3 text-xs">Follow these steps:</h3>
                         <div className="space-y-2">
                           {(() => {
-                            const steps = formData.selectedPMS === "Cliniko" 
-                              ? [
-                                  { step: "1", title: "Go to My Info", desc: "Click small arrow next to your name (bottom left)" },
-                                  { step: "2", title: "Scroll down", desc: "Enable API Keys" },
-                                  { step: "3", title: "Save changes", desc: "Click Save Changes" },
-                                  { step: "4", title: "Click manage API keys", desc: "Then manage API keys" },
-                                  { step: "5", title: "Create new API key", desc: "Click Create new API key" },
-                                  { step: "6", title: "Name the key", desc: "MyPhysioFlow" },
-                                  { step: "7", title: "Copy and paste", desc: "Copy key to MyPhysioFlow" }
-                                ]
-                              : [
-                                  { step: "1", title: "Log in to Nookal", desc: "Use your usual clinic login" },
-                                  { step: "2", title: "Go to Setup", desc: "Gear icon in top menu - opens clinic settings" },
-                                  { step: "3", title: "Click Connections", desc: "In left sidebar, then select API Keys" },
-                                  { step: "4", title: "Generate new key", desc: "Click + Generate API Key" },
-                                  { step: "5", title: "Select locations", desc: "Choose your clinic locations" },
-                                  { step: "6", title: "Leave unchecked", desc: "Clinical Notes/Invoices/Documents" },
-                                  { step: "7", title: "Save changes", desc: "Click Save Changes" },
-                                  { step: "8", title: "Copy API key", desc: "Copy for the key text box" },
-                                  { step: "9", title: "Paste in MyPhysioFlow", desc: "Connect Securely screen & click Connect" }
-                                ];
+                            const steps =
+                              formData.selectedPMS === 'Cliniko'
+                                ? [
+                                    {
+                                      step: '1',
+                                      title: 'Go to My Info',
+                                      desc: 'Click small arrow next to your name (bottom left)',
+                                    },
+                                    { step: '2', title: 'Scroll down', desc: 'Enable API Keys' },
+                                    {
+                                      step: '3',
+                                      title: 'Save changes',
+                                      desc: 'Click Save Changes',
+                                    },
+                                    {
+                                      step: '4',
+                                      title: 'Click manage API keys',
+                                      desc: 'Then manage API keys',
+                                    },
+                                    {
+                                      step: '5',
+                                      title: 'Create new API key',
+                                      desc: 'Click Create new API key',
+                                    },
+                                    { step: '6', title: 'Name the key', desc: 'MyPhysioFlow' },
+                                    {
+                                      step: '7',
+                                      title: 'Copy and paste',
+                                      desc: 'Copy key to MyPhysioFlow',
+                                    },
+                                  ]
+                                : [
+                                    {
+                                      step: '1',
+                                      title: 'Log in to Nookal',
+                                      desc: 'Use your usual clinic login',
+                                    },
+                                    {
+                                      step: '2',
+                                      title: 'Go to Setup',
+                                      desc: 'Gear icon in top menu - opens clinic settings',
+                                    },
+                                    {
+                                      step: '3',
+                                      title: 'Click Connections',
+                                      desc: 'In left sidebar, then select API Keys',
+                                    },
+                                    {
+                                      step: '4',
+                                      title: 'Generate new key',
+                                      desc: 'Click + Generate API Key',
+                                    },
+                                    {
+                                      step: '5',
+                                      title: 'Select locations',
+                                      desc: 'Choose your clinic locations',
+                                    },
+                                    {
+                                      step: '6',
+                                      title: 'Leave unchecked',
+                                      desc: 'Clinical Notes/Invoices/Documents',
+                                    },
+                                    {
+                                      step: '7',
+                                      title: 'Save changes',
+                                      desc: 'Click Save Changes',
+                                    },
+                                    {
+                                      step: '8',
+                                      title: 'Copy API key',
+                                      desc: 'Copy for the key text box',
+                                    },
+                                    {
+                                      step: '9',
+                                      title: 'Paste in MyPhysioFlow',
+                                      desc: 'Connect Securely screen & click Connect',
+                                    },
+                                  ];
                             return steps.map((item, index) => (
-                            <div key={index} className="flex items-center gap-2 p-1.5 rounded hover:bg-muted/30 transition-colors">
-                              <div className="w-4 h-4 bg-primary text-primary-foreground rounded-full flex items-center justify-center text-[10px] font-medium flex-shrink-0">
-                                {item.step}
+                              <div
+                                key={index}
+                                className="flex items-center gap-2 p-1.5 rounded hover:bg-muted/30 transition-colors"
+                              >
+                                <div className="w-4 h-4 bg-primary text-primary-foreground rounded-full flex items-center justify-center text-[10px] font-medium flex-shrink-0">
+                                  {item.step}
+                                </div>
+                                <div className="flex-1 min-w-0">
+                                  <div className="font-medium text-xs">{item.title}</div>
+                                  <div className="text-[10px] text-muted-foreground">
+                                    {item.desc}
+                                  </div>
+                                </div>
                               </div>
-                              <div className="flex-1 min-w-0">
-                                <div className="font-medium text-xs">{item.title}</div>
-                                <div className="text-[10px] text-muted-foreground">{item.desc}</div>
-                              </div>
-                            </div>
-                          ));
+                            ));
                           })()}
                         </div>
                       </Card>
 
                       {/* Quick Access Button */}
                       <Button variant="outline" size="default" className="w-full text-sm" asChild>
-                        <a href={`https://${formData.selectedPMS.toLowerCase()}.com/docs/api`} target="_blank" rel="noopener noreferrer">
+                        <a
+                          href={`https://${formData.selectedPMS.toLowerCase()}.com/docs/api`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                        >
                           <ExternalLink className="mr-2 h-4 w-4" />
                           Open {formData.selectedPMS} Settings
                         </a>
@@ -783,7 +861,9 @@ export default function OnboardingFlow() {
                           <div className="text-center">
                             <h3 className="font-medium mb-2 text-sm">Step 2: Paste Your API Key</h3>
                             <p className="text-xs text-muted-foreground">
-                              An API key is like a secure password that lets MyPhysioFlow safely read your {formData.selectedPMS} data. Copy it from step 1 and paste it here.
+                              An API key is like a secure password that lets MyPhysioFlow safely
+                              read your {formData.selectedPMS} data. Copy it from step 1 and paste
+                              it here.
                             </p>
                           </div>
 
@@ -793,7 +873,9 @@ export default function OnboardingFlow() {
                                 type="text"
                                 placeholder="ck_1234abcd5678..."
                                 value={formData.apiKey}
-                                onChange={(e) => setFormData({...formData, apiKey: e.target.value})}
+                                onChange={(e) =>
+                                  setFormData({ ...formData, apiKey: e.target.value })
+                                }
                                 className="font-mono text-xs h-10 pr-16"
                               />
                               <Button
@@ -803,7 +885,7 @@ export default function OnboardingFlow() {
                                 onClick={async () => {
                                   try {
                                     const text = await navigator.clipboard.readText();
-                                    setFormData({...formData, apiKey: text.trim()});
+                                    setFormData({ ...formData, apiKey: text.trim() });
                                   } catch (err) {
                                     console.error('Failed to read clipboard:', err);
                                   }
@@ -850,7 +932,9 @@ export default function OnboardingFlow() {
                         </div>
                         <div>
                           <h4 className="font-medium text-sm">Encrypted & Secure</h4>
-                          <p className="text-xs text-muted-foreground">Your data is protected with enterprise-grade encryption</p>
+                          <p className="text-xs text-muted-foreground">
+                            Your data is protected with enterprise-grade encryption
+                          </p>
                         </div>
                       </div>
                       <div className="flex flex-col items-center gap-2">
@@ -859,7 +943,9 @@ export default function OnboardingFlow() {
                         </div>
                         <div>
                           <h4 className="font-medium text-sm">Read-only Access</h4>
-                          <p className="text-xs text-muted-foreground">We can only view your data, never edit or delete anything</p>
+                          <p className="text-xs text-muted-foreground">
+                            We can only view your data, never edit or delete anything
+                          </p>
                         </div>
                       </div>
                       <div className="flex flex-col items-center gap-2">
@@ -868,7 +954,9 @@ export default function OnboardingFlow() {
                         </div>
                         <div>
                           <h4 className="font-medium text-sm">Done in 2 Minutes</h4>
-                          <p className="text-xs text-muted-foreground">Most clinics complete this setup in under 2 minutes</p>
+                          <p className="text-xs text-muted-foreground">
+                            Most clinics complete this setup in under 2 minutes
+                          </p>
                         </div>
                       </div>
                     </div>
@@ -876,30 +964,44 @@ export default function OnboardingFlow() {
 
                   {/* FAQ Section */}
                   <div className="mt-10 max-w-2xl mx-auto">
-                    <h3 className="font-medium text-center mb-4 text-sm">Frequently Asked Questions</h3>
+                    <h3 className="font-medium text-center mb-4 text-sm">
+                      Frequently Asked Questions
+                    </h3>
                     <Accordion type="single" collapsible className="w-full">
                       <AccordionItem value="item-1">
                         <AccordionTrigger>What is an API key?</AccordionTrigger>
                         <AccordionContent>
-                          An API key is like a secure password that allows MyPhysioFlow to read data from your {formData.selectedPMS} account. It's completely safe and gives us read-only access - we can see your data but never change or delete anything.
+                          An API key is like a secure password that allows MyPhysioFlow to read data
+                          from your {formData.selectedPMS} account. It's completely safe and gives
+                          us read-only access - we can see your data but never change or delete
+                          anything.
                         </AccordionContent>
                       </AccordionItem>
                       <AccordionItem value="item-2">
                         <AccordionTrigger>Is this safe?</AccordionTrigger>
                         <AccordionContent>
-                          Absolutely! API keys are the industry standard for secure data access. We use enterprise-grade encryption and only get read-only permissions. Your patient data stays 100% private and secure in your {formData.selectedPMS} account.
+                          Absolutely! API keys are the industry standard for secure data access. We
+                          use enterprise-grade encryption and only get read-only permissions. Your
+                          patient data stays 100% private and secure in your {formData.selectedPMS}{' '}
+                          account.
                         </AccordionContent>
                       </AccordionItem>
                       <AccordionItem value="item-3">
-                        <AccordionTrigger>Why can't you just log in with my username/password?</AccordionTrigger>
+                        <AccordionTrigger>
+                          Why can't you just log in with my username/password?
+                        </AccordionTrigger>
                         <AccordionContent>
-                          API keys are much safer than passwords! They can be revoked instantly if needed, give limited permissions (read-only), and follow security best practices. This way, you maintain full control over your account.
+                          API keys are much safer than passwords! They can be revoked instantly if
+                          needed, give limited permissions (read-only), and follow security best
+                          practices. This way, you maintain full control over your account.
                         </AccordionContent>
                       </AccordionItem>
                       <AccordionItem value="item-4">
                         <AccordionTrigger>What if I get stuck?</AccordionTrigger>
                         <AccordionContent>
-                          No worries! Watch the video tutorial above, or contact our support team. We're here to help you get connected quickly and easily. Most issues are resolved in just a few minutes.
+                          No worries! Watch the video tutorial above, or contact our support team.
+                          We're here to help you get connected quickly and easily. Most issues are
+                          resolved in just a few minutes.
                         </AccordionContent>
                       </AccordionItem>
                     </Accordion>
@@ -954,6 +1056,132 @@ export default function OnboardingFlow() {
           </div>
         );
 
+      case 'sync-results':
+        return (
+          <div className="space-y-8 fade-in">
+            <div className="text-center">
+              <CheckCircle className="h-16 w-16 mx-auto mb-4 text-green-500" />
+              <h2 className="text-3xl font-bold mb-2">Sync Complete!</h2>
+              <p className="text-muted-foreground">
+                Here's what we found in your {formData.selectedPMS} data
+              </p>
+            </div>
+
+            <div className="max-w-4xl mx-auto space-y-6">
+              <div className="grid md:grid-cols-4 gap-6">
+                <Card className="p-6 text-center bg-gradient-to-br from-red-50 to-red-100 dark:from-red-950/30 dark:to-red-900/30 border-red-200 dark:border-red-800">
+                  <div className="text-3xl font-bold text-red-700 dark:text-red-300 mb-2">
+                    {syncResults.overduePatients || 0}
+                  </div>
+                  <div className="text-sm font-medium text-red-600 dark:text-red-400 mb-1">
+                    Overdue Patients
+                  </div>
+                  <div className="text-xs text-red-500 dark:text-red-500">
+                    Urgent action required
+                  </div>
+                </Card>
+
+                <Card className="p-6 text-center bg-gradient-to-br from-orange-50 to-orange-100 dark:from-orange-950/30 dark:to-orange-900/30 border-orange-200 dark:border-orange-800">
+                  <div className="text-3xl font-bold text-orange-700 dark:text-orange-300 mb-2">
+                    {syncResults.actionNeededPatients}
+                  </div>
+                  <div className="text-sm font-medium text-orange-600 dark:text-orange-400 mb-1">
+                    Action Needed
+                  </div>
+                  <div className="text-xs text-orange-500 dark:text-orange-500">
+                    Approaching quota limits
+                  </div>
+                </Card>
+
+                <Card className="p-6 text-center bg-gradient-to-br from-green-50 to-green-100 dark:from-green-950/30 dark:to-green-900/30 border-green-200 dark:border-green-800">
+                  <div className="text-3xl font-bold text-green-700 dark:text-green-300 mb-2">
+                    {syncResults.epcPatients}
+                  </div>
+                  <div className="text-sm font-medium text-green-600 dark:text-green-400 mb-1">
+                    EPC Patients
+                  </div>
+                  <div className="text-xs text-green-500 dark:text-green-500">
+                    Active care plans tracked
+                  </div>
+                </Card>
+
+                <Card className="p-6 text-center bg-gradient-to-br from-blue-50 to-blue-100 dark:from-blue-950/30 dark:to-blue-900/30 border-blue-200 dark:border-blue-800">
+                  <div className="text-3xl font-bold text-blue-700 dark:text-blue-300 mb-2">
+                    {syncResults.wcPatients}
+                  </div>
+                  <div className="text-sm font-medium text-blue-600 dark:text-blue-400 mb-1">
+                    Workers Comp
+                  </div>
+                  <div className="text-xs text-blue-500 dark:text-blue-500">
+                    Ready for quota tracking
+                  </div>
+                </Card>
+              </div>
+
+              {syncResults.issues && syncResults.issues.length > 0 && (
+                <Card className="p-6 border-orange-200 bg-orange-50 dark:bg-orange-950/20">
+                  <div className="flex items-center gap-2 mb-4">
+                    <Shield className="h-5 w-5 text-orange-600" />
+                    <h3 className="font-semibold text-orange-800 dark:text-orange-200">
+                      Issues Found During Sync
+                    </h3>
+                  </div>
+                  <ul className="space-y-1 text-sm text-orange-700 dark:text-orange-300">
+                    {syncResults.issues.map((issue, index) => (
+                      <li key={index}>• {issue}</li>
+                    ))}
+                  </ul>
+                  <p className="text-xs text-orange-600 dark:text-orange-400 mt-3">
+                    These issues won't affect your dashboard functionality, but you may want to
+                    review them.
+                  </p>
+                </Card>
+              )}
+
+              <div className="text-center mt-8">
+                <p className="text-muted-foreground mb-6">
+                  Your practice data has been successfully synced and analyzed. You're ready to
+                  start tracking your quota compliance!
+                </p>
+
+                <div className="space-y-4">
+                  <Button
+                    variant="default"
+                    size="lg"
+                    onClick={() => setCurrentStep('plan-selection')}
+                    disabled={isProcessing || isLoading}
+                    className="bg-black hover:bg-gray-800 text-white min-w-[200px]"
+                  >
+                    Choose Your Plan
+                    <ArrowRight className="ml-2 h-4 w-4" />
+                  </Button>
+                  
+                  <div>
+                    <Button
+                      variant="outline"
+                      onClick={() => setCurrentStep('api')}
+                      disabled={isProcessing || isLoading}
+                    >
+                      <ArrowLeft className="mr-2 h-4 w-4" />
+                      Back
+                    </Button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        );
+
+      case 'plan-selection':
+        return (
+          <PlanSelection
+            onBack={() => setCurrentStep('sync-results')}
+            onPlanSelected={(plan, amount, isYearly) => {
+              // This will be handled by the plan selection component
+            }}
+          />
+        );
+
       case 'tag-config':
         return (
           <div className="space-y-8 fade-in">
@@ -973,34 +1201,26 @@ export default function OnboardingFlow() {
                 </div>
                 <p className="text-sm text-muted-foreground mb-6">
                   Customize how patients are categorized in your dashboard. These tags help track
-                  quota usage.
+                  quota usage. You can add multiple variations or keep just one - it's up to you!
                 </p>
 
                 <div className="grid md:grid-cols-2 gap-6 mb-6">
-                  <div>
-                    <label className="text-sm font-medium mb-2 block">
-                      Workers Compensation Tag
-                    </label>
-                    <Input
-                      value={customTags.wc}
-                      onChange={(e) => setCustomTags((prev) => ({ ...prev, wc: e.target.value }))}
-                      className="mb-2"
-                    />
-                    <p className="text-xs text-muted-foreground">
-                      What do you call Workers Compensation patients in your system?
-                    </p>
-                  </div>
-                  <div>
-                    <label className="text-sm font-medium mb-2 block">EPC Tag</label>
-                    <Input
-                      value={customTags.epc}
-                      onChange={(e) => setCustomTags((prev) => ({ ...prev, epc: e.target.value }))}
-                      className="mb-2"
-                    />
-                    <p className="text-xs text-muted-foreground">
-                      How do you identify EPC patients in your practice?
-                    </p>
-                  </div>
+                  <MultiTagInput
+                    tags={customTags.wc}
+                    onTagsChange={(tags) => setCustomTags((prev) => ({ ...prev, wc: tags }))}
+                    label="Workers Compensation Tags"
+                    placeholder="Type and press Enter to add tags (e.g., WC, Workers Comp, W/C)"
+                    description="Add variations you use for Workers Compensation patients (optional - you can keep just one)"
+                    maxTags={5}
+                  />
+                  <MultiTagInput
+                    tags={customTags.epc}
+                    onTagsChange={(tags) => setCustomTags((prev) => ({ ...prev, epc: tags }))}
+                    label="EPC Tags"
+                    placeholder="Type and press Enter to add tags (e.g., EPC, Enhanced Primary Care)"
+                    description="Add variations you use for EPC patients (optional - you can keep just one)"
+                    maxTags={5}
+                  />
                 </div>
 
                 <div className="flex justify-end">
@@ -1119,20 +1339,29 @@ export default function OnboardingFlow() {
                   start tracking your quota compliance!
                 </p>
 
-                <Button
-                  variant="default"
-                  size="lg"
-                  onClick={handleCompleteOnboarding}
-                  disabled={isProcessing || isLoading || isCompleting}
-                  className="bg-black hover:bg-gray-800 text-white"
-                >
-                  {isCompleting ? (
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  ) : (
-                    'Continue to Dashboard'
-                  )}
-                  {!isCompleting && <ArrowRight className="ml-2 h-4 w-4" />}
-                </Button>
+                <div className="space-y-4">
+                  <Button
+                    variant="default"
+                    size="lg"
+                    onClick={() => setCurrentStep('plan-selection')}
+                    disabled={isProcessing || isLoading}
+                    className="bg-black hover:bg-gray-800 text-white min-w-[200px]"
+                  >
+                    Choose Your Plan
+                    <ArrowRight className="ml-2 h-4 w-4" />
+                  </Button>
+                  
+                  <div>
+                    <Button
+                      variant="outline"
+                      onClick={() => setCurrentStep('tag-config')}
+                      disabled={isProcessing || isLoading}
+                    >
+                      <ArrowLeft className="mr-2 h-4 w-4" />
+                      Back
+                    </Button>
+                  </div>
+                </div>
               </div>
             </div>
           </div>
@@ -1164,8 +1393,8 @@ export default function OnboardingFlow() {
               </div>
               <h3 className="text-lg font-semibold mb-2">Custom Practice Management Software</h3>
               <p className="text-sm text-muted-foreground">
-                Our team will reach out to you to set up your custom integration within 3 hours for the same price. Please provide
-                your software details below.
+                Our team will reach out to you to set up your custom integration within 3 hours for
+                the same price. Please provide your software details below.
               </p>
             </div>
 

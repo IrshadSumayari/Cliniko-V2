@@ -37,7 +37,7 @@ const HeroSection = ({ onGetStarted, onLogin, onSignup }: HeroSectionProps) => {
           </Button>
           
           <p className="text-sm text-muted-foreground">
-            7-day free trial – no card required.
+            Choose your plan to get started.
           </p>
         </div>
 

@@ -49,8 +49,7 @@ export async function GET(request: NextRequest) {
             user.email?.split('@')[0] ||
             'User',
           is_onboarded: false,
-          subscription_status: 'trial',
-          trial_ends_at: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(), // 7 days from now
+          subscription_status: 'inactive',
           created_at: new Date().toISOString(),
           updated_at: new Date().toISOString(),
         })
@@ -82,7 +81,7 @@ export async function GET(request: NextRequest) {
     // Also fetch user data (subscription status, tags, etc.) from the users table
     const { data: userData, error: userDataError } = await supabase
       .from('users')
-      .select('subscription_status, trial_ends_at, stripe_customer_id, wc, epc')
+      .select('subscription_status, stripe_customer_id, wc, epc')
       .eq('id', userId)
       .single();
 
@@ -138,8 +137,7 @@ export async function GET(request: NextRequest) {
         success: true,
         user: {
           ...newProfile,
-          subscription_status: userData?.subscription_status || 'trial',
-          trial_ends_at: userData?.trial_ends_at,
+          subscription_status: userData?.subscription_status || 'inactive',
           stripe_customer_id: userData?.stripe_customer_id,
         },
         userTags: { wc: userData?.wc || 'WC', epc: userData?.epc || 'EPC' },
@@ -151,8 +149,7 @@ export async function GET(request: NextRequest) {
       success: true,
       user: {
         ...profile,
-        subscription_status: userData?.subscription_status || 'trial',
-        trial_ends_at: userData?.trial_ends_at,
+        subscription_status: userData?.subscription_status || 'inactive',
         stripe_customer_id: userData?.stripe_customer_id,
       },
       userTags: { wc: userData?.wc || 'WC', epc: userData?.epc || 'EPC' },

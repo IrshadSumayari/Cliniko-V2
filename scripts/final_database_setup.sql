@@ -57,12 +57,13 @@ CREATE TABLE IF NOT EXISTS users (
     email TEXT NOT NULL,
     full_name TEXT,
     is_onboarded BOOLEAN DEFAULT FALSE,
-    subscription_status TEXT DEFAULT 'trial',
-    trial_ends_at TIMESTAMP WITH TIME ZONE DEFAULT (NOW() + INTERVAL '7 days'),
+    subscription_status TEXT DEFAULT 'inactive',
     stripe_customer_id TEXT, -- Stripe customer ID for subscription management
     pms_type TEXT,
     WC TEXT DEFAULT 'WC',
     EPC TEXT DEFAULT 'EPC',
+    WC_TAGS TEXT[] DEFAULT ARRAY['WC'],
+    EPC_TAGS TEXT[] DEFAULT ARRAY['EPC'],
     custom_email TEXT, 
     enable_email_alerts BOOLEAN DEFAULT TRUE, 
     session_quota_threshold INTEGER DEFAULT 2, 
@@ -1003,26 +1004,29 @@ DECLARE
     v_appointment_type_name TEXT;
     v_next_visit_date DATE;
     v_last_visit_date DATE;
-    v_wc_tag TEXT;
-    v_epc_tag TEXT;
+    v_wc_tag TEXT[];
+    v_epc_tag TEXT[];
     v_wc_type_ids TEXT[];
     v_epc_type_ids TEXT[];
 BEGIN
-    -- Get user's custom WC and EPC tags from users table
-    SELECT wc, epc INTO v_wc_tag, v_epc_tag
+    -- Get user's custom WC and EPC tags from users table (prefer arrays, fallback to singles)
+    SELECT 
+        COALESCE(wc_tags, ARRAY[wc]) as wc_tags,
+        COALESCE(epc_tags, ARRAY[epc]) as epc_tags
+    INTO v_wc_tag, v_epc_tag
     FROM users 
     WHERE id = COALESCE(p_user_id, (SELECT user_id FROM patients LIMIT 1));
     
-    -- Get appointment type IDs that match the user's custom tags
+    -- Get appointment type IDs that match the user's custom tags using array-based matching
     SELECT ARRAY_AGG(appointment_id) INTO v_wc_type_ids
     FROM appointment_types 
     WHERE user_id = COALESCE(p_user_id, (SELECT user_id FROM patients LIMIT 1))
-    AND appointment_name ILIKE '%' || v_wc_tag || '%';
+    AND appointment_name ILIKE ANY(SELECT '%' || unnest(v_wc_tag) || '%');
     
     SELECT ARRAY_AGG(appointment_id) INTO v_epc_type_ids
     FROM appointment_types 
     WHERE user_id = COALESCE(p_user_id, (SELECT user_id FROM patients LIMIT 1))
-    AND appointment_name ILIKE '%' || v_epc_tag || '%';
+    AND appointment_name ILIKE ANY(SELECT '%' || unnest(v_epc_tag) || '%');
     
     -- First, clear existing cases to prevent duplication
     DELETE FROM cases WHERE user_id = COALESCE(p_user_id, (SELECT user_id FROM patients LIMIT 1));
@@ -1177,26 +1181,29 @@ DECLARE
     v_next_visit_date DATE;
     v_last_visit_date DATE;
     v_case_number TEXT;
-    v_wc_tag TEXT;
-    v_epc_tag TEXT;
+    v_wc_tag TEXT[];
+    v_epc_tag TEXT[];
     v_wc_type_ids TEXT[];
     v_epc_type_ids TEXT[];
 BEGIN
-    -- Get user's custom WC and EPC tags from users table
-    SELECT wc, epc INTO v_wc_tag, v_epc_tag
+    -- Get user's custom WC and EPC tags from users table (prefer arrays, fallback to singles)
+    SELECT 
+        COALESCE(wc_tags, ARRAY[wc]) as wc_tags,
+        COALESCE(epc_tags, ARRAY[epc]) as epc_tags
+    INTO v_wc_tag, v_epc_tag
     FROM users 
     WHERE id = COALESCE(p_user_id, (SELECT user_id FROM patients LIMIT 1));
     
-    -- Get appointment type IDs that match the user's custom tags
+    -- Get appointment type IDs that match the user's custom tags using array-based matching
     SELECT ARRAY_AGG(appointment_id) INTO v_wc_type_ids
     FROM appointment_types 
     WHERE user_id = COALESCE(p_user_id, (SELECT user_id FROM patients LIMIT 1))
-    AND appointment_name ILIKE '%' || v_wc_tag || '%';
+    AND appointment_name ILIKE ANY(SELECT '%' || unnest(v_wc_tag) || '%');
     
     SELECT ARRAY_AGG(appointment_id) INTO v_epc_type_ids
     FROM appointment_types 
     WHERE user_id = COALESCE(p_user_id, (SELECT user_id FROM patients LIMIT 1))
-    AND appointment_name ILIKE '%' || v_epc_tag || '%';
+    AND appointment_name ILIKE ANY(SELECT '%' || unnest(v_epc_tag) || '%');
     
     -- First, clear existing cases to prevent duplication
     DELETE FROM cases WHERE user_id = COALESCE(p_user_id, (SELECT user_id FROM patients LIMIT 1));
