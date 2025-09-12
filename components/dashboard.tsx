@@ -1144,9 +1144,9 @@ const Dashboard = ({ onNavigate }: DashboardProps) => {
           </AlertDialogContent>
         </AlertDialog>
 
-        <div className="container mx-auto px-8 py-10">
-          {/* Trial Banner - Only show for trial users */}
-          {subscriptionLoaded &&
+        {/* <div className="container mx-auto px-8 py-10"> */}
+        {/* Trial Banner - Only show for trial users */}
+        {/* {subscriptionLoaded &&
             userSubscription &&
             userSubscription.subscription_status === 'trial' && (
               <div
@@ -1179,7 +1179,7 @@ const Dashboard = ({ onNavigate }: DashboardProps) => {
                         }`}
                       />
                     </div>
-                    {/* <div>
+                    <div>
                       <span className="font-semibold text-foreground">
                         {userSubscription.daysRemaining === 0
                           ? 'Your free trial expires today'
@@ -1192,7 +1192,7 @@ const Dashboard = ({ onNavigate }: DashboardProps) => {
                           ? 'Upgrade now to avoid service interruption'
                           : 'Unlock unlimited features and advanced analytics'}
                       </p>
-                    </div> */}
+                    </div>
                   </div>
                   <Button
                     className={`transition-transform hover:scale-105 ${
@@ -1208,10 +1208,10 @@ const Dashboard = ({ onNavigate }: DashboardProps) => {
                   </Button>
                 </div>
               </div>
-            )}
+            )} */}
 
-          {/* KPI Summary */}
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8 mb-12">
+        {/* KPI Summary */}
+        {/* <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8 mb-12">
             {kpiData.map((kpi, index) => (
               <div
                 key={index}
@@ -1230,8 +1230,8 @@ const Dashboard = ({ onNavigate }: DashboardProps) => {
                 </div>
               </div>
             ))}
-          </div>
-        </div>
+          </div> */}
+        {/* </div> */}
 
         {/* Full Page Client Overview */}
         <div className="bg-gradient-to-br from-background/80 to-accent/5 min-h-screen">
