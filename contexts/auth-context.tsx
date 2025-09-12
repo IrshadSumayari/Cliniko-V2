@@ -185,8 +185,36 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     try {
       setIsLoading(true);
-      const updatedUser = await fetchUserData(user);
+      
+      // Force fresh fetch from database, bypassing all caching
+      if (!supabase) {
+        throw new Error('Supabase client not initialized');
+      }
+
+      const { data: userData, error } = await supabase
+        .from('users')
+        .select('is_onboarded')
+        .eq('auth_user_id', user.id)
+        .single();
+
+      if (error) {
+        console.error('Error fetching fresh user data:', error);
+        return;
+      }
+
+      const isOnboarded = userData?.is_onboarded || false;
+      
+      // Update localStorage with fresh data
+      try {
+        localStorage.setItem('user_onboarding_status', isOnboarded.toString());
+        localStorage.setItem('user_onboarding_status_timestamp', Date.now().toString());
+      } catch (localStorageError) {
+        console.warn('Failed to update localStorage:', localStorageError);
+      }
+
+      const updatedUser = { ...user, isOnboarded };
       setUser(updatedUser);
+      
     } catch (error) {
       console.error('Error refreshing user data:', error);
     } finally {
