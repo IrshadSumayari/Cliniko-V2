@@ -57,7 +57,7 @@ export async function POST(req: NextRequest) {
     // Check subscription status
     const { data: userData, error: userError } = await createAdminClient()
       .from('users')
-      .select('id, subscription_status, trial_ends_at, pms_type, WC, EPC')
+      .select('id, subscription_status, pms_type, WC, EPC')
       .eq('auth_user_id', user.id)
       .single();
 
@@ -65,16 +65,12 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Failed to fetch user data.' }, { status: 500 });
     }
 
-    // Check if trial expired and no subscription
-    const now = new Date();
-    const trialEndsAt = new Date(userData.trial_ends_at);
-    const isTrialExpired = now > trialEndsAt && userData.subscription_status === 'trial';
-
-    if (isTrialExpired) {
+    // Check if user has active subscription
+    if (userData.subscription_status !== 'active') {
       return NextResponse.json(
         {
           success: false,
-          error: 'Trial expired. Please upgrade to continue syncing data.',
+          error: 'Active subscription required to sync data. Please choose a plan to continue.',
           dashboardLocked: true,
         },
         { status: 402 }

@@ -31,8 +31,9 @@ import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
 import { authenticatedFetch } from '@/lib/utils';
 import { useRouter } from 'next/navigation';
+import PlanSelection from './plan-selection';
 
-type OnboardingStep = 'pms' | 'api' | 'syncing' | 'sync-results' | 'tag-config' | 'tag-complete';
+type OnboardingStep = 'pms' | 'api' | 'syncing' | 'sync-results' | 'plan-selection' | 'tag-config' | 'tag-complete';
 
 interface SyncResults {
   wcPatients: number;
@@ -326,7 +327,7 @@ export default function OnboardingFlow() {
             });
 
             toast.success('Successfully connected and synced data!');
-            setCurrentStep('tag-config');
+            setCurrentStep('sync-results');
             return;
           }
         } catch (error) {
@@ -1055,6 +1056,132 @@ export default function OnboardingFlow() {
           </div>
         );
 
+      case 'sync-results':
+        return (
+          <div className="space-y-8 fade-in">
+            <div className="text-center">
+              <CheckCircle className="h-16 w-16 mx-auto mb-4 text-green-500" />
+              <h2 className="text-3xl font-bold mb-2">Sync Complete!</h2>
+              <p className="text-muted-foreground">
+                Here's what we found in your {formData.selectedPMS} data
+              </p>
+            </div>
+
+            <div className="max-w-4xl mx-auto space-y-6">
+              <div className="grid md:grid-cols-4 gap-6">
+                <Card className="p-6 text-center bg-gradient-to-br from-red-50 to-red-100 dark:from-red-950/30 dark:to-red-900/30 border-red-200 dark:border-red-800">
+                  <div className="text-3xl font-bold text-red-700 dark:text-red-300 mb-2">
+                    {syncResults.overduePatients || 0}
+                  </div>
+                  <div className="text-sm font-medium text-red-600 dark:text-red-400 mb-1">
+                    Overdue Patients
+                  </div>
+                  <div className="text-xs text-red-500 dark:text-red-500">
+                    Urgent action required
+                  </div>
+                </Card>
+
+                <Card className="p-6 text-center bg-gradient-to-br from-orange-50 to-orange-100 dark:from-orange-950/30 dark:to-orange-900/30 border-orange-200 dark:border-orange-800">
+                  <div className="text-3xl font-bold text-orange-700 dark:text-orange-300 mb-2">
+                    {syncResults.actionNeededPatients}
+                  </div>
+                  <div className="text-sm font-medium text-orange-600 dark:text-orange-400 mb-1">
+                    Action Needed
+                  </div>
+                  <div className="text-xs text-orange-500 dark:text-orange-500">
+                    Approaching quota limits
+                  </div>
+                </Card>
+
+                <Card className="p-6 text-center bg-gradient-to-br from-green-50 to-green-100 dark:from-green-950/30 dark:to-green-900/30 border-green-200 dark:border-green-800">
+                  <div className="text-3xl font-bold text-green-700 dark:text-green-300 mb-2">
+                    {syncResults.epcPatients}
+                  </div>
+                  <div className="text-sm font-medium text-green-600 dark:text-green-400 mb-1">
+                    EPC Patients
+                  </div>
+                  <div className="text-xs text-green-500 dark:text-green-500">
+                    Active care plans tracked
+                  </div>
+                </Card>
+
+                <Card className="p-6 text-center bg-gradient-to-br from-blue-50 to-blue-100 dark:from-blue-950/30 dark:to-blue-900/30 border-blue-200 dark:border-blue-800">
+                  <div className="text-3xl font-bold text-blue-700 dark:text-blue-300 mb-2">
+                    {syncResults.wcPatients}
+                  </div>
+                  <div className="text-sm font-medium text-blue-600 dark:text-blue-400 mb-1">
+                    Workers Comp
+                  </div>
+                  <div className="text-xs text-blue-500 dark:text-blue-500">
+                    Ready for quota tracking
+                  </div>
+                </Card>
+              </div>
+
+              {syncResults.issues && syncResults.issues.length > 0 && (
+                <Card className="p-6 border-orange-200 bg-orange-50 dark:bg-orange-950/20">
+                  <div className="flex items-center gap-2 mb-4">
+                    <Shield className="h-5 w-5 text-orange-600" />
+                    <h3 className="font-semibold text-orange-800 dark:text-orange-200">
+                      Issues Found During Sync
+                    </h3>
+                  </div>
+                  <ul className="space-y-1 text-sm text-orange-700 dark:text-orange-300">
+                    {syncResults.issues.map((issue, index) => (
+                      <li key={index}>• {issue}</li>
+                    ))}
+                  </ul>
+                  <p className="text-xs text-orange-600 dark:text-orange-400 mt-3">
+                    These issues won't affect your dashboard functionality, but you may want to
+                    review them.
+                  </p>
+                </Card>
+              )}
+
+              <div className="text-center mt-8">
+                <p className="text-muted-foreground mb-6">
+                  Your practice data has been successfully synced and analyzed. You're ready to
+                  start tracking your quota compliance!
+                </p>
+
+                <div className="space-y-4">
+                  <Button
+                    variant="default"
+                    size="lg"
+                    onClick={() => setCurrentStep('plan-selection')}
+                    disabled={isProcessing || isLoading}
+                    className="bg-black hover:bg-gray-800 text-white min-w-[200px]"
+                  >
+                    Choose Your Plan
+                    <ArrowRight className="ml-2 h-4 w-4" />
+                  </Button>
+                  
+                  <div>
+                    <Button
+                      variant="outline"
+                      onClick={() => setCurrentStep('api')}
+                      disabled={isProcessing || isLoading}
+                    >
+                      <ArrowLeft className="mr-2 h-4 w-4" />
+                      Back
+                    </Button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        );
+
+      case 'plan-selection':
+        return (
+          <PlanSelection
+            onBack={() => setCurrentStep('sync-results')}
+            onPlanSelected={(plan, amount, isYearly) => {
+              // This will be handled by the plan selection component
+            }}
+          />
+        );
+
       case 'tag-config':
         return (
           <div className="space-y-8 fade-in">
@@ -1212,20 +1339,29 @@ export default function OnboardingFlow() {
                   start tracking your quota compliance!
                 </p>
 
-                <Button
-                  variant="default"
-                  size="lg"
-                  onClick={handleCompleteOnboarding}
-                  disabled={isProcessing || isLoading || isCompleting}
-                  className="bg-black hover:bg-gray-800 text-white"
-                >
-                  {isCompleting ? (
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  ) : (
-                    'Continue to Dashboard'
-                  )}
-                  {!isCompleting && <ArrowRight className="ml-2 h-4 w-4" />}
-                </Button>
+                <div className="space-y-4">
+                  <Button
+                    variant="default"
+                    size="lg"
+                    onClick={() => setCurrentStep('plan-selection')}
+                    disabled={isProcessing || isLoading}
+                    className="bg-black hover:bg-gray-800 text-white min-w-[200px]"
+                  >
+                    Choose Your Plan
+                    <ArrowRight className="ml-2 h-4 w-4" />
+                  </Button>
+                  
+                  <div>
+                    <Button
+                      variant="outline"
+                      onClick={() => setCurrentStep('tag-config')}
+                      disabled={isProcessing || isLoading}
+                    >
+                      <ArrowLeft className="mr-2 h-4 w-4" />
+                      Back
+                    </Button>
+                  </div>
+                </div>
               </div>
             </div>
           </div>

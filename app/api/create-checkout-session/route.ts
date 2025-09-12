@@ -48,13 +48,14 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Invalid authentication token.' }, { status: 401 });
     }
 
-    const { userId, email } = await request.json();
+    const { userId, email, plan, isYearly, amount } = await request.json();
     if (!userId) {
       return NextResponse.json({ error: 'User ID is required' }, { status: 400 });
     }
+    if (!plan) {
+      return NextResponse.json({ error: 'Plan is required' }, { status: 400 });
+    }
 
-    console.log('🔍 Debug - Auth user ID:', user.id);
-    console.log('🔍 Debug - Requested userId:', userId);
 
     // Verify that the authenticated user matches the requested userId
     if (user.id !== userId) {
@@ -76,30 +77,55 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'User record not found in database' }, { status: 404 });
     }
 
-    console.log('🔍 Debug - Database user ID:', dbUser.id);
-    console.log('🔍 Debug - Database auth_user_id:', dbUser.auth_user_id);
 
-    // Get the professional plan price ID
-    const priceId = config.stripe.priceIds.professional;
+    // Define plan pricing
+    const planPricing = {
+      starter: {
+        monthly: 4900, // $49.00 in cents
+        yearly: 3700,  // $37.00 in cents
+        name: 'Starter Plan',
+        description: 'Perfect for small clinics getting started'
+      },
+      professional: {
+        monthly: 9900, // $99.00 in cents
+        yearly: 7400,  // $74.00 in cents
+        name: 'Professional Plan',
+        description: 'The choice for most successful clinics'
+      },
+      enterprise: {
+        monthly: 79900, // $799.00 in cents
+        yearly: 59900,  // $599.00 in cents
+        name: 'Enterprise Plan',
+        description: 'For multi-location clinic groups'
+      }
+    };
 
-    if (!priceId) {
-      console.error('NEXT_PUBLIC_STRIPE_PROFESSIONAL_PRICE_ID not configured');
-      return NextResponse.json(
-        { error: 'Stripe configuration error - missing price ID' },
-        { status: 500 }
-      );
+    const selectedPlan = planPricing[plan as keyof typeof planPricing];
+    if (!selectedPlan) {
+      return NextResponse.json({ error: 'Invalid plan selected' }, { status: 400 });
     }
 
-    console.log('Using price ID:', priceId);
+    const unitAmount = isYearly ? selectedPlan.yearly : selectedPlan.monthly;
+    const interval = isYearly ? 'year' : 'month';
+
 
     // Create Stripe checkout session
-    console.log('Creating Stripe checkout session...');
     const session = await stripe.checkout.sessions.create({
       customer_email: email,
       payment_method_types: ['card'],
       line_items: [
         {
-          price: priceId,
+          price_data: {
+            currency: 'aud',
+            product_data: {
+              name: selectedPlan.name,
+              description: selectedPlan.description,
+            },
+            unit_amount: unitAmount,
+            recurring: {
+              interval: interval,
+            },
+          },
           quantity: 1,
         },
       ],
@@ -107,19 +133,21 @@ export async function POST(request: NextRequest) {
       success_url: `${config.app.url}/payment-success?session_id={CHECKOUT_SESSION_ID}`,
       cancel_url: `${config.app.url}/`,
       metadata: {
-        userId: dbUser.id, // Use database user ID instead of auth user ID
-        authUserId: user.id, // Keep auth user ID for reference
-        planType: 'professional',
+        userId: dbUser.id,
+        authUserId: user.id,
+        plan: plan,
+        isYearly: isYearly.toString(),
       },
       subscription_data: {
         metadata: {
-          userId: dbUser.id, // Use database user ID instead of auth user ID
-          authUserId: user.id, // Keep auth user ID for reference
+          userId: dbUser.id,
+          authUserId: user.id,
+          plan: plan,
+          isYearly: isYearly.toString(),
         },
       },
     });
 
-    console.log('Checkout session created successfully:', session.id);
     return NextResponse.json({
       sessionId: session.id,
       url: session.url,
