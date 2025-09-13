@@ -254,7 +254,7 @@ export class ClinikoAPI implements PMSApiInterface {
                 postcode: patient.post_code,
                 country: patient.country,
               },
-              patientType: 'EPC',
+              patientType: null, // Will be determined by appointment types during case population
               physioName: `${patient.first_name || ''} ${patient.last_name || ''}`.trim(),
               lastModified: patient.updated_at,
             };

@@ -290,7 +290,7 @@ export class NookalAPI implements PMSApiInterface {
           postcode: patient.Postcode || patient.postcode || '',
           country: patient.Country || patient.country || '',
         },
-        patientType: 'EPC' as const, // Default to EPC as per requirements
+        patientType: null, // Will be determined by appointment types during case population
         physioName: patient.Practitioner || patient.practitioner || '',
         lastModified: patient.LastModified || patient.lastModified || patient.last_modified || '',
       }));
@@ -365,7 +365,7 @@ export class NookalAPI implements PMSApiInterface {
               postcode: patientData.Postcode || patientData.postcode || '',
               country: patientData.Country || patientData.country || '',
             },
-            patientType: 'EPC', // Default to EPC as per requirements
+            patientType: null, // Will be determined by appointment types during case population
             physioName: patientData.Practitioner || patientData.practitioner || '',
             lastModified:
               patientData.LastModified ||
