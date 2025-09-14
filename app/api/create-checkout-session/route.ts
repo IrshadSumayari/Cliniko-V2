@@ -1,11 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
 import Stripe from 'stripe';
 import { createClient } from '@supabase/supabase-js';
+import { config } from '@/lib/config';
+import { getPlan, getPrice, validatePricingConfig, getPricingConfig } from '@/lib/pricing-config';
 
 const stripe = new Stripe(config.stripe.secretKey, {});
-
-// Create server-side Supabase client with service role key
-import { config } from '@/lib/config';
 
 const supabaseUrl = config.supabase.url;
 const supabaseServiceKey = config.supabase.serviceRoleKey;
@@ -73,87 +72,107 @@ export async function POST(request: NextRequest) {
       .single();
 
     if (dbUserError || !dbUser) {
-      console.error('Database user not found:', dbUserError);
       return NextResponse.json({ error: 'User record not found in database' }, { status: 404 });
     }
 
 
-    // Define plan pricing
-    const planPricing = {
-      starter: {
-        monthly: 4900, // $49.00 in cents
-        yearly: 3700,  // $37.00 in cents
-        name: 'Starter Plan',
-        description: 'Perfect for small clinics getting started'
-      },
-      professional: {
-        monthly: 9900, // $99.00 in cents
-        yearly: 7400,  // $74.00 in cents
-        name: 'Professional Plan',
-        description: 'The choice for most successful clinics'
-      },
-      enterprise: {
-        monthly: 79900, // $799.00 in cents
-        yearly: 59900,  // $599.00 in cents
-        name: 'Enterprise Plan',
-        description: 'For multi-location clinic groups'
-      }
-    };
+    // Get pricing configuration
+    const pricingConfig = getPricingConfig();
+    
+    // Validate pricing configuration
+    if (!validatePricingConfig(pricingConfig)) {
+      return NextResponse.json({ error: 'Pricing configuration error' }, { status: 500 });
+    }
 
-    const selectedPlan = planPricing[plan as keyof typeof planPricing];
+    // Get the selected plan
+    const selectedPlan = getPlan(plan);
     if (!selectedPlan) {
       return NextResponse.json({ error: 'Invalid plan selected' }, { status: 400 });
     }
 
-    const unitAmount = isYearly ? selectedPlan.yearly : selectedPlan.monthly;
-    const interval = isYearly ? 'year' : 'month';
-
-
-    // Create Stripe checkout session
-    const session = await stripe.checkout.sessions.create({
-      customer_email: email,
-      payment_method_types: ['card'],
-      line_items: [
-        {
-          price_data: {
-            currency: 'aud',
-            product_data: {
-              name: selectedPlan.name,
-              description: selectedPlan.description,
-            },
-            unit_amount: unitAmount,
-            recurring: {
-              interval: interval,
-            },
+    // Use existing Stripe price ID if available
+    const priceId = isYearly ? selectedPlan.stripePriceId?.yearly : selectedPlan.stripePriceId?.monthly;
+    
+    let session;
+    
+    if (priceId) {
+      // Use existing Stripe price ID
+      session = await stripe.checkout.sessions.create({
+        customer_email: email,
+        payment_method_types: ['card'],
+        line_items: [
+          {
+            price: priceId,
+            quantity: 1,
           },
-          quantity: 1,
-        },
-      ],
-      mode: 'subscription',
-      success_url: `${config.app.url}/payment-success?session_id={CHECKOUT_SESSION_ID}`,
-      cancel_url: `${config.app.url}/`,
-      metadata: {
-        userId: dbUser.id,
-        authUserId: user.id,
-        plan: plan,
-        isYearly: isYearly.toString(),
-      },
-      subscription_data: {
+        ],
+        mode: 'subscription',
+        success_url: `${config.app.url}/payment-success?session_id={CHECKOUT_SESSION_ID}`,
+        cancel_url: `${config.app.url}/`,
         metadata: {
           userId: dbUser.id,
           authUserId: user.id,
           plan: plan,
           isYearly: isYearly.toString(),
         },
-      },
-    });
+        subscription_data: {
+          metadata: {
+            userId: dbUser.id,
+            authUserId: user.id,
+            plan: plan,
+            isYearly: isYearly.toString(),
+          },
+        },
+      });
+    } else {
+      // Fallback: Create price dynamically if no existing price ID
+      const unitAmount = getPrice(selectedPlan, isYearly);
+      const interval = isYearly ? 'year' : 'month';
+      
+      session = await stripe.checkout.sessions.create({
+        customer_email: email,
+        payment_method_types: ['card'],
+        line_items: [
+          {
+            price_data: {
+              currency: 'aud',
+              product_data: {
+                name: selectedPlan.name,
+                description: selectedPlan.description,
+              },
+              unit_amount: unitAmount,
+              recurring: {
+                interval: interval,
+              },
+            },
+            quantity: 1,
+          },
+        ],
+        mode: 'subscription',
+        success_url: `${config.app.url}/payment-success?session_id={CHECKOUT_SESSION_ID}`,
+        cancel_url: `${config.app.url}/`,
+        metadata: {
+          userId: dbUser.id,
+          authUserId: user.id,
+          plan: plan,
+          isYearly: isYearly.toString(),
+        },
+        subscription_data: {
+          metadata: {
+            userId: dbUser.id,
+            authUserId: user.id,
+            plan: plan,
+            isYearly: isYearly.toString(),
+          },
+        },
+      });
+    }
 
     return NextResponse.json({
       sessionId: session.id,
       url: session.url,
     });
   } catch (error: any) {
-    console.error('Error creating checkout session:', error);
     return NextResponse.json(
       {
         error: 'Failed to create checkout session',

@@ -12,9 +12,12 @@ export const config = {
     webhookSecret: process.env.STRIPE_WEBHOOK_SECRET || '', // server-only
     publishableKey: process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY || '',
     priceIds: {
-      basic: process.env.NEXT_PUBLIC_STRIPE_BASIC_PRICE_ID || '',
-      professional: process.env.NEXT_PUBLIC_STRIPE_PROFESSIONAL_PRICE_ID || '',
-      enterprise: process.env.NEXT_PUBLIC_STRIPE_ENTERPRISE_PRICE_ID || '',
+      starterMonthly: process.env.NEXT_PUBLIC_STARTER_MONTHLY_PRICE_ID || '',
+      starterYearly: process.env.NEXT_PUBLIC_STARTER_YEARLY_PRICE_ID || '',
+      professionalMonthly: process.env.NEXT_PUBLIC_PROFESSIONAL_MONTHLY_PRICE_ID || '',
+      professionalYearly: process.env.NEXT_PUBLIC_PROFESSIONAL_YEARLY_PRICE_ID || '',
+      enterpriseMonthly: process.env.NEXT_PUBLIC_ENTERPRISE_MONTHLY_PRICE_ID || '',
+      enterpriseYearly: process.env.NEXT_PUBLIC_ENTERPRISE_YEARLY_PRICE_ID || '',
     },
   },
   app: {

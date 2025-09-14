@@ -1,65 +1,43 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { CheckCircle, ArrowRight, ArrowLeft } from 'lucide-react';
 import { useAuth } from '@/contexts/auth-context';
 import { toast } from 'sonner';
+import { getPricingConfig, getPriceInDollars, PricingPlan } from '@/lib/pricing-config';
 
 interface PlanSelectionProps {
   onBack: () => void;
   onPlanSelected: (plan: string, amount: number, isYearly: boolean) => void;
 }
 
-const PLANS = {
-  starter: {
-    name: 'Starter',
-    monthlyPrice: 49,
-    yearlyPrice: 37,
-    description: 'Perfect for small clinics getting started',
-    features: [
-      'Up to 50 patients',
-      'Basic dashboard',
-      'Standard EPC & WC tracking'
-    ],
-    popular: false
-  },
-  professional: {
-    name: 'Professional',
-    monthlyPrice: 99,
-    yearlyPrice: 74,
-    description: 'The choice for most successful clinics',
-    features: [
-      'Unlimited patients',
-      'Full dashboard with analytics',
-      'Smart email alerts',
-      'Advanced compliance features'
-    ],
-    popular: true
-  },
-  enterprise: {
-    name: 'Enterprise',
-    monthlyPrice: 799,
-    yearlyPrice: 599,
-    description: 'For multi-location clinic groups',
-    features: [
-      'Everything in Professional',
-      'Fully customisable dashboard',
-      'Custom tracking for any clinic metric',
-      'Multi-location support',
-      'First access to NDIS/CTP/AHTR automation',
-      'Dedicated account manager'
-    ],
-    popular: false
-  }
-};
+// This will be replaced with dynamic pricing from the config
 
 export default function PlanSelection({ onBack, onPlanSelected }: PlanSelectionProps) {
   const [isYearly, setIsYearly] = useState(true);
   const [selectedPlan, setSelectedPlan] = useState<string | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
+  const [plans, setPlans] = useState<Record<string, PricingPlan>>({});
+  const [isLoading, setIsLoading] = useState(true);
   const { getAccessToken } = useAuth();
+
+  // Load pricing configuration
+  useEffect(() => {
+    const loadPricing = async () => {
+      try {
+        const pricingConfig = getPricingConfig();
+        setPlans(pricingConfig);
+        setIsLoading(false);
+      } catch (error) {
+        toast.error('Failed to load pricing information');
+        setIsLoading(false);
+      }
+    };
+
+    loadPricing();
+  }, []);
 
   const handlePlanSelect = async (planKey: string) => {
     if (planKey === 'enterprise') {
@@ -72,8 +50,12 @@ export default function PlanSelection({ onBack, onPlanSelected }: PlanSelectionP
     setIsProcessing(true);
 
     try {
-      const plan = PLANS[planKey as keyof typeof PLANS];
-      const amount = isYearly ? plan.yearlyPrice : plan.monthlyPrice;
+      const plan = plans[planKey];
+      if (!plan) {
+        throw new Error('Plan not found');
+      }
+      
+      const amount = getPriceInDollars(plan, isYearly);
       
       // Get auth token
       const token = await getAccessToken();
@@ -122,7 +104,7 @@ export default function PlanSelection({ onBack, onPlanSelected }: PlanSelectionP
           email: userEmail,
           plan: planKey,
           isYearly,
-          amount: amount * 100, // Convert to cents for Stripe
+          amount: plan.monthlyPrice, // Pass the price in cents directly from the plan
         }),
       });
 
@@ -136,12 +118,22 @@ export default function PlanSelection({ onBack, onPlanSelected }: PlanSelectionP
       // Redirect to Stripe checkout
       window.location.href = url;
     } catch (error) {
-      console.error('Error creating checkout session:', error);
       toast.error('Failed to start checkout process. Please try again.');
       setIsProcessing(false);
       setSelectedPlan(null);
     }
   };
+
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-4"></div>
+          <p>Loading pricing information...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-background">
@@ -207,7 +199,7 @@ export default function PlanSelection({ onBack, onPlanSelected }: PlanSelectionP
           {/* Pricing Plans */}
           <div className="max-w-6xl mx-auto">
             <div className="grid md:grid-cols-3 gap-6 mb-12">
-              {Object.entries(PLANS).map(([key, plan]) => (
+              {Object.entries(plans).map(([key, plan]) => (
                 <Card 
                   key={key}
                   className={`p-6 hover:shadow-lg transition-shadow ${
@@ -228,12 +220,12 @@ export default function PlanSelection({ onBack, onPlanSelected }: PlanSelectionP
                     <h3 className="text-xl font-semibold mb-2 text-foreground">{plan.name}</h3>
                     <div className="mb-4">
                       <span className="text-3xl font-bold text-foreground">
-                        ${isYearly ? plan.yearlyPrice : plan.monthlyPrice}
+                        ${getPriceInDollars(plan, isYearly).toFixed(0)}
                       </span>
                       <span className="text-base text-muted-foreground">/month</span>
                       {isYearly && (
                         <div className="text-xs text-muted-foreground mt-1">
-                          Billed annually (${isYearly ? plan.yearlyPrice * 12 : plan.monthlyPrice * 12})
+                          Billed annually (${(getPriceInDollars(plan, isYearly) * 12).toFixed(0)})
                         </div>
                       )}
                     </div>
