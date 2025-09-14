@@ -79,8 +79,17 @@ export async function POST(req: NextRequest) {
 
     const userId = userData.id;
     const pmsType = userData.pms_type;
-    const wcTag = userData.WC || 'WC';
-    const epcTag = userData.EPC || 'EPC';
+    
+    // Handle multiple WC and EPC tags - parse them as arrays
+    const wcTags = userData.WC ? 
+      (typeof userData.WC === 'string' ? userData.WC.split(',').map(tag => tag.trim()) : [userData.WC]) 
+      : ['WC'];
+    const epcTags = userData.EPC ? 
+      (typeof userData.EPC === 'string' ? userData.EPC.split(',').map(tag => tag.trim()) : [userData.EPC]) 
+      : ['EPC'];
+    
+    console.log(`[SYNC ENGINE] WC tags: ${JSON.stringify(wcTags)}`);
+    console.log(`[SYNC ENGINE] EPC tags: ${JSON.stringify(epcTags)}`);
 
     // Get last sync time
     const { data: lastSync } = await createAdminClient()
@@ -112,19 +121,15 @@ export async function POST(req: NextRequest) {
     }
 
     try {
-      // Step 1: Fetch PMS data (incremental)
-      const pmsData = await fetchPMSData(pmsType, lastSyncTime, token);
-
-      if (!pmsData.success) {
-        throw new Error(pmsData.error);
-      }
+      // Step 1: Fetch data from database (patients and appointments already synced)
+      const dbData = await fetchDataFromDatabase(userId, pmsType, lastSyncTime);
 
       // Step 2: Process and filter data
       const processedData = await processPMSData(
-        pmsData.patients,
-        pmsData.appointments,
-        wcTag,
-        epcTag,
+        dbData.patients,
+        dbData.appointments,
+        wcTags,
+        epcTags,
         userId
       );
 
@@ -156,8 +161,8 @@ export async function POST(req: NextRequest) {
         processedData,
         userId,
         pmsType,
-        wcTag,
-        epcTag
+        wcTags,
+        epcTags
       );
 
       // Step 5: Check for Action Needed patients and send notifications
@@ -237,28 +242,44 @@ export async function POST(req: NextRequest) {
   }
 }
 
-// Fetch data from PMS system
-async function fetchPMSData(pmsType: string, lastSyncTime: string, token: string) {
+// Fetch data from database (patients and appointments already synced)
+async function fetchDataFromDatabase(userId: string, pmsType: string, lastSyncTime: string) {
   try {
-    // This would integrate with your existing PMS API endpoints
-    // For now, we'll simulate the data structure
+    console.log(`[SYNC ENGINE] Fetching data from database for user ${userId} (${pmsType})`);
+    
+    // Fetch patients from database
+    const { data: patients, error: patientsError } = await createAdminClient()
+      .from('patients')
+      .select('*')
+      .eq('user_id', userId)
+      .eq('pms_type', pmsType)
+      .gte('updated_at', lastSyncTime); // Only get patients updated since last sync
 
-    // In production, you would:
-    // 1. Use the stored API key for the specific PMS
-    // 2. Make API calls to fetch incremental data
-    // 3. Handle rate limiting and pagination
-
-    const response = await fetch(`/api/pms/sync-data?pmsType=${pmsType}&lastSync=${lastSyncTime}`, {
-      headers: { Authorization: `Bearer ${token}` },
-    });
-
-    if (!response.ok) {
-      throw new Error(`PMS API call failed: ${response.statusText}`);
+    if (patientsError) {
+      throw new Error(`Failed to fetch patients: ${patientsError.message}`);
     }
 
-    return await response.json();
+    // Fetch appointments from database
+    const { data: appointments, error: appointmentsError } = await createAdminClient()
+      .from('appointments')
+      .select('*')
+      .eq('user_id', userId)
+      .eq('pms_type', pmsType)
+      .gte('created_at', lastSyncTime); // Only get appointments created since last sync
+
+    if (appointmentsError) {
+      throw new Error(`Failed to fetch appointments: ${appointmentsError.message}`);
+    }
+
+    console.log(`[SYNC ENGINE] Found ${patients?.length || 0} patients and ${appointments?.length || 0} appointments in database`);
+
+    return {
+      success: true,
+      patients: patients || [],
+      appointments: appointments || [],
+    };
   } catch (error) {
-    throw new Error(`Failed to fetch PMS data: ${error.message}`);
+    throw new Error(`Failed to fetch data from database: ${error instanceof Error ? error.message : 'Unknown error'}`);
   }
 }
 
@@ -266,8 +287,8 @@ async function fetchPMSData(pmsType: string, lastSyncTime: string, token: string
 async function processPMSData(
   patients: PatientData[],
   appointments: AppointmentData[],
-  wcTag: string,
-  epcTag: string,
+  wcTags: string[],
+  epcTags: string[],
   userId: string
 ) {
   // Filter only completed appointments using status field
@@ -278,13 +299,13 @@ async function processPMSData(
   console.log(`[SYNC ENGINE] Total appointments: ${appointments.length}`);
   console.log(`[SYNC ENGINE] Completed appointments: ${completedAppointments.length}`);
 
-  // Filter appointments by funding scheme
+  // Filter appointments by funding scheme - check against all WC and EPC tags
   const relevantAppointments = completedAppointments.filter(
-    (apt) => apt.appointment_type === wcTag || apt.appointment_type === epcTag
+    (apt) => wcTags.includes(apt.appointment_type) || epcTags.includes(apt.appointment_type)
   );
 
   console.log(
-    `[SYNC ENGINE] Relevant appointments (${wcTag}/${epcTag}): ${relevantAppointments.length}`
+    `[SYNC ENGINE] Relevant appointments (WC: ${wcTags.join(',')} / EPC: ${epcTags.join(',')}): ${relevantAppointments.length}`
   );
 
   // Determine the active year based on user's latest appointment
@@ -292,49 +313,62 @@ async function processPMSData(
   console.log(`[SYNC ENGINE] Using active year: ${activeYear} for user ${userId}`);
 
   // Process patients with their appointments
-  const processedPatients = patients.map((patient) => {
-    const patientAppointments = relevantAppointments.filter((apt) => apt.patient_id === patient.id);
+  const processedPatients = patients.map((patient: any) => {
+    const patientAppointments = relevantAppointments.filter((apt: any) => apt.patient_id === patient.pms_patient_id);
 
     // Count sessions by type using smart counting logic
-    const wcSessions = countWCSessions(patientAppointments, wcTag);
-    const epcSessions = countEPCSessions(patientAppointments, epcTag, activeYear);
+    const wcSessions = countWCSessions(patientAppointments, wcTags);
+    const epcSessions = countEPCSessions(patientAppointments, epcTags, activeYear);
 
     // Determine patient type and calculate quota
     let patientType = patient.patient_type;
     let sessionsUsed = 0;
-    let totalSessions = 5; // Default EPC quota
+    let quota = 5; // Default EPC quota
 
+    // Only process patients who have relevant appointments (WC or EPC sessions)
     if (wcSessions > 0) {
       patientType = 'WC';
       sessionsUsed = wcSessions;
-      totalSessions = 8; // Default WC quota
+      quota = 8; // Default WC quota
 
       // TODO: Add injury_date field to patients table for proper old injury logic
       // For now, we'll use the default 8 sessions
       // if (patient.injury_date && isOlderThan3Months(patient.injury_date)) {
-      //   totalSessions = 1; // Old injury
+      //   quota = 1; // Old injury
       // }
     } else if (epcSessions > 0) {
       patientType = 'EPC';
       sessionsUsed = epcSessions;
-      totalSessions = 5; // EPC quota per calendar year
+      quota = 5; // EPC quota per calendar year
+    } else {
+      // Patient has no WC or EPC appointments - keep their existing type or set to Private
+      patientType = patient.patient_type || 'Private';
+      sessionsUsed = 0;
+      quota = 5; // Default
     }
 
     console.log(
-      `[SYNC ENGINE] Patient ${patient.id} (${patientType}): ${sessionsUsed}/${totalSessions} sessions`
+      `[SYNC ENGINE] Patient ${patient.id} (${patientType || 'No Type'}): ${sessionsUsed}/${quota} sessions`
     );
 
     return {
       ...patient,
       patient_type: patientType,
       sessions_used: sessionsUsed,
-      total_sessions: totalSessions,
-      remaining_sessions: Math.max(0, totalSessions - sessionsUsed),
+      quota: quota,
+      remaining_sessions: Math.max(0, quota - sessionsUsed),
     };
   });
 
+  // Filter out patients who don't have any WC or EPC appointments
+  const relevantPatients = processedPatients.filter(patient => 
+    patient.patient_type === 'WC' || patient.patient_type === 'EPC'
+  );
+
+  console.log(`[SYNC ENGINE] Processing ${relevantPatients.length} patients with WC/EPC appointments out of ${processedPatients.length} total patients`);
+
   return {
-    patients: processedPatients,
+    patients: relevantPatients,
     appointments: relevantAppointments,
   };
 }
@@ -375,27 +409,27 @@ async function determineActiveYear(userId: string): Promise<number> {
 }
 
 // Function to count WorkCover sessions (injury-based, no year limit)
-function countWCSessions(appointments: AppointmentData[], wcTag: string): number {
-  const wcCount = appointments.filter((apt) => apt.appointment_type === wcTag).length;
-  console.log(`[SYNC ENGINE] Found ${wcCount} WC sessions for tag: ${wcTag}`);
+function countWCSessions(appointments: AppointmentData[], wcTags: string[]): number {
+  const wcCount = appointments.filter((apt) => wcTags.includes(apt.appointment_type)).length;
+  console.log(`[SYNC ENGINE] Found ${wcCount} WC sessions for tags: ${wcTags.join(',')}`);
   return wcCount;
 }
 
 // Function to count EPC sessions (calendar year based)
 function countEPCSessions(
   appointments: AppointmentData[],
-  epcTag: string,
+  epcTags: string[],
   activeYear: number
 ): number {
   const epcCount = appointments.filter((apt) => {
-    if (apt.appointment_type !== epcTag) return false;
+    if (!epcTags.includes(apt.appointment_type)) return false;
 
     const appointmentYear = new Date(apt.appointment_date).getFullYear();
     return appointmentYear === activeYear;
   }).length;
 
   console.log(
-    `[SYNC ENGINE] Found ${epcCount} EPC sessions for tag: ${epcTag} in year: ${activeYear}`
+    `[SYNC ENGINE] Found ${epcCount} EPC sessions for tags: ${epcTags.join(',')} in year: ${activeYear}`
   );
   return epcCount;
 }
@@ -437,7 +471,7 @@ async function updateDatabase(processedData: any, userId: string, pmsType: strin
             physio_name: patient.physio_name,
             pms_last_modified: patient.pms_last_modified,
             sessions_used: patient.sessions_used,
-            total_sessions: patient.total_sessions,
+            quota: patient.quota,
             updated_at: new Date().toISOString(),
           })
           .eq('id', existingPatient.id);
@@ -458,7 +492,7 @@ async function updateDatabase(processedData: any, userId: string, pmsType: strin
           physio_name: patient.physio_name,
           pms_last_modified: patient.pms_last_modified,
           sessions_used: patient.sessions_used,
-          total_sessions: patient.total_sessions,
+          quota: patient.quota,
           is_active: true,
         });
 
@@ -511,7 +545,7 @@ async function checkActionNeededPatients(userId: string) {
   if (!patients) return [];
 
   return patients.filter((patient) => {
-    const remainingSessions = patient.total_sessions - patient.sessions_used;
+    const remainingSessions = patient.quota - patient.sessions_used;
     return remainingSessions <= 2; // Warning threshold
   });
 }
@@ -528,7 +562,7 @@ async function calculateOverduePatients(userId: string) {
 
   return patients.filter((patient) => {
     const sessionsUsed = parseInt(patient.sessions_used) || 0;
-    const quota = parseInt(patient.total_sessions) || 0;
+    const quota = parseInt(patient.quota) || 0;
     return sessionsUsed > quota; // Overdue if sessions used exceeds quota
   });
 }
@@ -575,8 +609,8 @@ async function createCasesFromSyncedData(
   processedData: any,
   userId: string,
   pmsType: string,
-  wcTag: string,
-  epcTag: string
+  wcTags: string[],
+  epcTags: string[]
 ) {
   try {
     console.log(`[CASES] Starting case creation for user ${userId} (${pmsType})`);
@@ -613,11 +647,9 @@ async function createCasesFromSyncedData(
         const locationName = latestPatientAppointment?.location_name || 'Main Clinic';
         const appointmentTypeName =
           latestPatientAppointment?.appointment_type || patient.patient_type;
-        console.log('bero', latestPatientAppointment);
         // Get practitioner ID and name from appointment data
         let practitionerId = null;
         let physioName = null;
-        console.log('bero', latestPatientAppointment);
         // Priority 1: Use practitioner name from appointment if available
         if (latestPatientAppointment?.practitioner_name) {
           physioName = latestPatientAppointment.practitioner_name;

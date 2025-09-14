@@ -236,7 +236,7 @@ export class ClinikoAPI implements PMSApiInterface {
               console.log(`🎯 Reached target of ${targetTotal} patients`);
               break;
             }
-            console.log(patients, 'allPatients');
+
             // Map Cliniko patient data to our standard format
             const mappedPatient: PMSPatient = {
               id: patient.id,
@@ -442,7 +442,6 @@ export class ClinikoAPI implements PMSApiInterface {
   }
 
   private mapBookingToAppointment(booking: any): PMSAppointment | null {
-
     if (!booking) {
       return null;
     }
@@ -466,7 +465,7 @@ export class ClinikoAPI implements PMSApiInterface {
     // Extract practitioner name and ID from Cliniko API
     let practitionerName = 'Unknown Practitioner';
     let practitionerId = null;
-    
+
     // Extract practitioner ID
     if (booking.practitioner?.id) {
       practitionerId = booking.practitioner.id.toString();
@@ -475,7 +474,7 @@ export class ClinikoAPI implements PMSApiInterface {
     } else if (booking.practitioner_id) {
       practitionerId = booking.practitioner_id.toString();
     }
-    
+
     // Extract practitioner name
     if (booking.practitioner?.display_name) {
       practitionerName = booking.practitioner.display_name;
@@ -490,8 +489,6 @@ export class ClinikoAPI implements PMSApiInterface {
     } else if (booking.therapist?.name) {
       practitionerName = booking.therapist.name;
     }
-
-
 
     const appointmentData = {
       id: parseInt(booking.id),
@@ -510,17 +507,9 @@ export class ClinikoAPI implements PMSApiInterface {
       appointment_date: booking.starts_at,
       appointment_type_id: appointmentTypeId,
     };
-    
+
     // Log the final appointment data for debugging
-    console.log(`🔍 [CLINIKO DEBUG] Final appointment data for booking ${booking.id}:`, {
-      id: appointmentData.id,
-      patientId: appointmentData.patientId,
-      practitioner_id: appointmentData.practitioner_id,
-      physioName: appointmentData.physioName,
-      practitionerName: practitionerName,
-      practitionerId: practitionerId
-    });
-    
+
     return appointmentData;
   }
 

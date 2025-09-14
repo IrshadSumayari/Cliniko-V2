@@ -266,7 +266,7 @@ export async function POST(request: NextRequest) {
               const appointmentTypeIds = patientAppointmentTypes.get(patient.id) || [];
 
               // Determine patient type based on appointment types
-              let newPatientType = 'Private'; // Default
+              let newPatientType = null; // Will be determined based on appointments
 
               // Check if patient has WC appointments
               const hasWCAppointments = appointmentTypeIds.some((typeId: string | number) =>
@@ -278,7 +278,7 @@ export async function POST(request: NextRequest) {
                 epcTypeIds.includes(typeId)
               );
 
-              // Only update if patient actually has WC or EPC appointments
+              // Only process patients who have WC or EPC appointments
               if (hasWCAppointments || hasEPCAppointments) {
                 if (hasWCAppointments && hasEPCAppointments) {
                   // If patient has both, prioritize WC (as per business logic)

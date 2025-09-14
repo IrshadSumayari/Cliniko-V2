@@ -346,17 +346,9 @@ async function performInitialSync(supabase: any, userId: string, pmsClient: any,
       console.log(`[SERVER] Fetched ${patients.length} patients from ${pmsType}`);
     }
 
-    const patientsToInsert = patients
-      .filter((patient) => {
-        const isValid = patient.patientType && patient.patientType.trim() !== '';
-        if (!isValid) {
-          console.log(
-            `[SERVER] Filtered out patient ${patient.id} (${patient.firstName} ${patient.lastName}) - no patient type`
-          );
-        }
-        return isValid;
-      })
-      .map((patient) => ({
+    // Store ALL patients initially - patientType will be determined later during appointment processing
+    console.log(`[SERVER] Processing ${patients.length} patients for insertion`);
+    const patientsToInsert = patients.map((patient) => ({
         user_id: userId,
         pms_patient_id: String(patient.id),
         pms_type: pmsType,
@@ -365,9 +357,11 @@ async function performInitialSync(supabase: any, userId: string, pmsClient: any,
         email: patient.email || null,
         phone: patient.phone || null,
         date_of_birth: patient.dateOfBirth || null,
-        patient_type: patient.patientType,
+        patient_type: 'Private', // Default to Private, will be updated during appointment processing with WC/EPC tags
         physio_name: patient.physioName || null,
         pms_last_modified: patient.lastModified || new Date().toISOString(),
+        sessions_used: 0, // Initialize to 0
+        quota: 5, // Default EPC quota, will be updated during processing
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString(),
       }));
@@ -385,7 +379,8 @@ async function performInitialSync(supabase: any, userId: string, pmsClient: any,
 
         if (bulkPatientError) {
           console.error('[SERVER] Bulk patient insert error:', bulkPatientError);
-          issues.push('Failed to bulk insert patients');
+          console.error('[SERVER] Error details:', JSON.stringify(bulkPatientError, null, 2));
+          issues.push(`Failed to bulk insert patients: ${bulkPatientError.message}`);
         } else {
           console.log(
             `[SERVER] ✅ Successfully bulk inserted ${insertedPatients?.length || 0} patients`
