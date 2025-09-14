@@ -5,7 +5,7 @@ import LandingPage from '@/components/landing-page';
 import OnboardingFlow from '@/components/onboarding-flow';
 import Dashboard from '@/components/dashboard';
 import Settings from '@/components/settings';
-import { useState, useMemo, useEffect } from 'react';
+import { useState, useMemo } from 'react';
 
 /**
  * A wrapper for the main application view after a user is authenticated and onboarded.
@@ -23,6 +23,7 @@ function AuthenticatedApp() {
 
 export default function HomePage() {
   const { user, loading } = useAuth();
+
   const content = useMemo(() => {
     if (loading) {
       return (

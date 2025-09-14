@@ -55,7 +55,7 @@ interface SyncResults {
 }
 
 export default function OnboardingFlow() {
-  const { updateUserOnboardingStatus, completeDashboardSetup, isLoading, user, getAccessToken } =
+  const { updateUserOnboardingStatus, completeDashboardSetup, isLoading, user, getAccessToken, signOut } =
     useAuth();
   const router = useRouter();
   const [currentStep, setCurrentStep] = useState<OnboardingStep>('pms');
@@ -456,15 +456,17 @@ export default function OnboardingFlow() {
 
     setIsCompleting(true);
     try {
-      toast.info('You can connect your PMS later in settings.');
-      const success = await updateUserOnboardingStatus(false);
-      if (success) {
-      } else {
-        toast.error('Failed to update status. Please try again.');
-      }
+      // Sign out the user completely
+      await signOut();
+      
+      // Small delay to ensure sign out completes
+      setTimeout(() => {
+        // Redirect to homepage
+        router.push('/');
+      }, 500);
     } catch (error) {
-      console.error('Error skipping onboarding:', error);
-      toast.error('Failed to update status. Please try again.');
+      console.error('Error signing out:', error);
+      toast.error('Failed to sign out. Please try again.');
     } finally {
       setIsCompleting(false);
     }
