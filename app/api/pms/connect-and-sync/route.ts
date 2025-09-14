@@ -485,15 +485,6 @@ async function performInitialSync(supabase: any, userId: string, pmsClient: any,
         // Get practitioner name from the practitioners table using practitioner_id
         let practitionerName = null;
         if (appointment.practitioner_id) {
-          console.log(
-            `[SERVER] 🔍 Looking up practitioner ID: ${appointment.practitioner_id} for appointment ${appointment.id}`
-          );
-          console.log(
-            `[SERVER] 🔍 Appointment object practitioner_id:`,
-            appointment.practitioner_id
-          );
-          console.log(`[SERVER] 🔍 Appointment object physioName:`, appointment.physioName);
-
           // Look up practitioner name from practitioners table
           const { data: practitioner, error: practitionerError } = await supabase
             .from('practitioners')
@@ -514,9 +505,6 @@ async function performInitialSync(supabase: any, userId: string, pmsClient: any,
             practitionerName =
               practitioner.display_name ||
               `${practitioner.first_name} ${practitioner.last_name}`.trim();
-            console.log(
-              `[SERVER] ✅ Found practitioner: ${practitionerName} for appointment ${appointment.id}`
-            );
           } else {
             console.log(
               `[SERVER] ⚠️ No practitioner found in database for ID: ${appointment.practitioner_id}`
@@ -609,44 +597,25 @@ async function performInitialSync(supabase: any, userId: string, pmsClient: any,
       }
     }
 
-    // Populate cases table from existing data before calculating counts
-    try {
-      console.log('[SERVER] 🏗️ Populating cases table from existing data...');
-      const { data: populateResult, error: populateError } = await supabase.rpc('populate_cases_from_existing_data', {
-        p_user_id: userId
-      });
-      
-      if (populateError) {
-        console.error('[SERVER] ❌ Error populating cases table:', populateError);
-        issues.push('Failed to populate cases table');
-      } else {
-        console.log('[SERVER] ✅ Cases table populated successfully');
-      }
-    } catch (populateError) {
-      console.error('[SERVER] ❌ Exception populating cases table:', populateError);
-      issues.push('Exception populating cases table');
-    }
+    // Set counts to 0 to indicate they need to be calculated after user sets tags
+    wcPatients = 0;
+    epcPatients = 0;
 
-    // Calculate actual counts from cases table after it's populated
+    // Calculate action needed patients count using same logic as dashboard
     try {
       const { data: casesData, error: casesError } = await supabase
         .from('cases')
-        .select('id, program_type, quota, sessions_used, status')
-        .eq('user_id', userId);
+        .select('id, quota, sessions_used, status')
+        .eq('user_id', userId)
+        .eq('status', 'active');
 
       if (!casesError && casesData) {
-        // Calculate WC and EPC counts from cases table
-        wcPatients = casesData.filter((caseItem: any) => caseItem.program_type === 'WC').length;
-        epcPatients = casesData.filter((caseItem: any) => caseItem.program_type === 'EPC').length;
-        
-        // Calculate action needed patients count
         actionNeededPatients = casesData.filter((caseItem: any) => {
           const remainingSessions = caseItem.quota - caseItem.sessions_used;
           // Use same logic as dashboard: warning status with remaining sessions > 0
           return remainingSessions <= 2 && remainingSessions > 0;
         }).length;
-        
-        console.log(`[SERVER] 📊 Cases table counts: ${wcPatients} WC + ${epcPatients} EPC = ${wcPatients + epcPatients} total`);
+
         console.log(`[SERVER] 📊 Action needed patients: ${actionNeededPatients}`);
       }
     } catch (actionError) {

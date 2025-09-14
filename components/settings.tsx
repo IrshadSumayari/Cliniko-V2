@@ -16,6 +16,8 @@ import {
   XCircle,
   Loader2,
   Crown,
+  AlertTriangle,
+  LogOut,
 } from 'lucide-react';
 import { useAuth } from '@/contexts/auth-context';
 import { toast } from 'sonner';
@@ -47,15 +49,14 @@ interface UserProfile {
 
 import { config } from '@/lib/config';
 
-// Get the professional plan price ID
-const priceId = config.stripe.priceIds.professional;
-
 const Settings = ({ onBack }: { onBack: () => void }) => {
-  const { user, signOut } = useAuth();
+  const { user, signOut, refreshUserData } = useAuth();
   const [upgradeLoading, setUpgradeLoading] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [isConnecting, setIsConnecting] = useState(false);
+  const [isUnsubscribing, setIsUnsubscribing] = useState(false);
+  const [showUnsubscribeConfirm, setShowUnsubscribeConfirm] = useState(false);
 
   const [profile, setProfile] = useState<UserProfile>({
     id: '',
@@ -366,6 +367,36 @@ const Settings = ({ onBack }: { onBack: () => void }) => {
     }
   }
 
+  const handleUnsubscribe = async () => {
+    try {
+      setIsUnsubscribing(true);
+
+      const response = await authenticatedFetch('/api/user/unsubscribe', {
+        method: 'POST',
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to unsubscribe');
+      }
+
+      const data = await response.json();
+
+      if (data.success) {
+        toast.success('Subscription canceled successfully');
+
+        await signOut();
+
+        window.location.href = '/unsubscribe-confirmation';
+      }
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Failed to unsubscribe');
+    } finally {
+      setIsUnsubscribing(false);
+      setShowUnsubscribeConfirm(false);
+    }
+  };
+
   if (isLoading) {
     return (
       <div className="min-h-screen bg-gradient-to-b from-background to-accent flex items-center justify-center">
@@ -482,7 +513,7 @@ const Settings = ({ onBack }: { onBack: () => void }) => {
               <hr className="border-border" />
             </div>
 
-            <div className="mt-auto">
+            <div className="mt-auto space-y-3">
               <Button variant="outline" onClick={signOut} className="w-full">
                 Sign Out
               </Button>
@@ -556,6 +587,81 @@ const Settings = ({ onBack }: { onBack: () => void }) => {
             </Card>
           )}
         </div>
+
+        {/* Unsubscribe Section - Only show for active subscribers */}
+        {(subscriptionStatus.plan === 'Professional' ||
+          profile.subscription_status === 'active') && (
+          <div className="mt-8">
+            <Card className="border-red-200 bg-red-50">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2 text-red-700">
+                  <AlertTriangle className="h-5 w-5 text-red-600" />
+                  Cancel Subscription
+                </CardTitle>
+                <CardDescription className="text-red-600">
+                  Cancel your subscription and deactivate your account
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="bg-red-100 rounded-lg p-4">
+                  <p className="text-sm text-red-700 font-medium mb-2">
+                    ⚠️ Warning: This action cannot be undone
+                  </p>
+                  <ul className="space-y-1 text-sm text-red-600">
+                    <li>• Your subscription will be canceled immediately</li>
+                    <li>• You will lose access to all features</li>
+                    <li>• Your account will be deactivated</li>
+                    <li>• You can resubscribe anytime in the future</li>
+                  </ul>
+                </div>
+
+                {!showUnsubscribeConfirm ? (
+                  <Button
+                    variant="destructive"
+                    onClick={() => setShowUnsubscribeConfirm(true)}
+                    className="w-full"
+                  >
+                    <LogOut className="mr-2 h-4 w-4" />
+                    Cancel Subscription
+                  </Button>
+                ) : (
+                  <div className="space-y-3">
+                    <div className="bg-red-100 border border-red-300 rounded-lg p-4">
+                      <p className="text-sm text-red-700 font-medium mb-2">
+                        Are you sure you want to cancel your subscription?
+                      </p>
+                      <p className="text-xs text-red-600">
+                        This will immediately cancel your subscription and deactivate your account.
+                      </p>
+                    </div>
+                    <div className="flex gap-2">
+                      <Button
+                        variant="destructive"
+                        onClick={handleUnsubscribe}
+                        disabled={isUnsubscribing}
+                        className="flex-1"
+                      >
+                        {isUnsubscribing ? (
+                          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                        ) : (
+                          <LogOut className="mr-2 h-4 w-4" />
+                        )}
+                        {isUnsubscribing ? 'Canceling...' : 'Yes, Cancel Subscription'}
+                      </Button>
+                      <Button
+                        variant="outline"
+                        onClick={() => setShowUnsubscribeConfirm(false)}
+                        className="flex-1"
+                      >
+                        Keep Subscription
+                      </Button>
+                    </div>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </div>
+        )}
       </div>
     </div>
   );
