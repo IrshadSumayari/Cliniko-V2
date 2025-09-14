@@ -99,9 +99,9 @@ export async function POST(request: NextRequest) {
           console.log(`[SYNC] About to call createCasesFromSyncedData with:`, {
             userId: credential.user_id,
             pmsType: credential.pms_type,
-            supabaseType: typeof supabase
+            supabaseType: typeof supabase,
           });
-          
+
           let casesResult;
           try {
             casesResult = await createCasesFromSyncedData(
@@ -116,7 +116,7 @@ export async function POST(request: NextRequest) {
             console.error(`[SYNC] Case error details:`, {
               name: caseError instanceof Error ? caseError.name : 'Unknown',
               message: caseError instanceof Error ? caseError.message : 'Unknown error',
-              stack: caseError instanceof Error ? caseError.stack : 'No stack trace'
+              stack: caseError instanceof Error ? caseError.stack : 'No stack trace',
             });
             // Don't fail the whole sync if cases fail
             casesResult = { casesCreated: 0, casesUpdated: 0, error: 'Case creation failed' };
@@ -600,8 +600,12 @@ async function performNookalBatchSync(
 // Function to create cases from synced patients and appointments data
 async function createCasesFromSyncedData(supabase: any, userId: string, pmsType: string) {
   console.log(`[CASES] 🚀 FUNCTION ENTRY - createCasesFromSyncedData called!`);
-  console.log(`[CASES] 📍 Function parameters:`, { userId, pmsType, supabaseType: typeof supabase });
-  
+  console.log(`[CASES] 📍 Function parameters:`, {
+    userId,
+    pmsType,
+    supabaseType: typeof supabase,
+  });
+
   try {
     console.log(`[CASES] 🚀 Starting case creation for user ${userId} (${pmsType})`);
     console.log(`[CASES] 📊 Supabase client type:`, typeof supabase);
@@ -620,7 +624,7 @@ async function createCasesFromSyncedData(supabase: any, userId: string, pmsType:
         .from('users')
         .select('id')
         .limit(1);
-      
+
       if (testError) {
         console.error(`[CASES] ❌ Database connection test failed:`, testError);
         throw new Error(`Database connection failed: ${testError.message}`);
@@ -809,9 +813,6 @@ async function createCasesFromSyncedData(supabase: any, userId: string, pmsType:
 
           if (practitioner) {
             practitionerId = practitioner.id;
-            console.log(
-              `[CASES] Found practitioner by name: ${physioName} (ID: ${practitionerId})`
-            );
           }
         }
 
@@ -833,7 +834,6 @@ async function createCasesFromSyncedData(supabase: any, userId: string, pmsType:
             physioName =
               practitioner.display_name ||
               `${practitioner.first_name} ${practitioner.last_name}`.trim();
-            console.log(`[CASES] Found practitioner by ID: ${physioName} (${practitionerId})`);
           } else {
             console.log(
               `[CASES] No practitioner found by ID: ${latestPatientAppointment.practitioner_id}`
@@ -1305,4 +1305,3 @@ async function syncPractitioners(supabase: any, userId: string, pmsApi: any, pms
     throw error;
   }
 }
-

@@ -42,10 +42,10 @@ export async function GET(req: NextRequest) {
 
     const userId = userData.id;
 
-    // Get user's custom WC and EPC tags from users table (prefer arrays, fallback to singles)
+    // Get user's custom WC and EPC tags from users table
     const { data: userTags, error: tagsError } = await createAdminClient()
       .from('users')
-      .select('wc, epc, wc_tags, epc_tags')
+      .select('wc, epc')
       .eq('id', userId)
       .single();
 
@@ -54,9 +54,8 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ error: 'Failed to fetch user configuration.' }, { status: 500 });
     }
 
-    // Use array tags if available, otherwise fallback to single tags
-    const wcTag = (userTags.wc_tags && userTags.wc_tags.length > 0) ? userTags.wc_tags[0] : (userTags.wc || 'WC');
-    const epcTag = (userTags.epc_tags && userTags.epc_tags.length > 0) ? userTags.epc_tags[0] : (userTags.epc || 'EPC');
+    const wcTag = userTags.wc || 'WC'; // Use user's custom tag or fallback to default
+    const epcTag = userTags.epc || 'EPC'; // Use user's custom tag or fallback to default
 
     // Fetch practitioners for filter dropdown
     const { data: practitioners, error: practitionersError } = await createAdminClient()

@@ -13,7 +13,6 @@ import {
   AccordionTrigger,
 } from '@/components/ui/accordion';
 import { VideoPlayer } from '@/components/ui/video-player';
-import { MultiTagInput } from '@/components/ui/multi-tag-input';
 import {
   ArrowRight,
   ArrowLeft,
@@ -33,7 +32,14 @@ import { authenticatedFetch } from '@/lib/utils';
 import { useRouter } from 'next/navigation';
 import PlanSelection from './plan-selection';
 
-type OnboardingStep = 'pms' | 'api' | 'syncing' | 'sync-results' | 'plan-selection' | 'tag-config' | 'tag-complete';
+type OnboardingStep =
+  | 'pms'
+  | 'api'
+  | 'syncing'
+  | 'sync-results'
+  | 'plan-selection'
+  | 'tag-config'
+  | 'tag-complete';
 
 interface SyncResults {
   wcPatients: number;
@@ -43,8 +49,8 @@ interface SyncResults {
   overduePatients?: number;
   issues?: string[];
   customTags?: {
-    wc: string[];
-    epc: string[];
+    wc: string;
+    epc: string;
   };
 }
 
@@ -78,14 +84,14 @@ export default function OnboardingFlow() {
     actionNeededPatients: 0,
     issues: [],
     customTags: {
-      wc: ['WC'],
-      epc: ['EPC'],
+      wc: 'WC',
+      epc: 'EPC',
     },
   });
 
   const [customTags, setCustomTags] = useState({
-    wc: ['WC'],
-    epc: ['EPC'],
+    wc: 'WC',
+    epc: 'EPC',
   });
 
   // Function to get appropriate syncing subtext based on progress percentage
@@ -118,8 +124,8 @@ export default function OnboardingFlow() {
         if (response.ok) {
           const userTags = await response.json();
           setCustomTags({
-            wc: Array.isArray(userTags.wc) ? userTags.wc : [userTags.wc || 'WC'],
-            epc: Array.isArray(userTags.epc) ? userTags.epc : [userTags.epc || 'EPC'],
+            wc: userTags.wc || 'WC',
+            epc: userTags.epc || 'EPC',
           });
           console.log('Fetched user tags:', userTags);
         } else {
@@ -505,12 +511,6 @@ export default function OnboardingFlow() {
     try {
       setIsSavingTags(true);
 
-      // Validate that at least one tag is provided for each category
-      if (!customTags.wc.length || !customTags.epc.length) {
-        toast.error('Please add at least one tag for both WC and EPC categories');
-        return;
-      }
-
       // Get the access token from auth context
       const token = getAccessToken();
 
@@ -522,8 +522,8 @@ export default function OnboardingFlow() {
       const response = await authenticatedFetch('/api/user/update-tags', {
         method: 'POST',
         body: JSON.stringify({
-          wcTags: customTags.wc,
-          epcTags: customTags.epc,
+          wcTag: customTags.wc,
+          epcTag: customTags.epc,
         }),
       });
 
@@ -536,11 +536,17 @@ export default function OnboardingFlow() {
       console.log('Tags API response:', result);
 
       // Update the sync results with new counts
-      // The API returns counts for WC and EPC patients
+      // The API returns dynamic property names based on user's custom tags
+      const wcKey = `${customTags.wc}Patients`;
+      const epcKey = `${customTags.epc}Patients`;
+
+      console.log('Looking for count keys:', { wcKey, epcKey });
+      console.log('Available keys in newCounts:', Object.keys(result.newCounts || {}));
+
       setSyncResults((prev) => ({
         ...prev,
-        wcPatients: result.newCounts.wcPatients || 0,
-        epcPatients: result.newCounts.epcPatients || 0,
+        wcPatients: result.newCounts[wcKey] || 0,
+        epcPatients: result.newCounts[epcKey] || 0,
         totalAppointments: result.newCounts.totalAppointments || 0,
         actionNeededPatients: result.newCounts.actionNeededPatients || 0,
         overduePatients: result.newCounts.overduePatientsCount || 0,
@@ -1155,7 +1161,7 @@ export default function OnboardingFlow() {
                     Choose Your Plan
                     <ArrowRight className="ml-2 h-4 w-4" />
                   </Button>
-                  
+
                   <div>
                     <Button
                       variant="outline"
@@ -1201,26 +1207,34 @@ export default function OnboardingFlow() {
                 </div>
                 <p className="text-sm text-muted-foreground mb-6">
                   Customize how patients are categorized in your dashboard. These tags help track
-                  quota usage. You can add multiple variations or keep just one - it's up to you!
+                  quota usage.
                 </p>
 
                 <div className="grid md:grid-cols-2 gap-6 mb-6">
-                  <MultiTagInput
-                    tags={customTags.wc}
-                    onTagsChange={(tags) => setCustomTags((prev) => ({ ...prev, wc: tags }))}
-                    label="Workers Compensation Tags"
-                    placeholder="Type and press Enter to add tags (e.g., WC, Workers Comp, W/C)"
-                    description="Add variations you use for Workers Compensation patients (optional - you can keep just one)"
-                    maxTags={5}
-                  />
-                  <MultiTagInput
-                    tags={customTags.epc}
-                    onTagsChange={(tags) => setCustomTags((prev) => ({ ...prev, epc: tags }))}
-                    label="EPC Tags"
-                    placeholder="Type and press Enter to add tags (e.g., EPC, Enhanced Primary Care)"
-                    description="Add variations you use for EPC patients (optional - you can keep just one)"
-                    maxTags={5}
-                  />
+                  <div>
+                    <label className="text-sm font-medium mb-2 block">
+                      Workers Compensation Tag
+                    </label>
+                    <Input
+                      value={customTags.wc}
+                      onChange={(e) => setCustomTags((prev) => ({ ...prev, wc: e.target.value }))}
+                      className="mb-2"
+                    />
+                    <p className="text-xs text-muted-foreground">
+                      What do you call Workers Compensation patients in your system?
+                    </p>
+                  </div>
+                  <div>
+                    <label className="text-sm font-medium mb-2 block">EPC Tag</label>
+                    <Input
+                      value={customTags.epc}
+                      onChange={(e) => setCustomTags((prev) => ({ ...prev, epc: e.target.value }))}
+                      className="mb-2"
+                    />
+                    <p className="text-xs text-muted-foreground">
+                      How do you identify EPC patients in your practice?
+                    </p>
+                  </div>
                 </div>
 
                 <div className="flex justify-end">
@@ -1350,7 +1364,6 @@ export default function OnboardingFlow() {
                     Choose Your Plan
                     <ArrowRight className="ml-2 h-4 w-4" />
                   </Button>
-                  
                   <div>
                     <Button
                       variant="outline"
