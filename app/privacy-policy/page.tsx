@@ -234,8 +234,7 @@ export default function PrivacyPolicyPage() {
               
               <div className="bg-muted/50 rounded-lg p-4 mt-4">
                 <p className="text-muted-foreground">
-                  <strong>Email:</strong> privacy@myphysioflow.com.au<br />
-                  <strong>Mail:</strong> Privacy Officer, MyPhysioFlow, 4 William Street, Maryville, Australia
+                  <strong>Email:</strong> ryan@myphysioflow.com.au
                 </p>
               </div>
 

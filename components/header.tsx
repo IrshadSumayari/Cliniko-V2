@@ -108,7 +108,7 @@ const Header = ({ onLogin, onSignup }: HeaderProps) => {
               >
                 <Link href="/signup">
                   <User className="h-4 w-4 mr-2" />
-                  Start Free Trial
+                  Sign Up
                 </Link>
               </Button>
             </div>

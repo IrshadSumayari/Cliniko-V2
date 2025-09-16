@@ -28,6 +28,7 @@ import Header from './header';
 import AnimatedDashboard from './animated-dashboard';
 import AnimatedEmailAlert from './animated-email-alert';
 import FlowArrow from './flow-arrow';
+import { useRouter } from 'next/navigation';
 
 interface LandingPageProps {
   onGetStarted?: () => void;
@@ -38,6 +39,11 @@ interface LandingPageProps {
 const LandingPage = ({ onGetStarted, onLogin, onSignup }: LandingPageProps) => {
   const [isYearly, setIsYearly] = useState(true);
   const [expandedFAQ, setExpandedFAQ] = useState<number | null>(null);
+  const router = useRouter();
+  const handleGetStarted = () => {
+    router.push('/signup');
+  };
+
   // FAQ data
   const iconMap = {
     zap: Zap,
@@ -255,17 +261,35 @@ const LandingPage = ({ onGetStarted, onLogin, onSignup }: LandingPageProps) => {
                   <span className="font-semibold text-primary">without lifting a finger</span>.
                 </p>
 
-                <Button
-                  size="lg"
-                  onClick={onGetStarted}
-                  className="text-lg px-8 py-4 rounded-xl hover:scale-105 transition-all duration-300"
-                >
-                  <Zap className="mr-2 h-5 w-5" />
-                  See My Dashboard in 3 Minutes
-                  <ArrowRight className="ml-2 h-5 w-5" />
-                </Button>
+                <div className="flex flex-col sm:flex-row gap-4 mb-4">
+                  <Button
+                    size="lg"
+                    onClick={handleGetStarted}
+                    className="text-lg px-8 py-4 rounded-xl hover:scale-105 transition-all duration-300"
+                  >
+                    <Zap className="mr-2 h-5 w-5" />
+                    See My Dashboard in 3 Minutes
+                    <ArrowRight className="ml-2 h-5 w-5" />
+                  </Button>
 
-                <p className="text-sm text-muted-foreground mt-4">No setup fee • Cancel anytime</p>
+                  <Button
+                    size="lg"
+                    variant="outline"
+                    onClick={() =>
+                      window.open(
+                        'https://calendly.com/ryan-ryflow/myphysioflow-setup-walkthrough',
+                        '_blank'
+                      )
+                    }
+                    className="text-lg px-8 py-4 rounded-xl hover:scale-105 transition-all duration-300 border-primary/20 hover:border-primary/40 hover:bg-primary/5"
+                  >
+                    <Calendar className="mr-2 h-5 w-5" />
+                    Book Setup Call
+                    <ArrowRight className="ml-2 h-5 w-5" />
+                  </Button>
+                </div>
+
+                <p className="text-sm text-muted-foreground">No setup fee • Cancel anytime</p>
               </div>
             </div>
 
@@ -713,7 +737,7 @@ const LandingPage = ({ onGetStarted, onLogin, onSignup }: LandingPageProps) => {
                 <Button
                   variant="outline"
                   className="w-full hover:bg-card hover:text-foreground hover:border-primary/20"
-                  onClick={onGetStarted}
+                  onClick={handleGetStarted}
                 >
                   Start Starter Plan
                 </Button>
@@ -760,7 +784,7 @@ const LandingPage = ({ onGetStarted, onLogin, onSignup }: LandingPageProps) => {
                   </div>
                 </div>
 
-                <Button className="w-full" onClick={onGetStarted}>
+                <Button className="w-full" onClick={handleGetStarted}>
                   Start Professional Plan
                 </Button>
               </div>
@@ -815,7 +839,7 @@ const LandingPage = ({ onGetStarted, onLogin, onSignup }: LandingPageProps) => {
                 <Button
                   variant="outline"
                   className="w-full hover:bg-card hover:text-foreground hover:border-primary/20"
-                  onClick={onGetStarted}
+                  onClick={handleGetStarted}
                 >
                   Contact Sales
                 </Button>
@@ -898,14 +922,27 @@ const LandingPage = ({ onGetStarted, onLogin, onSignup }: LandingPageProps) => {
             </h2>
 
             <div className="mb-8">
-              <Button
-                size="default"
-                onClick={onGetStarted}
-                className="text-base px-8 py-3 rounded-lg hover:scale-105 transition-all duration-300"
-              >
-                Start Your Setup — See Your Dashboard in 3 Minutes
-                <ArrowRight className="ml-2 h-4 w-4" />
-              </Button>
+              <div className="flex flex-col sm:flex-row gap-4 justify-center">
+                <Button
+                  size="default"
+                  onClick={handleGetStarted}
+                  className="text-base px-8 py-3 rounded-lg hover:scale-105 transition-all duration-300"
+                >
+                  Start Your Setup — See Your Dashboard in 3 Minutes
+                  <ArrowRight className="ml-2 h-4 w-4" />
+                </Button>
+
+                {/* <Button
+                  size="default"
+                  variant="outline"
+                  onClick={() => window.open('https://calendly.com/ryan-ryflow/myphysioflow-setup-walkthrough', '_blank')}
+                  className="text-base px-8 py-3 rounded-lg hover:scale-105 transition-all duration-300 border-primary/20 hover:border-primary/40 hover:bg-primary/5"
+                >
+                  <Calendar className="mr-2 h-4 w-4" />
+                  Book Setup Call
+                  <ArrowRight className="ml-2 h-4 w-4" />
+                </Button> */}
+              </div>
             </div>
 
             {/* Trust Indicators */}
@@ -941,12 +978,11 @@ const LandingPage = ({ onGetStarted, onLogin, onSignup }: LandingPageProps) => {
                 />
               </div>
               <p className="text-muted-foreground text-sm leading-relaxed mb-4">
-                Built for Australian physiotherapy clinics to track EPC and WorkCover sessions, 
+                Built for Australian physiotherapy clinics to track EPC and WorkCover sessions,
                 ensuring compliance and preventing revenue loss from missed renewals.
               </p>
               <div className="text-sm text-muted-foreground">
-                <p>4 William Street, Maryville, Australia</p>
-                <p>support@myphysioflow.com.au</p>
+                <p>ryan@myphysioflow.com.au</p>
               </div>
             </div>
 
@@ -954,14 +990,14 @@ const LandingPage = ({ onGetStarted, onLogin, onSignup }: LandingPageProps) => {
             <div>
               <h3 className="font-semibold text-foreground mb-4">Legal</h3>
               <div className="space-y-2">
-                <a 
-                  href="/terms-of-service" 
+                <a
+                  href="/terms-of-service"
                   className="block text-sm text-muted-foreground hover:text-primary transition-colors"
                 >
                   Terms of Service
                 </a>
-                <a 
-                  href="/privacy-policy" 
+                <a
+                  href="/privacy-policy"
                   className="block text-sm text-muted-foreground hover:text-primary transition-colors"
                 >
                   Privacy Policy
@@ -973,14 +1009,14 @@ const LandingPage = ({ onGetStarted, onLogin, onSignup }: LandingPageProps) => {
             <div>
               <h3 className="font-semibold text-foreground mb-4">Support</h3>
               <div className="space-y-2">
-                <a 
-                  href="mailto:support@myphysioflow.com.au" 
+                <a
+                  href="mailto:support@myphysioflow.com.au"
                   className="block text-sm text-muted-foreground hover:text-primary transition-colors"
                 >
                   Contact Support
                 </a>
-                <a 
-                  href="mailto:privacy@myphysioflow.com.au" 
+                <a
+                  href="mailto:privacy@myphysioflow.com.au"
                   className="block text-sm text-muted-foreground hover:text-primary transition-colors"
                 >
                   Privacy Officer
