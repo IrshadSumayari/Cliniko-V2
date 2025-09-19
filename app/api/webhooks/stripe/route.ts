@@ -21,9 +21,12 @@ const webhookSecret = config.stripe.webhookSecret;
 export async function POST(request: NextRequest) {
   try {
     console.log('🚀 Stripe webhook called!');
+    console.log('📍 Webhook URL:', request.url);
+    console.log('🔗 Headers:', Object.fromEntries(request.headers.entries()));
+    
     const body = await request.text();
     const signature = request.headers.get('stripe-signature');
-
+    
     console.log('📝 Request body length:', body.length);
     console.log('🔐 Signature present:', !!signature);
 
@@ -117,22 +120,62 @@ export async function POST(request: NextRequest) {
       case 'customer.subscription.updated':
         const subscription = event.data.object as Stripe.Subscription;
         console.log('Subscription updated:', subscription.id);
+        console.log('Subscription status:', subscription.status);
 
-        // Update subscription status based on Stripe subscription status
         if (subscription.metadata?.userId) {
-          const subscriptionStatus = subscription.status === 'active' ? 'active' : 'inactive';
+          let subscriptionStatus = 'inactive';
+          let updateData: any = {};
+
+          switch (subscription.status) {
+            case 'active':
+              subscriptionStatus = 'active';
+              updateData = {
+                subscription_status: subscriptionStatus,
+              };
+              console.log('✅ Subscription is active');
+              break;
+
+            case 'past_due':
+              subscriptionStatus = 'past_due';
+              updateData = {
+                subscription_status: subscriptionStatus,
+              };
+              console.log('⚠️ Subscription is past due');
+              break;
+
+            case 'unpaid':
+              subscriptionStatus = 'unpaid';
+              updateData = {
+                subscription_status: subscriptionStatus,
+              };
+              console.log('❌ Subscription is unpaid');
+              break;
+
+            case 'canceled':
+              subscriptionStatus = 'inactive';
+              updateData = {
+                subscription_status: subscriptionStatus,
+              };
+              console.log('🛑 Subscription is cancelled (immediate)');
+              break;
+
+            default:
+              subscriptionStatus = 'inactive';
+              updateData = {
+                subscription_status: subscriptionStatus,
+              };
+              console.log(`⚠️ Unknown subscription status: ${subscription.status}`);
+          }
 
           const { error } = await supabase
             .from('users')
-            .update({
-              subscription_status: subscriptionStatus,
-            })
+            .update(updateData)
             .eq('id', subscription.metadata.userId);
 
           if (error) {
             console.error('Error updating subscription status:', error);
           } else {
-            console.log('Subscription status updated successfully');
+            console.log(`✅ Subscription status updated to: ${subscriptionStatus}`);
           }
         }
         break;
@@ -140,9 +183,10 @@ export async function POST(request: NextRequest) {
       case 'customer.subscription.deleted':
         const deletedSubscription = event.data.object as Stripe.Subscription;
         console.log('Subscription deleted:', deletedSubscription.id);
+        console.log('🛑 Immediate cancellation detected');
 
-        // Set subscription to inactive when cancelled
         if (deletedSubscription.metadata?.userId) {
+          // Immediate cancellation - deactivate now
           const { error } = await supabase
             .from('users')
             .update({
@@ -153,7 +197,7 @@ export async function POST(request: NextRequest) {
           if (error) {
             console.error('Error updating subscription status to inactive:', error);
           } else {
-            console.log('Subscription status set to inactive successfully');
+            console.log('✅ Subscription immediately deactivated');
           }
         }
         break;
