@@ -8,6 +8,8 @@ import { config } from '@/lib/config';
 
 interface AuthUser extends User {
   isOnboarded?: boolean;
+  subscriptionStatus?: string;
+  isSubscriptionActive?: boolean;
 }
 
 interface AuthResult {
@@ -69,7 +71,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
               Math.round(cacheAge / 1000),
               'seconds)'
             );
-            return { ...authUser, isOnboarded: cachedOnboardingStatus };
+            return { 
+              ...authUser, 
+              isOnboarded: cachedOnboardingStatus,
+              subscriptionStatus: 'inactive',
+              isSubscriptionActive: false
+            };
           }
         }
       }
@@ -88,7 +95,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           // Optimized query with shorter timeout
           const queryPromise = supabase
             .from('users')
-            .select('is_onboarded')
+            .select('is_onboarded, subscription_status')
             .eq('auth_user_id', authUser.id)
             .single();
 
@@ -120,7 +127,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         // Don't sign them out - they are still authenticated
         if (error.code === 'PGRST116') {
           console.log('User not found in database, defaulting to not onboarded');
-          return { ...authUser, isOnboarded: false };
+          return { 
+          ...authUser, 
+          isOnboarded: false,
+          subscriptionStatus: 'inactive',
+          isSubscriptionActive: false
+        };
         }
 
         // For other database errors, also default to not onboarded but keep them authenticated
@@ -132,7 +144,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           return { ...authUser, isOnboarded: cachedOnboardingStatus };
         }
 
-        return { ...authUser, isOnboarded: false };
+        return { 
+          ...authUser, 
+          isOnboarded: false,
+          subscriptionStatus: 'inactive',
+          isSubscriptionActive: false
+        };
       }
 
       console.log('User data fetched successfully:', userData);
@@ -145,9 +162,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         console.warn('Failed to store onboarding status in localStorage:', localStorageError);
       }
 
+      // Determine if subscription is active
+      const subscriptionStatus = userData?.subscription_status || 'inactive';
+      const isSubscriptionActive = subscriptionStatus === 'active';
+
       return {
         ...authUser,
         isOnboarded: userData?.is_onboarded || false,
+        subscriptionStatus,
+        isSubscriptionActive,
       };
     } catch (error) {
       console.error('Error in fetchUserData:', error);
@@ -168,7 +191,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           console.warn('Failed to read from localStorage:', localStorageError);
         }
 
-        return { ...authUser, isOnboarded: false };
+        return { 
+          ...authUser, 
+          isOnboarded: false,
+          subscriptionStatus: 'inactive',
+          isSubscriptionActive: false
+        };
       }
 
       // For any other errors, default to not onboarded but keep them authenticated
