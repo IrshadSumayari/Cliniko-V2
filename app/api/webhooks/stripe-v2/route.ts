@@ -25,12 +25,72 @@ const endpointSecrets = (config.stripe.webhookSecret || '')
   .map((s) => s.trim())
   .filter(Boolean);
 
+async function updateUserSubscription(
+  updateData: Record<string, unknown>,
+  identifiers: { id?: string | null; authUserId?: string | null; stripeCustomerId?: string | null }
+): Promise<boolean> {
+  // Try by database id
+  if (identifiers.id) {
+    const { data, error } = await supabase
+      .from('users')
+      .update(updateData)
+      .eq('id', identifiers.id)
+      .select('id');
+    if (error) {
+      console.error('❌ Update by id failed:', error);
+    } else if (data && data.length > 0) {
+      console.log('✅ Updated user via id:', data[0].id);
+      return true;
+    } else {
+      console.warn('⚠️ No user matched by id');
+    }
+  }
+
+  // Try by auth_user_id
+  if (identifiers.authUserId) {
+    const { data, error } = await supabase
+      .from('users')
+      .update(updateData)
+      .eq('auth_user_id', identifiers.authUserId)
+      .select('id');
+    if (error) {
+      console.error('❌ Update by auth_user_id failed:', error);
+    } else if (data && data.length > 0) {
+      console.log('✅ Updated user via auth_user_id:', data[0].id);
+      return true;
+    } else {
+      console.warn('⚠️ No user matched by auth_user_id');
+    }
+  }
+
+  // Try by stripe_customer_id
+  if (identifiers.stripeCustomerId) {
+    const { data, error } = await supabase
+      .from('users')
+      .update(updateData)
+      .eq('stripe_customer_id', identifiers.stripeCustomerId)
+      .select('id');
+    if (error) {
+      console.error('❌ Update by stripe_customer_id failed:', error);
+    } else if (data && data.length > 0) {
+      console.log('✅ Updated user via stripe_customer_id:', data[0].id);
+      return true;
+    } else {
+      console.warn('⚠️ No user matched by stripe_customer_id');
+    }
+  }
+
+  return false;
+}
+
 export async function POST(request: NextRequest) {
   try {
     console.log('🚀 Stripe webhook v2 called!');
     console.log('📍 Webhook URL:', request.url);
     console.log('🌍 Environment:', process.env.NODE_ENV);
     console.log('🔑 Webhook secret(s) configured:', endpointSecrets.length);
+    console.log('🗄️ Supabase URL configured:', !!config.supabase.url);
+    console.log('🗄️ Supabase service key set:', !!config.supabase.serviceRoleKey);
     console.log('⏰ Timestamp:', new Date().toISOString());
     console.log(
       '🔗 All headers:',
@@ -218,42 +278,21 @@ export async function POST(request: NextRequest) {
               console.log(`⚠️ Unknown subscription status: ${subscription.status}`);
           }
 
-          // Try by metadata.userId first if present
-          const userIdFromMetadata = subscription.metadata?.userId;
-          if (userIdFromMetadata) {
-            const { error } = await supabase
-              .from('users')
-              .update(updateData)
-              .eq('id', userIdFromMetadata);
-            if (!error) {
-              console.log(`✅ Subscription status updated to: ${subscriptionStatus} (via id)`);
-              break;
-            }
-            console.warn('⚠️ Update by id failed, will try by stripe_customer_id');
-          }
-
-          // Fallback: update by stripe customer id
           const stripeCustomerId =
             typeof subscription.customer === 'string'
               ? subscription.customer
               : (subscription.customer as Stripe.Customer | null)?.id;
-          if (stripeCustomerId) {
-            const { error: fbError } = await supabase
-              .from('users')
-              .update(updateData)
-              .eq('stripe_customer_id', stripeCustomerId as string);
-            if (fbError) {
-              console.error(
-                '❌ Error updating subscription status by stripe_customer_id:',
-                fbError
-              );
-            } else {
-              console.log(
-                `✅ Subscription status updated to: ${subscriptionStatus} (via stripe_customer_id)`
-              );
-            }
+
+          const updated = await updateUserSubscription(updateData, {
+            id: subscription.metadata?.userId || null,
+            authUserId: subscription.metadata?.authUserId || null,
+            stripeCustomerId: stripeCustomerId || null,
+          });
+
+          if (updated) {
+            console.log(`✅ Subscription status updated to: ${subscriptionStatus}`);
           } else {
-            console.error('❌ No stripe customer id available on subscription');
+            console.error('❌ Failed to update any user for subscription.updated');
           }
         }
         break;
@@ -266,40 +305,21 @@ export async function POST(request: NextRequest) {
         {
           const updateData = { subscription_status: 'inactive', is_onboarded: false } as const;
 
-          // Try by user id from metadata first
-          const userIdFromMetadata = deletedSubscription.metadata?.userId;
-          if (userIdFromMetadata) {
-            const { error } = await supabase
-              .from('users')
-              .update(updateData)
-              .eq('id', userIdFromMetadata);
-            if (!error) {
-              console.log('✅ Subscription immediately deactivated (via id)');
-              break;
-            }
-            console.warn('⚠️ Update by id failed, will try by stripe_customer_id');
-          }
-
-          // Fallback: update by stripe customer id
           const stripeCustomerId =
             typeof deletedSubscription.customer === 'string'
               ? deletedSubscription.customer
               : (deletedSubscription.customer as Stripe.Customer | null)?.id;
-          if (stripeCustomerId) {
-            const { error: fbError } = await supabase
-              .from('users')
-              .update(updateData)
-              .eq('stripe_customer_id', stripeCustomerId as string);
-            if (fbError) {
-              console.error(
-                '❌ Error updating subscription to inactive by stripe_customer_id:',
-                fbError
-              );
-            } else {
-              console.log('✅ Subscription immediately deactivated (via stripe_customer_id)');
-            }
+
+          const updated = await updateUserSubscription(updateData, {
+            id: deletedSubscription.metadata?.userId || null,
+            authUserId: deletedSubscription.metadata?.authUserId || null,
+            stripeCustomerId: stripeCustomerId || null,
+          });
+
+          if (updated) {
+            console.log('✅ Subscription immediately deactivated');
           } else {
-            console.error('❌ No stripe customer id available on deleted subscription event');
+            console.error('❌ Failed to update any user for subscription.deleted');
           }
         }
         break;
