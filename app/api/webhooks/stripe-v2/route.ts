@@ -19,14 +19,18 @@ const stripe = new Stripe(config.stripe.secretKey, {
   apiVersion: '2025-07-30.basil',
 });
 
-const endpointSecret = config.stripe.webhookSecret;
+// Support multiple signing secrets (comma-separated) for rotations/multiple endpoints
+const endpointSecrets = (config.stripe.webhookSecret || '')
+  .split(',')
+  .map((s) => s.trim())
+  .filter(Boolean);
 
 export async function POST(request: NextRequest) {
   try {
     console.log('🚀 Stripe webhook v2 called!');
     console.log('📍 Webhook URL:', request.url);
     console.log('🌍 Environment:', process.env.NODE_ENV);
-    console.log('🔑 Webhook secret configured:', !!endpointSecret);
+    console.log('🔑 Webhook secret(s) configured:', endpointSecrets.length);
     console.log('⏰ Timestamp:', new Date().toISOString());
     console.log(
       '🔗 All headers:',
@@ -46,41 +50,48 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'No signature provided' }, { status: 400 });
     }
 
-    if (!endpointSecret) {
+    if (endpointSecrets.length === 0) {
       console.error('Webhook secret not configured');
       return NextResponse.json({ error: 'Webhook secret not configured' }, { status: 500 });
     }
 
-    let event: Stripe.Event;
+    let event: Stripe.Event | null = null;
+    let verificationError: any = null;
 
-    try {
-      // Construct the event with raw body
-      event = stripe.webhooks.constructEvent(body, signature, endpointSecret);
-      console.log('✅ Signature verification successful');
-    } catch (err: any) {
-      console.error('❌ Webhook signature verification failed:', err.message);
+    for (let i = 0; i < endpointSecrets.length; i++) {
+      const secret = endpointSecrets[i];
+      try {
+        event = stripe.webhooks.constructEvent(body, signature as string, secret);
+        console.log(`✅ Signature verification successful with secret index ${i}`);
+        break;
+      } catch (err: any) {
+        verificationError = err;
+        console.warn(`⚠️ Signature verification failed with secret index ${i}:`, err.message);
+      }
+    }
+
+    if (!event) {
+      console.error('❌ Webhook signature verification failed for all configured secrets');
       console.error('Body length:', body.length);
-      console.error('Signature:', signature);
-      console.error('Webhook secret length:', endpointSecret.length);
+      console.error('Signature present:', !!signature);
       console.error('Body sample:', body.substring(0, 100));
-
       return NextResponse.json(
         {
-          error: `Webhook signature verification failed: ${err.message}`,
+          error: `Webhook signature verification failed: ${verificationError?.message || 'Unknown error'}`,
           details: {
             bodyLength: body.length,
             signaturePresent: !!signature,
-            webhookSecretLength: endpointSecret.length,
+            secretsTried: endpointSecrets.length,
           },
         },
         { status: 400 }
       );
     }
 
-    console.log('📨 Received webhook event:', event.type);
+    console.log('📨 Received webhook event:', (event as Stripe.Event).type);
 
     // Handle the event
-    switch (event.type) {
+    switch ((event as Stripe.Event).type) {
       case 'checkout.session.completed':
         const session = event.data.object as Stripe.Checkout.Session;
         console.log('✅ Checkout session completed:', session.id);
