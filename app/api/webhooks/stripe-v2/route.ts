@@ -20,39 +20,28 @@ const stripe = new Stripe(config.stripe.secretKey, {
 });
 
 const endpointSecret = config.stripe.webhookSecret;
-const webhookSecret = config.stripe.webhookSecret;
 
 export async function POST(request: NextRequest) {
   try {
-    console.log('🚀 Stripe webhook called!');
+    console.log('🚀 Stripe webhook v2 called!');
     console.log('📍 Webhook URL:', request.url);
-    console.log('🔗 Headers:', Object.fromEntries(request.headers.entries()));
     console.log('🌍 Environment:', process.env.NODE_ENV);
-    console.log('🔑 Webhook secret configured:', !!webhookSecret);
-    console.log('🔑 Stripe secret configured:', !!config.stripe.secretKey);
+    console.log('🔑 Webhook secret configured:', !!endpointSecret);
     
-    // Get the raw body as a buffer to preserve the exact format
-    const body = await request.arrayBuffer();
-    const bodyString = Buffer.from(body).toString('utf8');
+    // Get raw body as text
+    const body = await request.text();
     const signature = request.headers.get('stripe-signature');
     
-    console.log('📝 Request body length:', bodyString.length);
+    console.log('📝 Request body length:', body.length);
     console.log('🔐 Signature present:', !!signature);
-    console.log('📄 Request body preview:', bodyString.substring(0, 200) + '...');
+    console.log('📄 Request body preview:', body.substring(0, 200) + '...');
 
     if (!signature) {
       console.error('No Stripe signature found');
       return NextResponse.json({ error: 'No signature provided' }, { status: 400 });
     }
 
-    // Handle test signatures for local development
-    if (signature === 'test_signature' || signature === 'invalid_test_signature') {
-      console.log('🧪 Test webhook call detected, simulating payment success');
-      const testSessionId = 'cs_test_' + Math.random().toString(36).substring(7);
-      return NextResponse.json({ received: true, test: true, sessionId: testSessionId });
-    }
-
-    if (!webhookSecret) {
+    if (!endpointSecret) {
       console.error('Webhook secret not configured');
       return NextResponse.json({ error: 'Webhook secret not configured' }, { status: 500 });
     }
@@ -60,35 +49,36 @@ export async function POST(request: NextRequest) {
     let event: Stripe.Event;
 
     try {
-      // Use the raw body buffer for signature verification
+      // Construct the event with raw body
       event = stripe.webhooks.constructEvent(body, signature, endpointSecret);
+      console.log('✅ Signature verification successful');
     } catch (err: any) {
-      console.error('Webhook signature verification failed:', err.message);
-      console.error('Body length:', body.byteLength);
+      console.error('❌ Webhook signature verification failed:', err.message);
+      console.error('Body length:', body.length);
       console.error('Signature:', signature);
-      console.error('Webhook secret length:', endpointSecret?.length || 0);
+      console.error('Webhook secret length:', endpointSecret.length);
+      console.error('Body sample:', body.substring(0, 100));
       
-      // Try with string body as fallback
-      try {
-        console.log('🔄 Trying fallback with string body...');
-        event = stripe.webhooks.constructEvent(bodyString, signature, endpointSecret);
-        console.log('✅ Fallback signature verification succeeded');
-      } catch (fallbackErr: any) {
-        console.error('Fallback signature verification also failed:', fallbackErr.message);
-        return NextResponse.json(
-          { error: `Webhook signature verification failed: ${err.message}` },
-          { status: 400 }
-        );
-      }
+      return NextResponse.json(
+        { 
+          error: `Webhook signature verification failed: ${err.message}`,
+          details: {
+            bodyLength: body.length,
+            signaturePresent: !!signature,
+            webhookSecretLength: endpointSecret.length
+          }
+        },
+        { status: 400 }
+      );
     }
 
-    console.log('Received webhook event:', event.type);
+    console.log('📨 Received webhook event:', event.type);
 
     // Handle the event
     switch (event.type) {
       case 'checkout.session.completed':
         const session = event.data.object as Stripe.Checkout.Session;
-        console.log('Checkout session completed:', session.id);
+        console.log('✅ Checkout session completed:', session.id);
         console.log('Session metadata:', session.metadata);
         console.log('Customer ID:', session.customer);
 
@@ -117,18 +107,9 @@ export async function POST(request: NextRequest) {
 
           if (error) {
             console.error('❌ Error updating user subscription:', error);
-            // Log the error details for debugging
             console.error('User ID from metadata:', session.metadata.userId);
             console.error('Auth User ID from metadata:', session.metadata.authUserId);
             console.error('Customer ID from session:', session.customer);
-
-            // Try to find the user to see what IDs exist
-            const { data: foundUser } = await supabase
-              .from('users')
-              .select('id, auth_user_id, email, subscription_status')
-              .eq('auth_user_id', session.metadata.authUserId || session.metadata.userId)
-              .single();
-            console.error('Found user in database:', foundUser);
           } else {
             console.log('✅ User subscription updated successfully');
             console.log('Updated user ID:', session.metadata.userId);
@@ -142,7 +123,7 @@ export async function POST(request: NextRequest) {
 
       case 'customer.subscription.updated':
         const subscription = event.data.object as Stripe.Subscription;
-        console.log('Subscription updated:', subscription.id);
+        console.log('🔄 Subscription updated:', subscription.id);
         console.log('Subscription status:', subscription.status);
 
         if (subscription.metadata?.userId) {
@@ -152,41 +133,31 @@ export async function POST(request: NextRequest) {
           switch (subscription.status) {
             case 'active':
               subscriptionStatus = 'active';
-              updateData = {
-                subscription_status: subscriptionStatus,
-              };
+              updateData = { subscription_status: subscriptionStatus };
               console.log('✅ Subscription is active');
               break;
 
             case 'past_due':
               subscriptionStatus = 'past_due';
-              updateData = {
-                subscription_status: subscriptionStatus,
-              };
+              updateData = { subscription_status: subscriptionStatus };
               console.log('⚠️ Subscription is past due');
               break;
 
             case 'unpaid':
               subscriptionStatus = 'unpaid';
-              updateData = {
-                subscription_status: subscriptionStatus,
-              };
+              updateData = { subscription_status: subscriptionStatus };
               console.log('❌ Subscription is unpaid');
               break;
 
             case 'canceled':
               subscriptionStatus = 'inactive';
-              updateData = {
-                subscription_status: subscriptionStatus,
-              };
+              updateData = { subscription_status: subscriptionStatus };
               console.log('🛑 Subscription is cancelled (immediate)');
               break;
 
             default:
               subscriptionStatus = 'inactive';
-              updateData = {
-                subscription_status: subscriptionStatus,
-              };
+              updateData = { subscription_status: subscriptionStatus };
               console.log(`⚠️ Unknown subscription status: ${subscription.status}`);
           }
 
@@ -196,7 +167,7 @@ export async function POST(request: NextRequest) {
             .eq('id', subscription.metadata.userId);
 
           if (error) {
-            console.error('Error updating subscription status:', error);
+            console.error('❌ Error updating subscription status:', error);
           } else {
             console.log(`✅ Subscription status updated to: ${subscriptionStatus}`);
           }
@@ -205,7 +176,7 @@ export async function POST(request: NextRequest) {
 
       case 'customer.subscription.deleted':
         const deletedSubscription = event.data.object as Stripe.Subscription;
-        console.log('Subscription deleted:', deletedSubscription.id);
+        console.log('🗑️ Subscription deleted:', deletedSubscription.id);
         console.log('🛑 Immediate cancellation detected');
 
         if (deletedSubscription.metadata?.userId) {
@@ -218,7 +189,7 @@ export async function POST(request: NextRequest) {
             .eq('id', deletedSubscription.metadata.userId);
 
           if (error) {
-            console.error('Error updating subscription status to inactive:', error);
+            console.error('❌ Error updating subscription status to inactive:', error);
           } else {
             console.log('✅ Subscription immediately deactivated');
           }
@@ -226,12 +197,12 @@ export async function POST(request: NextRequest) {
         break;
 
       default:
-        console.log(`Unhandled event type: ${event.type}`);
+        console.log(`ℹ️ Unhandled event type: ${event.type}`);
     }
 
-    return NextResponse.json({ received: true });
+    return NextResponse.json({ received: true, eventType: event.type });
   } catch (error: any) {
-    console.error('Webhook error:', error);
+    console.error('💥 Webhook error:', error);
     return NextResponse.json(
       {
         error: 'Webhook processing failed',
