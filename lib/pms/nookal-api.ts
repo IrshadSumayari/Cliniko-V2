@@ -95,8 +95,6 @@ export class NookalAPI implements PMSApiInterface {
         },
       });
 
-      console.log(`[NOOKAL] Response status: ${response.status}`);
-
       // Update rate limiting based on response headers
       this.updateRateLimiting(response.headers);
 
@@ -295,10 +293,6 @@ export class NookalAPI implements PMSApiInterface {
         lastModified: patient.LastModified || patient.lastModified || patient.last_modified || '',
       }));
 
-      console.log(
-        `[NOOKAL] Mapped patients sample:`,
-        JSON.stringify(mappedPatients.slice(0, 2), null, 2)
-      );
       return mappedPatients;
     } catch (error) {
       console.error(`[NOOKAL] Error fetching patients page ${page}:`, error);

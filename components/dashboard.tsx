@@ -1094,7 +1094,7 @@ const Dashboard = ({ onNavigate }: DashboardProps) => {
                   className="gap-2 h-12 px-6 border-border/60 hover:border-secondary/60 hover:bg-secondary/5"
                 >
                   <Settings className="h-5 w-5" />
-                  Settings
+                  Edit Profile
                 </Button>
                 <Button
                   variant="ghost"
@@ -1187,6 +1187,14 @@ const Dashboard = ({ onNavigate }: DashboardProps) => {
                     <Plus className="h-5 w-5" />
                     Add Patient
                   </Button> */}
+                  <Button variant="outline">
+                    <a
+                      href="mailto:ryan@ryflow.com.au"
+                      className="block text-sm  hover:text-primary "
+                    >
+                      Contact Support
+                    </a>
+                  </Button>
                   <Button
                     variant="outline"
                     size="lg"
@@ -1481,17 +1489,20 @@ const Dashboard = ({ onNavigate }: DashboardProps) => {
         <div className="container mx-auto px-8">
           <div className="text-center">
             <p className="text-xs text-muted-foreground leading-relaxed max-w-4xl mx-auto">
-              <strong>Medical Disclaimer:</strong> MyPhysioFlow is an administrative support tool. It does not provide medical advice or replace professional clinical judgment. Clinics are responsible for ensuring patient data accuracy, obtaining patient consent, and meeting Medicare/WorkCover/NDIS obligations.
+              <strong>Medical Disclaimer:</strong> MyPhysioFlow is an administrative support tool.
+              It does not provide medical advice or replace professional clinical judgment. Clinics
+              are responsible for ensuring patient data accuracy, obtaining patient consent, and
+              meeting Medicare/WorkCover/NDIS obligations.
             </p>
             <div className="flex justify-center gap-6 mt-4 text-xs">
-              <a 
-                href="/terms-of-service" 
+              <a
+                href="/terms-of-service"
                 className="text-muted-foreground hover:text-primary transition-colors"
               >
                 Terms of Service
               </a>
-              <a 
-                href="/privacy-policy" 
+              <a
+                href="/privacy-policy"
                 className="text-muted-foreground hover:text-primary transition-colors"
               >
                 Privacy Policy

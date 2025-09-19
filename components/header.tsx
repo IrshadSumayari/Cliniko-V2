@@ -69,7 +69,7 @@ const Header = ({ onLogin, onSignup }: HeaderProps) => {
           </div>
 
           {/* Right Section - Actions */}
-          <div className="flex items-center gap-3">
+          <div className="flex items-center  justify-end gap-3">
             {/* Support Link */}
             {/* <a
               href="#support"
