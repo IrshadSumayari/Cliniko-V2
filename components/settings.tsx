@@ -522,7 +522,7 @@ const Settings = ({ onBack }: { onBack: () => void }) => {
         </div>
 
         {/* Subscription Card - Full Width at Bottom */}
-        <div className="mt-8">
+        {/* <div className="mt-8">
           {subscriptionStatus.plan === 'Professional' ||
           profile.subscription_status === 'active' ? (
             <Card className="border-green-200 bg-green-50">
@@ -586,7 +586,7 @@ const Settings = ({ onBack }: { onBack: () => void }) => {
               </CardContent>
             </Card>
           )}
-        </div>
+        </div> */}
 
         {/* Unsubscribe Section - Only show for active subscribers */}
         {(subscriptionStatus.plan === 'Professional' ||

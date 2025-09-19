@@ -24,14 +24,6 @@ const Header = ({ onLogin, onSignup }: HeaderProps) => {
         <div className="grid grid-cols-3 items-center">
           {/* Left Section - Navigation */}
           <div className="flex items-center gap-4">
-            {/* Mobile Logo - shown when desktop nav is hidden */}
-            <div className="lg:hidden flex items-center gap-2">
-              <div className="w-8 h-8 bg-gradient-to-br from-primary to-primary/80 rounded-lg flex items-center justify-center shadow-md">
-                <span className="text-white font-bold text-sm">M</span>
-              </div>
-              <span className="text-lg font-bold text-foreground">MyPhysioFlow</span>
-            </div>
-
             {/* Desktop Navigation */}
             <nav className="hidden lg:flex items-center gap-1">
               <a
@@ -77,7 +69,7 @@ const Header = ({ onLogin, onSignup }: HeaderProps) => {
           </div>
 
           {/* Right Section - Actions */}
-          <div className="flex items-center gap-3">
+          <div className="flex items-center  justify-end gap-3">
             {/* Support Link */}
             {/* <a
               href="#support"
@@ -166,13 +158,13 @@ const Header = ({ onLogin, onSignup }: HeaderProps) => {
                 >
                   FAQ
                 </a>
-                <a
+                {/* <a
                   href="#support"
                   className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors px-3 py-2 rounded-lg hover:bg-muted/50"
                   onClick={() => setIsMobileMenuOpen(false)}
                 >
                   Support
-                </a>
+                </a> */}
               </nav>
 
               {/* Mobile Theme Toggle & Auth Buttons */}

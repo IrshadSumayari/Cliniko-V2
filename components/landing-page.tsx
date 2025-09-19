@@ -181,14 +181,13 @@ const LandingPage = ({ onGetStarted, onLogin, onSignup }: LandingPageProps) => {
               {/* Main Headline */}
               <div className="animate-fade-in mb-8">
                 <h1 className="text-4xl lg:text-5xl xl:text-6xl font-bold leading-tight">
-                  <span className="text-foreground">Never Miss an</span>
+                  <span className="text-foreground">Stay On Top of Every EPC &</span>
                   <br />
-                  <span className="text-primary">EPC or WorkCover</span>
+                  <span className="text-primary"> WorkCover Patient</span>
                   <br />
-                  <span className="text-foreground">Renewal Again</span>
+                  <span className="text-foreground">Without the Stress</span>
                 </h1>
               </div>
-
               {/* Loss Statement */}
               <div className="animate-fade-in delay-200 mb-8">
                 <div className="inline-flex items-center gap-3 bg-destructive/10 rounded-lg px-6 py-3 mb-6">
@@ -200,7 +199,6 @@ const LandingPage = ({ onGetStarted, onLogin, onSignup }: LandingPageProps) => {
                   </span>
                 </div>
               </div>
-
               {/* Key Benefits */}
               <div className="animate-fade-in delay-300 mb-10">
                 <p className="text-lg text-muted-foreground mb-6">
@@ -253,7 +251,6 @@ const LandingPage = ({ onGetStarted, onLogin, onSignup }: LandingPageProps) => {
                   </div>
                 </div>
               </div>
-
               {/* CTA */}
               <div className="animate-fade-in delay-400">
                 <p className="text-muted-foreground mb-6">
@@ -1010,13 +1007,13 @@ const LandingPage = ({ onGetStarted, onLogin, onSignup }: LandingPageProps) => {
               <h3 className="font-semibold text-foreground mb-4">Support</h3>
               <div className="space-y-2">
                 <a
-                  href="mailto:support@myphysioflow.com.au"
+                  href="mailto:ryan@ryflow.com.au"
                   className="block text-sm text-muted-foreground hover:text-primary transition-colors"
                 >
                   Contact Support
                 </a>
                 <a
-                  href="mailto:privacy@myphysioflow.com.au"
+                  href="mailto:ryan@ryflow.com.au"
                   className="block text-sm text-muted-foreground hover:text-primary transition-colors"
                 >
                   Privacy Officer

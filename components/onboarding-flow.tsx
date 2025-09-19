@@ -72,11 +72,6 @@ export default function OnboardingFlow() {
     apiKey: '',
   });
   const [showOtherPopup, setShowOtherPopup] = useState(false);
-  const [otherPMSData, setOtherPMSData] = useState({
-    softwareName: '',
-    phoneNumber: '',
-  });
-  const [phoneError, setPhoneError] = useState('');
   const [syncResults, setSyncResults] = useState<SyncResults>({
     wcPatients: 0,
     epcPatients: 0,
@@ -140,16 +135,6 @@ export default function OnboardingFlow() {
     fetchUserTags();
   }, [getAccessToken]);
 
-  const validatePhoneNumber = (phone: string): boolean => {
-    // Basic phone number validation - allow various formats
-    const phonePattern = /^[\+]?[\d\s\-\(\)]{10,}$/;
-    if (!phonePattern.test(phone)) {
-      setPhoneError('Please enter a valid phone number (at least 10 digits)');
-      return false;
-    }
-    setPhoneError('');
-    return true;
-  };
 
   const handlePMSSelect = (pms: string) => {
     if (pms === 'Other') {
@@ -159,69 +144,8 @@ export default function OnboardingFlow() {
     }
   };
 
-  const handleOtherPMSSubmit = async () => {
-    if (!otherPMSData.softwareName.trim() || !otherPMSData.phoneNumber.trim()) {
-      toast.error('Please fill in both software name and phone number');
-      return;
-    }
-
-    // Validate phone number
-    if (!validatePhoneNumber(otherPMSData.phoneNumber)) {
-      return;
-    }
-
-    try {
-      setIsProcessing(true);
-
-      // Get the access token from auth context
-      const token = getAccessToken();
-      if (!token) {
-        toast.error('Authentication token not found. Please try logging in again.');
-        return;
-      }
-
-      // Send the custom PMS setup request using direct fetch with manual headers
-      const response = await fetch('/api/pms/pms-request', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify({
-          softwareName: otherPMSData.softwareName,
-          phoneNumber: otherPMSData.phoneNumber,
-        }),
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || 'Failed to submit request');
-      }
-
-      const result = await response.json();
-
-      toast.success(result.message || 'Custom PMS integration request submitted successfully!');
-
-      // Close popup and skip to completion
-      setShowOtherPopup(false);
-      setOtherPMSData({ softwareName: '', phoneNumber: '' });
-
-      // Skip the normal flow and go to a completion step
-      setCurrentStep('tag-complete');
-    } catch (error) {
-      console.error('Error submitting custom PMS request:', error);
-      toast.error(
-        error instanceof Error ? error.message : 'Failed to submit request. Please try again.'
-      );
-    } finally {
-      setIsProcessing(false);
-    }
-  };
-
   const handleOtherPMSCancel = () => {
     setShowOtherPopup(false);
-    setOtherPMSData({ softwareName: '', phoneNumber: '' });
-    setPhoneError('');
   };
 
   const resetSyncProgress = () => {
@@ -1397,74 +1321,29 @@ export default function OnboardingFlow() {
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <Settings className="h-5 w-5" />
-              Manual Setup Required
+              Book Your Setup Call
             </DialogTitle>
           </DialogHeader>
 
           <div className="space-y-6">
             <div className="text-center">
-              <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-blue-100 dark:bg-blue-900/20 flex items-center justify-center">
-                <Settings className="h-8 w-8 text-blue-600" />
+              <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-green-100 dark:bg-green-900/20 flex items-center justify-center">
+                <Clock className="h-8 w-8 text-green-600" />
               </div>
               <h3 className="text-lg font-semibold mb-2">Custom Practice Management Software</h3>
               <p className="text-sm text-muted-foreground">
-                Our team will reach out to you to set up your custom integration within 3 hours for
-                the same price. Please provide your software details below.
+                Book a quick setup call and tutorial for absolutely free! We'll help you integrate your custom software.
               </p>
             </div>
 
-            <div className="space-y-4">
-              <div>
-                <label className="text-sm font-medium mb-2 block">Management Software Name</label>
-                <Input
-                  placeholder="e.g., MyClinic Pro, PracticeMax, etc."
-                  value={otherPMSData.softwareName}
-                  onChange={(e) =>
-                    setOtherPMSData({ ...otherPMSData, softwareName: e.target.value })
-                  }
-                />
-              </div>
-
-              <div>
-                <label className="text-sm font-medium mb-2 block">Phone Number</label>
-                <Input
-                  type="tel"
-                  placeholder="+1 (555) 123-4567"
-                  value={otherPMSData.phoneNumber}
-                  onChange={(e) => {
-                    const phone = e.target.value;
-                    setOtherPMSData({ ...otherPMSData, phoneNumber: phone });
-                    // Clear error when user starts typing
-                    if (phoneError) {
-                      setPhoneError('');
-                    }
-                  }}
-                  onBlur={(e) => {
-                    // Validate on blur if there's a value
-                    if (e.target.value.trim()) {
-                      validatePhoneNumber(e.target.value);
-                    }
-                  }}
-                  className={`text-sm ${phoneError ? 'border-red-500 focus:border-red-500' : ''}`}
-                />
-                {phoneError ? (
-                  <p className="text-xs text-red-500 mt-1">{phoneError}</p>
-                ) : (
-                  <p className="text-xs text-muted-foreground mt-1">
-                    We'll call you to discuss the integration details
-                  </p>
-                )}
-              </div>
-            </div>
-
-            <div className="bg-blue-50 dark:bg-blue-950/20 p-4 rounded-lg">
-              <h4 className="font-medium text-sm mb-2">What happens next?</h4>
+            <div className="bg-green-50 dark:bg-green-950/20 p-4 rounded-lg">
+              <h4 className="font-medium text-sm mb-2">What's included in your free call?</h4>
               <ul className="text-xs text-muted-foreground space-y-1">
-                <li>• Our team will review your software details</li>
-                <li>• We'll call you within 3 hours to discuss the integration process</li>
-                <li>• We'll create a custom integration for your software at the same price</li>
-                <li>• You'll receive an email confirmation once ready</li>
-                <li>• Your dashboard will be set up automatically</li>
+                <li>• Complete setup and integration walkthrough</li>
+                <li>• Custom software configuration assistance</li>
+                <li>• Live tutorial on using your dashboard</li>
+                <li>• Direct support from our integration team</li>
+                <li>• No cost - completely free service</li>
               </ul>
             </div>
 
@@ -1473,26 +1352,14 @@ export default function OnboardingFlow() {
                 Cancel
               </Button>
               <Button
-                onClick={handleOtherPMSSubmit}
-                className="flex-1"
-                disabled={
-                  !otherPMSData.softwareName.trim() ||
-                  !otherPMSData.phoneNumber.trim() ||
-                  !!phoneError ||
-                  isProcessing
-                }
+                onClick={() => {
+                  window.open('https://calendly.com/ryan-ryflow/myphysioflow-setup-walkthrough', '_blank');
+                  setShowOtherPopup(false);
+                }}
+                className="flex-1 bg-green-600 hover:bg-green-700"
               >
-                {isProcessing ? (
-                  <>
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    Submitting...
-                  </>
-                ) : (
-                  <>
-                    Submit Request
-                    <ArrowRight className="ml-2 h-4 w-4" />
-                  </>
-                )}
+                <ExternalLink className="mr-2 h-4 w-4" />
+                Book Setup Call
               </Button>
             </div>
           </div>
